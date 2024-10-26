@@ -44,6 +44,8 @@ import sys
 import typing as T
 
 
+# TODO(matt): add decorator support for functions and classes
+# T0DO(matt): annotate global constatnts
 class LineAnnotator(ast.NodeVisitor):
     def __init__(self, code):
         self.code = code.splitlines()  # Split code into individual lines
@@ -71,6 +73,7 @@ class LineAnnotator(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_FunctionDef(self, node):
+        print(f"decorators = {[(n.attr, n.value, n.lineno, n.end_lineno) for n in  node.decorator_list]}")
         self.annotate_lines(node, [f"function:{node.name}"])
         self.generic_visit(node)
 
