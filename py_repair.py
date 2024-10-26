@@ -44,7 +44,6 @@ import sys
 import typing as T
 
 
-# TODO(matt): add decorator support for functions and classes
 # T0DO(matt): annotate global constatnts
 class LineAnnotator(ast.NodeVisitor):
     def __init__(self, code):

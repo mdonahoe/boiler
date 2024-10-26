@@ -3,9 +3,6 @@ import unittest
 from py_repair import filter_code, LineAnnotator
 
 
-# TODO(matt): make this file run on save of py_repair.py or itself.
-
-
 class PyRepairTest(unittest.TestCase):
     def test_annotations(self):
         """
