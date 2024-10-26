@@ -19,6 +19,16 @@ def bar():
     def baz():
         pass
     return 1
+
+@dataclass
+class Dog:
+    "man's best friend"
+    name: str
+    age: int
+
+    @verb
+    def bark(self) -> str:
+        return "woof"
 """
         annotator = LineAnnotator(code)
         annotations = annotator.annotate()
@@ -34,6 +44,17 @@ def bar():
             [['function:bar'], ['function:baz']], # function body and another function def
             [['function:bar'], ['function:baz']], # function body and another function body
             [['function:bar']], # function body and another function body
+            [], # blank line
+            [['class:Dog', 'decorator:dataclass']],
+            [['class:Dog']],
+            [['class:Dog']],
+            [['class:Dog']],
+            [['class:Dog']],
+            [['class:Dog']],
+            [['class:Dog'], ['function:bark', 'decorator:verb']],
+            [['class:Dog'], ['function:bark']],
+            [['class:Dog'], ['function:bark']],
+
         ]
         self.assertEqual(expected, annotations)
 
