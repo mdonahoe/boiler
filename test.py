@@ -9,10 +9,11 @@ from py_repair import filter_code, LineAnnotator
 class PyRepairTest(unittest.TestCase):
     def test_annotations(self):
         code = """
-import foo
+import some_package
 # define X
 X = 1
-@foo.whatever
+@some_package.a_decorator
+@another
 def bar():
     y = 1
     def baz():
@@ -23,10 +24,11 @@ def bar():
         annotations = annotator.annotate()
         expected = [
             [], # blank line
-            [['import:foo']],  # import
+            [['import:some_package']],  # import
             [], # comment
             [], # variable def
-            [['function:bar']],  # decorator
+            [['function:bar', "decorator:some_package.a_decorator"]],  # attr decorator
+            [['function:bar', "decorator:another"]],  # simple decorator
             [['function:bar']], # function signature
             [['function:bar']], # function body, y = 1
             [['function:bar'], ['function:baz']], # function body and another function def

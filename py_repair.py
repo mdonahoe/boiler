@@ -73,8 +73,20 @@ class LineAnnotator(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_FunctionDef(self, node):
-        print(f"decorators = {[(n.attr, n.value, n.lineno, n.end_lineno) for n in  node.decorator_list]}")
+        def get_name(n):
+            print(f"get_name({n}) = {type(n)}")
+            if hasattr(n, "attr"):
+                print(f"attr decorator= {(type(n), n.attr, n.value.id, n.lineno, n.end_lineno)}")
+                # this is an attribute
+                return get_name(n.value) + "." + n.attr
+            else:
+                print(f"other decorator= {(type(n), dir(n), n.lineno, n.end_lineno)}")
+                return n.id
+
         self.annotate_lines(node, [f"function:{node.name}"])
+        for decorator in node.decorator_list:
+            name = get_name(decorator)
+            self.annotate_lines(decorator, [f"function:{node.name}", f"decorator:{name}"])
         self.generic_visit(node)
 
     def visit_ClassDef(self, node):
