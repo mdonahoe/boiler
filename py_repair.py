@@ -65,10 +65,19 @@ class LineAnnotator(ast.NodeVisitor):
     # TODO(matt): handle import aliases, with `import typing as T`
 
     def visit_Import(self, node):
-        self.annotate_lines(node, [f"import:{n.name}" for n in node.names])
+        first = node.names[0]
+        print(f"import {first.name} as {first.asname}")
+        labels = []
+        for name in node.names:
+            if name.asname is not None:
+                labels.append(f"import:{name.name} as {name.asname}")
+            else:
+                labels.append(f"import:{name.name}")
+        self.annotate_lines(node, labels)
         self.generic_visit(node)
 
     def visit_ImportFrom(self, node):
+        print(f"from import {dir(node)}")
         self.annotate_lines(node, [f"import:{n.name}" for n in node.names])
         self.generic_visit(node)
 

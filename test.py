@@ -3,13 +3,17 @@ import unittest
 from py_repair import filter_code, LineAnnotator
 
 
-# TODO(matt): make this file run on save of py_repair.py
+# TODO(matt): make this file run on save of py_repair.py or itself.
 
 
 class PyRepairTest(unittest.TestCase):
     def test_annotations(self):
+        """
+        Ensure a complicated example has expected line annotations
+        """
         code = """
 import some_package
+import typing as T
 # define X
 X = 1
 @some_package.a_decorator
@@ -35,6 +39,7 @@ class Dog:
         expected = [
             [], # blank line
             [['import:some_package']],  # import
+            [['import:typing as T']],  # import
             [], # comment
             [], # variable def
             [['function:bar', "decorator:some_package.a_decorator"]],  # attr decorator
@@ -59,39 +64,47 @@ class Dog:
         self.assertEqual(expected, annotations)
 
     def test_empty_patterns(self):
-        code = """
+        """
+        We should filter out all classes, functions and imports if no patterns are given
+        """
+        code = """# start
 import foo
 # define X
 X = 1
 @foo.whatever
 def bar():
     return 1
-"""
+# end"""
         output = "\n".join(filter_code(code, set(), verbose=True))
-        expected = """
+        expected = """# start
 # define X
 X = 1
-"""
+# end"""
         self.assertMultiLineEqual(expected, output)
 
     def test_decorators(self):
-        code = """
-import foo
+        """
+        classes, functions and methods should be correctly decorated
+        """
+        code = """# start
 X = 1
-@foo.whatever
+@foo
 def bar():
     return 1
-"""
-        lines = filter_code(code, {"foo", "bar"}, verbose=True)
+# end"""
+        lines = filter_code(code, {".*foo", ".*bar"}, verbose=True)
         output = "\n".join(lines)
         self.assertMultiLineEqual(code, output)
 
     def test_import_alias(self):
+        """
+        import lines should be included if their 'asname' matches a pattern
+        """
         code = \
-"""# imports
+"""# start
 import typing as T
-"""
-        lines = filter_code(code, {"T"}, verbose=True)
+# end"""
+        lines = filter_code(code, {".*T"}, verbose=True)
         output = "\n".join(lines)
         self.assertMultiLineEqual(code, output)
 
