@@ -1,27 +1,77 @@
+import argparse
+import dataclasses
 import os
 import subprocess
 import re
+import shutil
 import sys
+import typing as T
+
+import py_repair
 
 """
-there seems to be an issue where python files that aren't necessary are still being
-restored to git.
+git branch "boiling"
+cp .git/index .git/boil.index
+GIT_INDEX_FILE=.git/boil.index git add .boil hil/
+GIT_INDEX_FILE=.git/boil.index git write-tree
+git commit-tree 9cb6a377da0c7931ac1a112db026bbab67a6631e -p HEAD -m 'first boil: unhandled error'
+git update-ref refs/heads/boiling becd92e6fb329986a153070791e36a294874605d
 
-examples:
-    auth_utils.py
-
-also something weird is going on with client.py
-but i think it might have to do with the PYTHON_PATH when running them standalone.
+Also useful to reset the working directory to a particular tree state, without touching index
+git restore --source boiling -- .
 """
 
-# The commands you want to test
-commands = [
-    "python3 runtest.py".split(),
-]
+BOILING_BRANCH = "boiling"
 
 
-def run_command(command):
-    """Run a shell command and return its output and error."""
+def save_changes(parent: str, message: str, branch_name: T.Optional[str] = None) -> str:
+    """
+    Commit the current working directory, relative to a parent.
+    Also update a branch, if given.
+
+    Returns the created commit hash.
+    """
+    index_file = ".git/boil.index"
+    shutil.copyfile(".git/index", index_file)
+    env = os.environ.copy()
+    env["GIT_INDEX_FILE"] = index_file
+    if os.path.isdir(".boil"):
+        subprocess.check_call(["git", "add", ".boil"], env=env)
+    subprocess.check_call(["git", "add", "-u"], env=env)
+    tree = subprocess.check_output(["git", "write-tree"], env=env, text=True).strip()
+    commit = subprocess.check_output(
+        ["git", "commit-tree", tree, "-p", parent, "-m", message], env=env, text=True
+    ).strip()
+    if branch_name:
+        subprocess.check_call(
+            ["git", "update-ref", f"refs/heads/{branch_name}", commit]
+        )
+    return commit
+
+
+@dataclasses.dataclass
+class Session:
+    """
+    Common properties of the current boiling invocation
+    """
+
+    key: str
+    git_ref: str
+    iteration: int
+    command: T.List[str]
+
+
+CURRENT_SESSION = Session("", "", 0, [])
+
+
+def ctx() -> Session:
+    return CURRENT_SESSION
+
+
+def run_command(command: T.List[str]) -> T.Tuple[str, str, int]:
+    """
+    Run a shell command and return its output, error and exit code.
+    """
     print(f"Running: {' '.join(command)}")
     try:
         result = subprocess.run(
@@ -32,9 +82,9 @@ def run_command(command):
         return "", str(e), -1
 
 
-def git_checkout(file_path):
+def git_checkout(file_path: str, ref: str = "HEAD") -> bool:
     """Run git checkout for the given file path."""
-    deleted_files = set(get_deleted_files())
+    deleted_files = set(get_deleted_files(ref=ref))
     if file_path not in deleted_files:
         print("missing", file_path)
         return False
@@ -44,7 +94,7 @@ def git_checkout(file_path):
         print("repairing checkout", file_path)
         return do_repair(file_path)
 
-    command = ["git", "checkout", file_path]
+    command = ["git", "checkout", ref, "--", file_path]
     stdout, stderr, code = run_command(command)
     if code != 0:
         print("stdout:", stdout)
@@ -55,36 +105,40 @@ def git_checkout(file_path):
     return success
 
 
-def get_python_file_path(module_name):
+def get_python_file_path(module_name: str) -> str:
     """Convert a Python module name to a file path."""
     return module_name.replace(".", "/") + ".py"
 
 
-def get_python_init_path(module_name):
+def get_python_init_path(module_name: str) -> str:
     """Convert a Python module name to a __init__.py path."""
     return module_name.replace(".", "/") + "/__init__.py"
 
 
-def get_deleted_files():
+def get_deleted_files(ref: str = "HEAD") -> T.Set[str]:
     """Get the list of deleted files from `git status`."""
     result = subprocess.run(
-        ["git", "status", "--porcelain"], stdout=subprocess.PIPE, text=True
+        ["git", "diff", "--name-status", ref], stdout=subprocess.PIPE, text=True
     )
     # TODO: what if result fails?
     return set(
-        line.split()[-1] for line in result.stdout.splitlines() if line.startswith(" D")
+        line.split()[-1] for line in result.stdout.splitlines() if line.startswith("D")
     )
 
 
-def restore_missing_file(missing_file):
+def restore_missing_file(missing_file: str, ref: T.Optional[str] = None) -> bool:
+    """
+    Restore a missing_file to disk, inferring the file path based on git diff since provided ref.
+    """
+    ref = ref or ctx().git_ref
     # Convert the absolute path to a relative path (assuming your repo's root is in your current working directory)
     if " " in missing_file:
         raise ValueError(missing_file)
     relative_path = os.path.relpath(missing_file)
-    deleted_files = get_deleted_files()
+    deleted_files = get_deleted_files(ref=ref)
 
     if relative_path in deleted_files:
-        if git_checkout(relative_path):
+        if git_checkout(relative_path, ref=ref):
             return True
         print(f"Did not restore {relative_path}, looking for alternatives")
     else:
@@ -130,10 +184,12 @@ def restore_missing_file(missing_file):
 
 def handle_no_such_file_or_directory(stderr: str) -> bool:
     """Handle the case where a missing executable or file is reported."""
-    match = re.search(r"([^\s]+): No such file or directory", stderr)
+    match = re.search(r"([^\s]+): (\[Errno \d\])? No such file or directory", stderr)
 
     if not match:
+        print("failed to match")
         return False
+    print(match)
     missing_file = match.group(1).strip()
     print(f"Missing file or executable: {missing_file}")
 
@@ -141,7 +197,10 @@ def handle_no_such_file_or_directory(stderr: str) -> bool:
     return restore_missing_file(missing_file)
 
 
-def parse_traceback(traceback_text):
+def parse_traceback(traceback_text: str) -> T.Tuple[T.Optional[str], T.Optional[str]]:
+    """
+    Look for NameErrors in a python traceback and return (file, name).
+    """
     # Regular expression to find the file path and line number
     file_line_regex = re.compile(r'  File "(?P<file>.*?)", line (?P<line>\d+), in ')
 
@@ -172,7 +231,10 @@ def parse_traceback(traceback_text):
     return None, None
 
 
-def parse_import_error(error_message: str) -> bool:
+def parse_import_error(error_message: str) -> T.Tuple[T.Optional[str], T.Optional[str]]:
+    """
+    Read a traceback and look for import errors, return (file, import name).
+    """
     # Regular expression to find the import error details
     import_error_regex = re.compile(
         r"ImportError: cannot import name '(?P<name>\w+)' from '(?P<module>[\w\.]+)' \((?P<file>.*?)\)"
@@ -191,6 +253,9 @@ def parse_import_error(error_message: str) -> bool:
 
 
 def handle_name_error(stderr: str) -> bool:
+    """
+    Fix a NameError
+    """
     # regex to find the filename and the name causing the NameError
     filepath, name = parse_traceback(stderr)
     if filepath is None:
@@ -246,6 +311,17 @@ def handle_missing_pyc(stderr: str) -> bool:
     if not match:
         return False
     missing_file = match.group(1).replace(".pyc", ".py")  # Convert .pyc to .py
+    print(f"Missing file: {missing_file}")
+    return restore_missing_file(missing_file)
+
+
+def handle_missing_file(stderr: str) -> bool:
+    """Handle the case where bash complains that a Python file is missing."""
+    missing_file_error_pattern = re.compile(r"can't open file '(.+)'")
+    match = missing_file_error_pattern.search(stderr)
+    if not match:
+        return False
+    missing_file = match.group(1)
     print(f"Missing file: {missing_file}")
     return restore_missing_file(missing_file)
 
@@ -311,7 +387,7 @@ def handle_missing_py_module(stderr: str) -> bool:
     return False
 
 
-def handle_import_error(stderr: str) -> bool:
+def handle_import_error1(stderr: str) -> bool:
     """Handle the case where a Python import fails, including cases where a name cannot be imported."""
     # Match the error where the import fails due to a missing name in the module
     match = re.search(
@@ -364,15 +440,21 @@ def handle_import_name_error(err: str) -> bool:
     return do_repair(package_path)
 
 
-def do_repair(file_path, missing=None):
-    cmd = ["python3", "py_repair.py", file_path]
-    if missing:
-        cmd.extend(["--missing", missing])
-    print("repairing:", cmd)
+def do_repair(
+    file_path: str, missing: T.Optional[str] = None, ref: T.Optional[str] = None
+) -> bool:
+    print("repair --missing {missing} {file_path}")
     try:
-        subprocess.check_call(cmd)
+        py_repair.repair(
+            filename=file_path,
+            commit=ref or ctx().git_ref,
+            missing=missing,
+            verbose=False,
+        )
         return True
-    except subprocess.CalledProcessError:
+    except Exception:
+        print(f"failed to repair {file_path} with {missing=}")
+        sys.exit(1)
         return False
 
 
@@ -436,51 +518,119 @@ def handle_ansible_variable(stderr: str) -> bool:
         return False
     var = match.group(1)
     # Search for the undefined variable in each deleted file
-    deleted_files = get_deleted_files()
-    for file in deleted_files:
-        print(f"Searching for '{var}' in {file}...")
+    ref = ctx().git_ref
+    deleted_files = get_deleted_files(ref=ref)
+    for deleted_file in deleted_files:
+        print(f"Searching for '{var}' in {deleted_file}...")
         try:
             show_result = subprocess.run(
-                ["git", "show", f":{file}"],
+                ["git", "show", f"{ref}:{deleted_file}"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
             )
             if var in show_result.stdout:
-                print(f"Found '{var}' in {file}. Attempting to restore...")
-                return restore_missing_file(file)
+                print(f"Found '{var}' in {deleted_file}. Attempting to restore...")
+                return restore_missing_file(deleted_file)
         except subprocess.CalledProcessError:
-            print(f"Error while processing file {file}")
+            print(f"Error while processing file {deleted_file}")
         except UnicodeDecodeError:
-            print(f"Error reading file {file}")
+            print(f"Error reading file {deleted_file}")
 
     print(f"Variable '{var}' not found in any deleted files.")
     return False
 
 
+def extract_mypy_names(error_message: str) -> T.Dict[str, T.Set[str]]:
+    """
+    Extracts quoted names and their associated filenames from mypy error messages.
+    """
+    pattern = r'(.+?):\d+: error: Name "(.*?)" is not defined  \[name-defined\]'
+    files_missing_names: T.Dict[str, T.Set[str]] = {}
+    for path, name in re.findall(pattern, error_message):
+        if path not in files_missing_names:
+            files_missing_names[path] = set()
+        files_missing_names[path].add(name)
+    return files_missing_names
+
+
+def handle_mypy_errors(stdout: str) -> bool:
+    """
+    Attempt to fix every [name-defined] error that mypy reports.
+    """
+    files_with_errors = extract_mypy_names(stdout)
+    if not files_with_errors:
+        return False
+
+    for filepath, names in files_with_errors.items():
+        for name in names:
+            success = do_repair(filepath, missing=name)
+            if not success:
+                # TODO
+                raise RuntimeError(name)
+    return True
+
+
 HANDLERS = [
+    handle_mypy_errors,
     handle_name_error,
-    # handle_global_name_error,
     handle_attribute_error,
     handle_import_error2,
     handle_missing_pyc,
     handle_executable_not_found,
     handle_missing_py_module,
     handle_missing_py_package,
-    handle_import_error,
+    handle_import_error1,
     handle_import_name_error,
     handle_ansible_file_not_found,
     handle_ansible_variable,
     handle_file_not_found,
     handle_no_such_file_or_directory,
+    handle_missing_file,
 ]
 
 
-def fix(command):
-    n = 1
+def fix(command: T.List[str], num_iterations: int) -> bool:
+    """
+    Repeatedly run a command, repairing files until it is fixed.
+    """
+    # create branches at the current location
+    ref = ctx().git_ref
+    ancestor_check = subprocess.call(
+        ["git", "merge-base", "--is-ancestor", ref, BOILING_BRANCH]
+    )
+    if ancestor_check == 1:
+        print("existing boiling session is stale. Deleting")
+        subprocess.call(["git", "branch", "-D", BOILING_BRANCH])
+        # Also delete the boil directory
+        os.system("rm -rf .boil")
+    elif ancestor_check == 128:
+        # branch doesn't exist
+        pass
+    elif ancestor_check == 0:
+        # branch exists and is a ancestor of HEAD. proceed.
+        pass
+    else:
+        raise ValueError("f{ancestor_check=}")
+
+    subprocess.call(["git", "branch", BOILING_BRANCH])
+
+    start_commit = BOILING_BRANCH
+
+    # add the current working directory to boil-start
+    boil_commit = save_changes(
+        parent=start_commit,
+        message=f"boil_start\n\n{' '.join(command)}",
+        branch_name=BOILING_BRANCH,
+    )
+
+    # load the iteration number from the .boil dir
+    os.makedirs(".boil", exist_ok=True)
+    n = len(os.listdir(".boil"))
+
     while True:
-        print(f"Attempt {n}")
         n += 1
+        print(f"Attempt {n}")
         # Run the main command
         stdout, stderr, code = run_command(command)
         if code == 0:
@@ -499,23 +649,70 @@ def fix(command):
         print(stdout)
         print(stderr)
         err = stdout + stderr
+        with open(f".boil/iter{n}.{code}.out", "w") as out:
+            out.write(err)
+
+        exit = False
         for handler in HANDLERS:
+            if handler(err):
+                message = f"fixed with {handler}"
+                break
+        else:
+            message = "failed to handle this type of error"
+            exit = True
+
+        boil_commit = save_changes(
+            parent=boil_commit,
+            message=f"boil_{n}\n\n{message}",
+            branch_name=BOILING_BRANCH,
+        )
+
+        if num_iterations is not None and n >= num_iterations:
+            print(f"Reached iteration limit {n}")
+            break
+    return False
+
+
+def main() -> int:
+    global CURRENT_SESSION
+    parser = argparse.ArgumentParser(description="Boil your code.")
+    parser.add_argument("-n", type=int, help="number of interations")
+    parser.add_argument("--ref", type=str, default="HEAD", help="a working commit")
+    parser.add_argument(
+        "--handle-error",
+        type=str,
+        default=None,
+        help="path to pre-existing output to analysis",
+    )
+
+    # Use parse_known_args to separate known and unknown arguments
+    args, unknown_args = parser.parse_known_args()
+
+    # Store the remaining arguments as a single command string
+    # TODO(matt): parse leading --dash-commands and complain because they are probs typos.
+    command = unknown_args
+
+    # set the global session
+    CURRENT_SESSION = Session("foo", args.ref, 0, command)
+
+    if args.handle_error:
+        err = open(args.handle_error).read()
+        for i, handler in enumerate(HANDLERS):
+            print(handler)
             if handler(err):
                 print(f"fixed with {handler}")
                 break
         else:
             raise RuntimeError("failed to handle this type of error")
+        return 0
 
-
-def main():
     num_failing = 0
-    for command in commands:
-        print(f"attempting to fix: {command}")
-        success = fix(command)
-        if not success:
-            print(f"failed to fix: {command}")
-            num_failing += 1
-    print(f"finished boiling: {num_failing} errors remaining.")
+    success = fix(command, num_iterations=args.n)
+    if not success:
+        print(f"failed to fix: {command}")
+        num_failing += 1
+    else:
+        print("success")
     return num_failing
 
 

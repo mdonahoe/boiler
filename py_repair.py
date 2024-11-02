@@ -46,55 +46,79 @@ import typing as T
 
 # T0DO(matt): annotate global constatnts
 class LineAnnotator(ast.NodeVisitor):
-    def __init__(self, code):
-        self.code = code.splitlines()  # Split code into individual lines
-        self.annotations = [[] for _ in range(len(self.code))]
+    """
+    Attempt to label every line of code.
+    Currently supports the following:
+    * class
+    * function
+    * decorator
+    * import / alias
 
-    def annotate(self):
+    Each line of code will have a list of labels.
+    """
+
+    def __init__(self, code: str) -> None:
+        self.code: T.List[str] = code.splitlines()  # Split code into individual lines
+        self.annotations: T.List[T.List[str]] = [[] for _ in range(len(self.code))]
+
+    def annotate(self) -> T.List[T.List[str]]:
         tree = ast.parse("\n".join(self.code))
         self.visit(tree)  # Visit each node in the AST
         return self.annotations
 
-    def annotate_lines(self, node, labels):
+    def annotate_lines(self, node: T.Any, labels: T.List[str]) -> None:
         start_line = node.lineno - 1
         end_line = getattr(node, "end_lineno", node.lineno) - 1
         for lineno in range(start_line, end_line + 1):
-            self.annotations[lineno].append(labels)
+            self.annotations[lineno].extend(labels)
 
-    # TODO(matt): handle import aliases, with `import typing as T`
-
-    def visit_Import(self, node):
+    def visit_Import(self, node: T.Any) -> None:
         first = node.names[0]
-        print(f"import {first.name} as {first.asname}")
         labels = []
         for name in node.names:
             if name.asname is not None:
-                labels.append(f"import:{name.name} as {name.asname}")
+                labels.append(f"import:{name.name}")
+                labels.append(f"alias:{name.asname}")
             else:
                 labels.append(f"import:{name.name}")
         self.annotate_lines(node, labels)
         self.generic_visit(node)
 
-    def visit_ImportFrom(self, node):
-        print(f"from import {dir(node)}")
+    def visit_ImportFrom(self, node: T.Any) -> None:
+        # print(f"from import {dir(node)}")
         self.annotate_lines(node, [f"import:{n.name}" for n in node.names])
         self.generic_visit(node)
 
-    def get_decorator_name(self, n):
+    def get_decorator_name(self, n: T.Any) -> str:
         if hasattr(n, "attr"):
-            # this is an attribute
+            # ast.Attribute
             return self.get_decorator_name(n.value) + "." + n.attr
-        else:
+        elif hasattr(n, "id"):
+            # ast.Name
             return n.id
+        elif hasattr(n, "func"):
+            # ast.Call
+            return self.get_decorator_name(n.func)
+        else:
+            print("Unsupported decorator node")
+            print(
+                ", ".join(
+                    f"n.{k} = {getattr(n, k)}" for k in dir(n) if not k.startswith("_")
+                )
+            )
+            # import pdb; pdb.set_trace()
+            raise ValueError(n)
 
-    def visit_FunctionDef(self, node):
+    def visit_FunctionDef(self, node: T.Any) -> None:
         self.annotate_lines(node, [f"function:{node.name}"])
         for decorator in node.decorator_list:
             name = self.get_decorator_name(decorator)
-            self.annotate_lines(decorator, [f"function:{node.name}", f"decorator:{name}"])
+            self.annotate_lines(
+                decorator, [f"function:{node.name}", f"decorator:{name}"]
+            )
         self.generic_visit(node)
 
-    def visit_ClassDef(self, node):
+    def visit_ClassDef(self, node: T.Any) -> None:
         self.annotate_lines(node, [f"class:{node.name}"])
         for decorator in node.decorator_list:
             name = self.get_decorator_name(decorator)
@@ -102,32 +126,10 @@ class LineAnnotator(ast.NodeVisitor):
         self.generic_visit(node)
 
 
-EXAMPLE_PATTERNS = {"function:my_function", "import:path", "class:MyClass"}
-EXAMPLE_CODE = """
-import os
-from sys import (
-    path, argv
-)
-
-def foo(): pass
-
-class MyClass:
-    # this is a comment
-    def my_function(self):
-        "some string"
-        # another comment
-        print("Hello, World!")
-        def inner_func(): pass
-        x = 1
-        return fart
-    VAR = 2
-# cool
-x = 1
-"""
-
-
-def pattern_match(patterns: T.Set[str], labels: T.List[str]) -> bool:
-    """Return True if any label matches any pattern"""
+def pattern_match(
+    patterns: T.Set[str], labels: T.List[str]
+) -> T.Optional[T.Tuple[str, str]]:
+    """Compare a set of regex patterns to a list of labels and return if any match"""
     for label in labels:
         for pattern in patterns:
             if re.match(pattern, label):
@@ -135,15 +137,14 @@ def pattern_match(patterns: T.Set[str], labels: T.List[str]) -> bool:
     return None
 
 
-def get_labels(code):
+def get_labels(code: str) -> T.Set[str]:
     """Return all the annotations in the code"""
     annotator = LineAnnotator(code)
     annotations = annotator.annotate()
     all_labels = set()
     for line_annotations in annotations:
-        for labels in line_annotations:
-            for label in labels:
-                all_labels.add(label)
+        for label in line_annotations:
+            all_labels.add(label)
     return all_labels
 
 
@@ -152,15 +153,15 @@ def _get_relative_path(file_path: str) -> str:
     return os.path.relpath(file_path, current_dir)
 
 
-def get_codes(filename):
+def get_codes(filename: str, commit: str) -> T.Tuple[str, str]:
     """Return the on-disk and git-version of the given file"""
     repo_path = _get_relative_path(filename)
     if os.path.exists(filename):
-        print(f"found {filename}")
+        # print(f"found {filename}")
         with open(filename) as sourcefile:
             index_code = sourcefile.read()
     else:
-        print("no file")
+        print(f"No file: {filename}")
         # restore with git so folders and permissions are correct
         r = subprocess.run(["git", "checkout", repo_path])
         if r.returncode != 0:
@@ -172,8 +173,7 @@ def get_codes(filename):
 
         index_code = ""
 
-    print("relative path: ", repo_path)
-    r = subprocess.run(["git", "show", f":{repo_path}"], capture_output=True)
+    r = subprocess.run(["git", "show", f"{commit}:{repo_path}"], capture_output=True)
     if r.returncode == 0:
         git_code = r.stdout.decode("utf-8")
     else:
@@ -183,52 +183,56 @@ def get_codes(filename):
     return index_code, git_code
 
 
-def filter_code(code, patterns, verbose=False):
+def filter_code(
+    code: str, patterns: T.Set[str], verbose: bool = False
+) -> T.Generator[str, None, None]:
     """Remove lines from code that doesn't match the set of syntactic patterns"""
     annotator = LineAnnotator(code)
     annotations = annotator.annotate()
-    for lineno, (line, annotations) in enumerate(
+    for lineno, (line, labels) in enumerate(
         zip(code.splitlines(), annotations), start=1
     ):
         # include any line without tags.
         include = True
-        match = None
-        for labels in annotations:
+        if not labels:
+            match = None
+            include = True
+        else:
             match = pattern_match(patterns, labels)
-            # fail on the first mismatch
-            if not match:
-                include = False
-                break
+            include = bool(match)
         label = "+" if include else "-"
         if verbose:
-            print(f" {label} {lineno}: {match} = {annotations} -> {line}")
+            print(f" {label} {lineno}: {match} = {labels} -> {line}")
         if include:
             yield line
 
 
-def repair(filename: str, missing=None, verbose=False):
+def repair(
+    filename: str, commit: str, missing: T.Optional[str] = None, verbose: bool = False
+) -> None:
     """Restore deleted lines to a file that match the `missing` pattern."""
-    index_code, git_code = get_codes(filename)
-    allowed_patterns = get_labels(index_code)
+    index_code, git_code = get_codes(filename, commit)
+    raw_labels = get_labels(index_code)
+    allowed_patterns = {x for x in raw_labels if not x.startswith("decorator:")}
     if missing is not None:
         if ":" not in missing:
-            # assume this is just a name, and match any type.
-            missing = ".*:" + missing
-        print(f"adding {missing}")
+            # Assume this is just a name, and match types that introduce names.
+            missing = "(class|function|import|alias):" + missing
         allowed_patterns.add(missing)
-    print(f"{allowed_patterns=}")
+    lines = list(filter_code(git_code, allowed_patterns, verbose=verbose))
     with open(filename, "w") as f:
-        for line in filter_code(git_code, allowed_patterns, verbose=verbose):
+        for line in lines:
             f.write(line + "\n")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("filename")
+    parser.add_argument("--commit")
     parser.add_argument("--missing")
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
-    repair(args.filename, args.missing, args.verbose)
+    repair(args.filename, args.commit, args.missing, args.verbose)
     return 0
 
 
