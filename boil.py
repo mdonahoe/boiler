@@ -86,12 +86,12 @@ def git_checkout(file_path: str, ref: str = "HEAD") -> bool:
     """Run git checkout for the given file path."""
     deleted_files = set(get_deleted_files(ref=ref))
     if file_path not in deleted_files:
-        print("missing", file_path)
+        print(f"missing: {file_path}")
         return False
 
     if file_path.endswith(".py"):
         # special handling for python scripts
-        print("repairing checkout", file_path)
+        print(f"repairing checkout {file_path}")
         return do_repair(file_path)
 
     command = ["git", "checkout", ref, "--", file_path]
@@ -262,19 +262,19 @@ def handle_name_error(stderr: str) -> bool:
         return False
 
     relative_path = os.path.relpath(filepath)
-    print("repairing name", relative_path, name)
+    print(f"repairing {relative_path} for {name=}")
     return do_repair(relative_path, missing=name)
 
 
 def handle_import_error2(stderr: str) -> bool:
     # regex to find the filename and the name causing the NameError
-    filepath, name = parse_import_error(stderr)
+    filepath, import_name = parse_import_error(stderr)
     if filepath is None:
         return False
 
     relative_path = os.path.relpath(filepath)
-    print("repairing import", relative_path, name)
-    return do_repair(relative_path, missing=name)
+    print(f"repairing {relative_path} for {import_name=}")
+    return do_repair(relative_path, missing=import_name)
 
 
 def handle_attribute_error(err: str) -> bool:
@@ -300,7 +300,7 @@ def handle_attribute_error(err: str) -> bool:
     file_path = grep_output.split(":")[0]
 
     # Call the repair tool to restore the missing method
-    print("repairing attribute", file_path, missing_method)
+    print(f"repairing {file_path} for {missing_method=}")
     return do_repair(file_path, missing_method)
 
 
@@ -430,7 +430,7 @@ def handle_import_name_error(err: str) -> bool:
     if not file_path_match:
         return False
     module_path = file_path_match.group(1).replace(".", "/") + ".py"
-    print("repairing import name", module_path, missing_function)
+    print(f"repairing {module_path} for {missing_function=}")
     if do_repair(module_path, missing_function):
         return True
     # fail to work. possibly we guessed wrong. Lets assume a package
@@ -443,7 +443,7 @@ def handle_import_name_error(err: str) -> bool:
 def do_repair(
     file_path: str, missing: T.Optional[str] = None, ref: T.Optional[str] = None
 ) -> bool:
-    print("repair --missing {missing} {file_path}")
+    print(f"repair --missing {missing} {file_path}")
     try:
         py_repair.repair(
             filename=file_path,
@@ -501,7 +501,7 @@ def handle_ansible_file_not_found(stderr: str) -> bool:
             continue
         missing_file = match.group(1)
         if "{{" in missing_file:
-            print("template found", missing_file)
+            print(f"template found: {missing_file}")
             missing_file = missing_file.split("{{")[0]
         print(f"Missing file reported by Ansible: {missing_file}")
 
@@ -682,7 +682,7 @@ def main() -> int:
         "--handle-error",
         type=str,
         default=None,
-        help="path to pre-existing output to analysis",
+        help="path to pre-existing command output for error analysis",
     )
 
     # Use parse_known_args to separate known and unknown arguments
@@ -695,6 +695,7 @@ def main() -> int:
     # set the global session
     CURRENT_SESSION = Session("foo", args.ref, 0, command)
 
+    # If the user passes the error output explicitly, we can handle it and exit.
     if args.handle_error:
         err = open(args.handle_error).read()
         for i, handler in enumerate(HANDLERS):
@@ -706,6 +707,7 @@ def main() -> int:
             raise RuntimeError("failed to handle this type of error")
         return 0
 
+    # Otherwise, we iteratively run the command and fix errors, up to n times.
     num_failing = 0
     success = fix(command, num_iterations=args.n)
     if not success:
