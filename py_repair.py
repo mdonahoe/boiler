@@ -211,6 +211,7 @@ def repair(
     filename: str, commit: str, missing: T.Optional[str] = None, verbose: bool = False
 ) -> None:
     """Restore deleted lines to a file that match the `missing` pattern."""
+    print(f"repairing {filename} from {commit} missing {missing}")
     index_code, git_code = get_codes(filename, commit)
     raw_labels = get_labels(index_code)
     allowed_patterns = {x for x in raw_labels if not x.startswith("decorator:")}

@@ -130,6 +130,7 @@ def restore_missing_file(missing_file: str, ref: T.Optional[str] = None) -> bool
     """
     Restore a missing_file to disk, inferring the file path based on git diff since provided ref.
     """
+    print(f"Restoring missing file {missing_file}")
     ref = ref or ctx().git_ref
     # Convert the absolute path to a relative path (assuming your repo's root is in your current working directory)
     if " " in missing_file:
@@ -246,6 +247,8 @@ def parse_import_error(error_message: str) -> T.Tuple[T.Optional[str], T.Optiona
     if match:
         name = match.group("name")
         file = match.group("file")
+        if file == "unknown location":
+            return None, None
         return file, name
 
     # If no match is found, return None
@@ -277,11 +280,29 @@ def handle_import_error2(stderr: str) -> bool:
     return do_repair(relative_path, missing=import_name)
 
 
-def handle_attribute_error(err: str) -> bool:
+def handle_module_attribute_error(err: str) -> bool:
+    # Match the stack trace pattern to check for AttributeError
+    match = re.search(r"AttributeError: module '(.*)' has no attribute '(\w+)'", err)
+
+    if not match:
+        print("no module attribute match")
+        return False
+
+    # Extract the class name and missing method from the error message
+    module_name, missing_method = match.groups()
+
+    module_path = module_name.replace(".", "/") + ".py"
+
+    # Call the repair tool to restore the missing method
+    print(f"repairing {module_path=} for {missing_method=}")
+    return do_repair(module_path, missing_method)
+
+def handle_object_attribute_error(err: str) -> bool:
     # Match the stack trace pattern to check for AttributeError
     match = re.search(r"AttributeError: '(\w+)' object has no attribute '(\w+)'", err)
 
     if not match:
+        print("no object attribute match")
         return False
 
     # Extract the class name and missing method from the error message
@@ -368,7 +389,7 @@ def handle_missing_py_module(stderr: str) -> bool:
     match = missing_module_error_pattern.search(stderr)
     if not match:
         return False
-    missing_module = match.group(1)
+    missing_module = match.group(1).rstrip("'")
     print(f"Missing module: {missing_module}")
 
     # Convert the module name to a file path and checkout the file
@@ -383,7 +404,7 @@ def handle_missing_py_module(stderr: str) -> bool:
 
     # Not sure what this could be.
     # Imports outside aircam maybe?
-    print(f"failed to restore {missing_module}")
+    print(f"Failed to restore {missing_module}")
     return False
 
 
@@ -574,7 +595,8 @@ def handle_mypy_errors(stdout: str) -> bool:
 HANDLERS = [
     handle_mypy_errors,
     handle_name_error,
-    handle_attribute_error,
+    handle_module_attribute_error,
+    handle_object_attribute_error,
     handle_import_error2,
     handle_missing_pyc,
     handle_executable_not_found,
