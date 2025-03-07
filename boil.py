@@ -676,12 +676,15 @@ def fix(command: T.List[str], num_iterations: int) -> bool:
 
         exit = False
         for handler in HANDLERS:
-            if handler(err):
+            if handler(err) and has_changes():
                 message = f"fixed with {handler}"
                 break
         else:
             message = "failed to handle this type of error"
             exit = True
+
+        if not has_changes(verbose=True):
+            raise RuntimeError("no change")
 
         boil_commit = save_changes(
             parent=boil_commit,
@@ -694,6 +697,46 @@ def fix(command: T.List[str], num_iterations: int) -> bool:
             break
     return False
 
+
+def has_changes(verbose:bool=False) -> bool:
+    """
+    Look for changes in the working directory relative to the boiling branch
+    """
+    index_file = ".git/boil.index"
+    env = os.environ.copy()
+    env["GIT_INDEX_FILE"] = index_file
+
+    # Check for modified files
+    result = subprocess.run(
+        ["git", "diff", "--quiet", BOILING_BRANCH],
+        capture_output=True,
+        env=env
+    )
+    modified = result.return_code != 0
+
+    # Check for untracked files
+    untracked_result = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard"],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    untracked = False
+    for line in untracked_result.stdout.splitlines():
+        if ".boil" in line:
+            continue
+        print("new", line)
+        untracked = True
+
+    changed = modified or untracked
+
+    # Print detailed diff if verbose
+    if changed and verbose:
+        print(" --- git diff start ---")
+        subprocess.call(["git", "--no-pager", "diff", BOILING_BRANCH], env=env)
+        print(" --- git diff end ---")
+
+    return changed
 
 def main() -> int:
     global CURRENT_SESSION
