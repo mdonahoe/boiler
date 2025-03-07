@@ -6,6 +6,7 @@ from py_repair import filter_code, get_labels, LineAnnotator
 EXAMPLE = """
 import some_package
 import typing as T
+from another_package import a_module as diff_name
 # define X
 X = 1
 @some_package.a_decorator
@@ -46,6 +47,7 @@ class PyRepairTest(unittest.TestCase):
             [],  # blank line
             ["import:some_package"],  # import
             ["import:typing", "alias:T"],  # import
+            ["import:a_module", "alias:diff_name"],  # import
             [],  # comment
             [],  # variable def
             ["function:bar", "decorator:some_package.a_decorator"],  # attr decorator

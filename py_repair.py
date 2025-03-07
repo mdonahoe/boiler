@@ -85,8 +85,14 @@ class LineAnnotator(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_ImportFrom(self, node: T.Any) -> None:
-        # print(f"from import {dir(node)}")
-        self.annotate_lines(node, [f"import:{n.name}" for n in node.names])
+        labels = []
+        for name in node.names:
+            if name.asname is not None:
+                labels.append(f"import:{name.name}")
+                labels.append(f"alias:{name.asname}")
+            else:
+                labels.append(f"import:{name.name}")
+        self.annotate_lines(node, labels)
         self.generic_visit(node)
 
     def get_decorator_name(self, n: T.Any) -> str:
@@ -157,7 +163,6 @@ def get_codes(filename: str, commit: str) -> T.Tuple[str, str]:
     """Return the on-disk and git-version of the given file"""
     repo_path = _get_relative_path(filename)
     if os.path.exists(filename):
-        # print(f"found {filename}")
         with open(filename) as sourcefile:
             index_code = sourcefile.read()
     else:
