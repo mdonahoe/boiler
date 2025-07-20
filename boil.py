@@ -61,7 +61,7 @@ class Session:
     command: T.List[str]
 
 
-CURRENT_SESSION = Session("", "", 0, [])
+CURRENT_SESSION = Session("", "HEAD", 0, [])
 
 
 def ctx() -> Session:
@@ -133,8 +133,6 @@ def restore_missing_file(missing_file: str, ref: T.Optional[str] = None) -> bool
     print(f"Restoring missing file {missing_file}")
     ref = ref or ctx().git_ref
     # Convert the absolute path to a relative path (assuming your repo's root is in your current working directory)
-    if " " in missing_file:
-        raise ValueError(missing_file)
     relative_path = os.path.relpath(missing_file)
     deleted_files = get_deleted_files(ref=ref)
 
@@ -172,14 +170,32 @@ def restore_missing_file(missing_file: str, ref: T.Optional[str] = None) -> bool
     dirname = filename + "/"
     matching_dirs = [f for f in deleted_files if dirname in f]
     if matching_dirs:
-        for d in matching_dirs:
-            path = d.split(dirname)[0] + dirname
-            try:
-                print(f"mkdir -p {path}")
-                os.makedirs(path)
-                return True
-            except:
-                pass
+        print(f"Found {len(matching_dirs)} files in directory {dirname}")
+        # Try to restore all files in the directory
+        success_count = 0
+        for file_path in matching_dirs:
+            print(f"Attempting to restore: {file_path}")
+            if git_checkout(file_path, ref=ref):
+                success_count += 1
+        if success_count > 0:
+            print(f"Successfully restored {success_count}/{len(matching_dirs)} files from {dirname}")
+            return True
+    
+    # Try a broader directory search pattern
+    dir_base = os.path.basename(relative_path)
+    print(f"Searching for directory pattern: {dir_base}/")
+    broad_matching_dirs = [f for f in deleted_files if f"/{dir_base}/" in f or f.startswith(f"{dir_base}/")]
+    if broad_matching_dirs:
+        print(f"Found {len(broad_matching_dirs)} files in broader directory search for {dir_base}")
+        success_count = 0
+        for file_path in broad_matching_dirs:
+            print(f"Attempting to restore: {file_path}")
+            if git_checkout(file_path, ref=ref):
+                success_count += 1
+        if success_count > 0:
+            print(f"Successfully restored {success_count}/{len(broad_matching_dirs)} files from {dir_base} pattern")
+            return True
+    
     return False
 
 
@@ -267,6 +283,113 @@ def handle_name_error(stderr: str) -> bool:
     relative_path = os.path.relpath(filepath)
     print(f"repairing {relative_path} for {name=}")
     return do_repair(relative_path, missing=name)
+
+
+def handle_future_annotations(stderr: str) -> bool:
+    """
+    Fix a NameError caused by forward reference in type annotations.
+    This happens when a class name is used in a type annotation before the class is defined,
+    and 'from __future__ import annotations' is missing.
+    """
+    # Parse the NameError to get filepath and name
+    filepath, name = parse_traceback(stderr)
+    if filepath is None:
+        return False
+    
+    # Check if this looks like a forward reference issue
+    # Look for patterns where the name appears in type annotations:
+    # - dict[tuple, ClassName] = {}
+    # - dict[weakref.ref[ClassName], None] = {}
+    # - other_type[ClassName] = {}
+    # We look for the name appearing after a comma, inside brackets, or at start of brackets
+    type_annotation_patterns = [
+        rf"\[.*,\s*{re.escape(name)}\]",  # dict[tuple, DType]
+        rf"\[{re.escape(name)}\]",       # list[DType] 
+        rf"\[.*{re.escape(name)}.*\]",   # any bracket containing the name
+    ]
+    
+    if not any(re.search(pattern, stderr) for pattern in type_annotation_patterns):
+        return False
+    
+    relative_path = os.path.relpath(filepath)
+    print(f"repairing {relative_path} for future annotations (forward reference {name=})")
+    return do_repair(relative_path, missing="annotations")
+
+
+def handle_indentation_error(stderr: str) -> bool:
+    """
+    Fix IndentationError by restoring missing imports or code blocks.
+    Common cases: 
+    1. 'if TYPE_CHECKING:' block missing its indented imports
+    2. Method definitions without containing class
+    3. Any other structural indentation issues
+    """
+    # Look for IndentationError patterns
+    indentation_match = re.search(r"IndentationError: (expected an indented block after '(.+)' statement on line (\d+)|unexpected indent)", stderr)
+    if not indentation_match:
+        return False
+    
+    # Use the same traceback parsing logic as other handlers
+    # Find the last file mentioned before the IndentationError
+    file_lines = [line for line in stderr.split('\n') if 'File "' in line]
+    if not file_lines:
+        return False
+    
+    # Get the last file path (where the error actually occurred)
+    last_file_line = file_lines[-1]
+    file_match = re.search(r'File "([^"]+)"', last_file_line)
+    if not file_match:
+        return False
+    
+    filepath = file_match.group(1)
+    relative_path = os.path.relpath(filepath)
+    
+    # Parse the type of indentation error
+    if "unexpected indent" in stderr:
+        print(f"repairing {relative_path} for unexpected indent - likely broken class structure")
+        # File structure is too broken, restore the whole file
+        try:
+            subprocess.check_call(["git", "checkout", "HEAD", "--", relative_path])
+            print(f"Successfully restored {relative_path} from HEAD")
+            return True
+        except subprocess.CalledProcessError:
+            print(f"Failed to restore {relative_path} from HEAD")
+            return False
+    
+    # Handle "expected an indented block" errors
+    statement = indentation_match.group(2) if indentation_match.group(2) else ""
+    line_num = int(indentation_match.group(3)) if indentation_match.group(3) else 0
+    print(f"repairing {relative_path} for indentation error after '{statement}' on line {line_num}")
+    
+    # For TYPE_CHECKING blocks, try to restore the missing imports
+    if statement == "if":
+        # Read the file to check if it's a TYPE_CHECKING block
+        try:
+            with open(filepath, 'r') as f:
+                lines = f.readlines()
+                if line_num <= len(lines) and "TYPE_CHECKING" in lines[line_num - 1]:
+                    print(f"Detected TYPE_CHECKING block issue, attempting full file restoration")
+                    # The file is too broken to repair incrementally, restore the whole file
+                    try:
+                        subprocess.check_call(["git", "checkout", "HEAD", "--", relative_path])
+                        print(f"Successfully restored {relative_path} from HEAD")
+                        return True
+                    except subprocess.CalledProcessError:
+                        print(f"Failed to restore {relative_path} from HEAD")
+                        return False
+        except (IOError, IndexError):
+            pass
+    
+    # For any other indentation error, try full file restoration first
+    # since partial repairs often leave files in broken states
+    try:
+        subprocess.check_call(["git", "checkout", "HEAD", "--", relative_path])
+        print(f"Successfully restored {relative_path} from HEAD for general indentation error")
+        return True
+    except subprocess.CalledProcessError:
+        print(f"Failed to restore {relative_path} from HEAD, trying partial repair")
+        # Fallback to general repair attempt
+        return do_repair(relative_path)
 
 
 def handle_import_error2(stderr: str) -> bool:
@@ -375,11 +498,20 @@ def handle_missing_py_package(stderr: str) -> bool:
 
 def handle_file_not_found(stderr: str) -> bool:
     # Search for missing module/file paths in the error output
-    file_not_found_pattern = re.compile(r"FileNotFoundError: (.*)")
+    # Match patterns like: FileNotFoundError: [Errno 2] No such file or directory: '/path/to/file'
+    file_not_found_pattern = re.compile(r"FileNotFoundError:.*?No such file or directory: '([^']+)'")
     match = file_not_found_pattern.search(stderr)
     if not match:
-        return False
-    missing_file = match.group(1)
+        # Fallback to simpler pattern
+        simple_pattern = re.compile(r"FileNotFoundError: (.*)")
+        simple_match = simple_pattern.search(stderr)
+        if not simple_match:
+            return False
+        missing_file = simple_match.group(1)
+    else:
+        missing_file = match.group(1)
+    
+    print(f"Extracted missing file: {missing_file}")
     return restore_missing_file(missing_file)
 
 
@@ -438,6 +570,35 @@ def handle_import_error1(stderr: str) -> bool:
     return restore_missing_file(file_path)
 
 
+def handle_circular_import_error(err: str) -> bool:
+    """Handle circular import errors by restoring the missing module file."""
+    # Match pattern: ImportError: cannot import name 'optim' from partially initialized module 'tinygrad.nn' (most likely due to a circular import)
+    circular_import_pattern = re.compile(
+        r"ImportError: cannot import name '(\w+)' from partially initialized module '([^']+)' \(most likely due to a circular import\)"
+    )
+    match = circular_import_pattern.search(err)
+    if not match:
+        return False
+    
+    missing_name = match.group(1)
+    module_path = match.group(2)
+    
+    print(f"Detected circular import: missing '{missing_name}' from '{module_path}'")
+    
+    # Try to restore the missing submodule file
+    # For 'optim' from 'tinygrad.nn', try 'tinygrad/nn/optim.py'
+    submodule_path = module_path.replace(".", "/") + "/" + missing_name + ".py"
+    print(f"Attempting to restore submodule: {submodule_path}")
+    
+    if restore_missing_file(submodule_path):
+        return True
+    
+    # Fallback: try to restore missing item from the main module file
+    main_module_path = module_path.replace(".", "/") + ".py"
+    print(f"Fallback: repairing main module {main_module_path} for {missing_name}")
+    return do_repair(main_module_path, missing_name)
+
+
 def handle_import_name_error(err: str) -> bool:
     # Handle ImportError pattern
     import_error_match = re.search(r"ImportError: cannot import name '?(\w+)'?", err)
@@ -486,9 +647,11 @@ def handle_executable_not_found(stderr: str) -> bool:
     missing_executable = stderr.split(":")[-1].strip().strip("'")
     print(f"Missing executable: {missing_executable}")
 
-    if " " in missing_executable:
+    # Handle paths with spaces by checking if it looks like a reasonable file path
+    # Only reject if it contains multiple unrelated components or shell commands
+    if " " in missing_executable and not missing_executable.startswith(("/", "./")):
+        # Looks like multiple shell arguments rather than a single path
         return False
-        raise ValueError(missing_executable)
 
     # Check if the executable path is relative and if it's a symlink
     if missing_executable.startswith("./"):
@@ -594,9 +757,12 @@ def handle_mypy_errors(stdout: str) -> bool:
 
 HANDLERS = [
     handle_mypy_errors,
+    handle_indentation_error,
+    handle_future_annotations,
     handle_name_error,
     handle_module_attribute_error,
     handle_object_attribute_error,
+    handle_circular_import_error,
     handle_import_error2,
     handle_missing_pyc,
     handle_executable_not_found,
@@ -712,7 +878,7 @@ def has_changes(verbose:bool=False) -> bool:
         capture_output=True,
         env=env
     )
-    modified = result.return_code != 0
+    modified = result.returncode != 0
 
     # Check for untracked files
     untracked_result = subprocess.run(
