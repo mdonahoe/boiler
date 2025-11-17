@@ -755,7 +755,97 @@ def handle_mypy_errors(stdout: str) -> bool:
     return True
 
 
+def handle_missing_test_output(err: str) -> bool:
+    """
+    Handle the case where test output is missing from expected output.
+    This detects unified diff output showing missing test lines and restores
+    the corresponding test functions.
+
+    Example error:
+        ERROR: Output does not match expected results!
+        Expected 50 lines, got 49 lines
+        Differences:
+        --------------------------------------------------------------------------------
+        --- python_feature_test.txt
+        +++ actual output
+        @@ -1,5 +1,4 @@
+         01. Integer arithmetic: 10 + 5 = 15
+        -02. Float operations: 3.14 * 2 = 6.28
+         03. String concatenation: 'Hello' + ' World' = 'Hello World'
+    """
+    # Check if this looks like a unified diff showing missing test output
+    if "Expected" not in err or "got" not in err or "lines" not in err:
+        return False
+
+    if "Differences:" not in err:
+        return False
+
+    # Look for lines starting with "-" that contain test output (pattern: "NN. Description")
+    # These are lines that are in the expected output but missing from actual output
+    missing_pattern = re.compile(r'^-(\d+)\.\s+(.+)', re.MULTILINE)
+    matches = missing_pattern.findall(err)
+
+    if not matches:
+        return False
+
+    print(f"Detected {len(matches)} missing test output lines")
+
+    # Try to find the test file being run
+    # Look in the command for a .py file that might be the test file
+    test_file = None
+    for arg in ctx().command:
+        if arg.endswith(".py") and "test" in arg.lower():
+            # This is likely the test runner, look for the file it's testing
+            # In our case, test_python.py runs python_feature_test.py
+            # We need to find python_feature_test.py
+            pass
+        if arg.endswith("_test.py"):
+            # Try to infer the actual test file
+            test_file = arg.replace("test_", "").replace(".py", "_test.py")
+            break
+
+    # For the specific case of test_python.py, we know it tests python_feature_test.py
+    # Let's look for files matching the pattern
+    if test_file is None:
+        # Try to find python_feature_test.py or similar
+        possible_files = ["python_feature_test.py"]
+        for f in possible_files:
+            if os.path.exists(f) or f in get_deleted_files(ref=ctx().git_ref):
+                test_file = f
+                break
+
+    if test_file is None:
+        print("Could not determine test file to repair")
+        return False
+
+    print(f"Repairing test file: {test_file}")
+
+    # For each missing test number, try to restore the corresponding test function
+    success = False
+    for test_num, description in matches:
+        # Test functions are typically named like test_02_floats
+        # We need to find the function that matches test_{test_num}_*
+        # Use a regex pattern that will match any function starting with test_{test_num}_
+        # The pattern will be matched against labels like "function:test_02_floats"
+        pattern = f"function:test_{test_num}_.*"
+        print(f"Attempting to restore test {test_num}: {description}")
+        print(f"Using pattern: {pattern}")
+
+        try:
+            if do_repair(test_file, missing=pattern):
+                success = True
+            else:
+                print(f"Failed to restore test {test_num}")
+        except Exception as e:
+            print(f"Error restoring test {test_num}: {e}")
+            # Continue trying other tests
+            pass
+
+    return success
+
+
 HANDLERS = [
+    handle_missing_test_output,
     handle_mypy_errors,
     handle_indentation_error,
     handle_future_annotations,
