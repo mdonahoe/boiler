@@ -1011,7 +1011,7 @@ def abort_boiling() -> int:
     # Find the boil_start commit
     try:
         boil_start_commit = subprocess.check_output(
-            ["git", "log", "--format=%H", "--grep", "boil_start", BOILING_BRANCH],
+            ["git", "log", "--format=%H", "--grep", "boil_start", f"HEAD..{BOILING_BRANCH}],
             text=True
         ).strip().split('\n')[0]  # Get the first (most recent) match
 
@@ -1031,6 +1031,9 @@ def abort_boiling() -> int:
 
         # Reset working directory to the original state
         subprocess.check_call(["git", "reset", "--hard", original_commit])
+
+        # then apply the changes to the working directory
+        subprocess.check_call(f"git show {boil_start_commit} | git apply", shell=True)
 
         print("Successfully aborted boiling session.")
         print("Working directory has been restored to pre-boiling state.")
