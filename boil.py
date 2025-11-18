@@ -169,7 +169,6 @@ def has_changes(verbose:bool=False) -> bool:
         env=env
     )
     modified = result.returncode != 0
-    print(f"has_changes: modified={modified}, diff return code={result.returncode}")
 
     # Check for untracked files
     untracked_result = subprocess.run(
