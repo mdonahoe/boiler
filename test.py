@@ -1,4 +1,8 @@
+#!/usr/bin/env python3
 import unittest
+import subprocess
+import sys
+import difflib
 
 from py_repair import filter_code, get_labels, LineAnnotator
 
@@ -141,6 +145,49 @@ class Snake:
             "function:bite",
         ])
         self.assertSetEqual(expected, labels)
+
+
+class PythonFeatureTest(unittest.TestCase):
+    def test_python_feature_output(self) -> None:
+        """
+        Run python_feature_test.py and verify output matches expected results
+        """
+        # Run the python_feature_test.py and capture output
+        result = subprocess.run(
+            ["python3", "python_feature_test.py"],
+            capture_output=True,
+            text=True
+        )
+
+        # Extract only the printed feature lines (filter out unittest output)
+        output_lines = result.stdout.splitlines()
+
+        # Read expected output from python_feature_test.txt
+        try:
+            with open("python_feature_test.txt", "r") as f:
+                expected_lines = [line.rstrip() for line in f.readlines() if line.strip()]
+        except FileNotFoundError:
+            self.fail("python_feature_test.txt not found!")
+
+        # Compare the outputs
+        if output_lines != expected_lines:
+            # Show detailed diff
+            diff = difflib.unified_diff(
+                expected_lines,
+                output_lines,
+                fromfile="python_feature_test.txt",
+                tofile="actual output",
+                lineterm=""
+            )
+            diff_output = "\n".join(list(diff))
+
+            error_msg = f"python_feature_test.py stdout does not match expected results!\n"
+            error_msg += f"Expected {len(expected_lines)} lines, got {len(output_lines)} lines\n\n"
+            error_msg += f"Differences:\n{'-' * 80}\n{diff_output}\n"
+            error_msg += f"python_feature_test.py exited with code {result.returncode}\n"
+            error_msg += f"python_feature_test.py stderr:\n{result.stderr}"
+
+            self.fail(error_msg)
 
 
 if __name__ == "__main__":
