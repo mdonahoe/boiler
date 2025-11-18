@@ -10,11 +10,7 @@ result = subprocess.run(
 )
 
 # Extract only the printed feature lines (filter out unittest output)
-output_lines = []
-for line in result.stdout.splitlines():
-    # Look for lines that match the pattern: "NN. Feature description..."
-    if line and len(line) > 3 and line[0:2].isdigit() and line[2] == '.':
-        output_lines.append(line)
+output_lines = result.stdout.splitlines()
 
 # Read expected output from python_feature_test.txt
 try:
@@ -30,7 +26,7 @@ if output_lines == expected_lines:
     print(f"All {len(output_lines)} feature tests matched.")
     sys.exit(0)
 else:
-    print("ERROR: Output does not match expected results!")
+    print("ERROR: python_feature_test.py stdout does not match expected results!")
     print(f"\nExpected {len(expected_lines)} lines, got {len(output_lines)} lines\n")
 
     # Show detailed diff
@@ -49,18 +45,7 @@ else:
     if diff_output:
         for line in diff_output:
             print(line)
-    else:
-        # If unified_diff shows nothing, do side-by-side comparison
-        print("\nLine-by-line comparison:")
-        max_lines = max(len(expected_lines), len(output_lines))
-        for i in range(max_lines):
-            expected = expected_lines[i] if i < len(expected_lines) else "[MISSING]"
-            actual = output_lines[i] if i < len(output_lines) else "[MISSING]"
-
-            if expected != actual:
-                print(f"\nLine {i+1}:")
-                print(f"  Expected: {expected}")
-                print(f"  Actual:   {actual}")
-
-    print("-" * 80)
+    print(f"python_feature_test.py exited with code {result.returncode}")
+    print("python_feature_test.py stderr:")
+    print(result.stderr)
     sys.exit(1)
