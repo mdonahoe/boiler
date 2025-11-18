@@ -691,9 +691,8 @@ def do_repair(
             verbose=False,
         )
         return True
-    except Exception:
-        print(f"failed to repair {file_path} with {missing=}")
-        sys.exit(1)
+    except Exception as e:
+        print(f"failed to repair {file_path} with {missing=}: {e}")
         return False
 
 
@@ -830,6 +829,10 @@ def handle_missing_test_output(err: str) -> bool:
         -02. Float operations: 3.14 * 2 = 6.28
          03. String concatenation: 'Hello' + ' World' = 'Hello World'
     """
+    # Don't try to restore test output if there are syntax errors preventing tests from running
+    if "IndentationError" in err or "SyntaxError" in err:
+        return False
+
     # Check if this looks like a unified diff showing missing test output
     if "Expected" not in err or "got" not in err or "lines" not in err:
         return False
