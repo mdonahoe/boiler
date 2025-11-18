@@ -829,8 +829,9 @@ def handle_missing_test_output(err: str) -> bool:
         -02. Float operations: 3.14 * 2 = 6.28
          03. String concatenation: 'Hello' + ' World' = 'Hello World'
     """
-    # Don't try to restore test output if there are syntax errors preventing tests from running
-    if "IndentationError" in err or "SyntaxError" in err:
+    # Don't try to restore test output if there are errors preventing tests from running
+    # Let other handlers deal with the root cause first
+    if "IndentationError" in err or "SyntaxError" in err or "NameError" in err or "ImportError" in err or "AttributeError" in err:
         return False
 
     # Check if this looks like a unified diff showing missing test output
@@ -1030,6 +1031,7 @@ def has_changes(verbose:bool=False) -> bool:
         env=env
     )
     modified = result.returncode != 0
+    print(f"has_changes: modified={modified}, diff return code={result.returncode}")
 
     # Check for untracked files
     untracked_result = subprocess.run(
@@ -1094,7 +1096,7 @@ def abort_boiling() -> int:
         subprocess.check_call(["git", "reset", "--hard", original_commit])
 
         # Then apply the changes to the working directory that existed when user called boil.py
-        subprocess.check_call(f"git show {boil_start_commit} | git apply", shell=True)
+        subprocess.check_call(f"git show {boil_start_commit} | git apply --allow-empty", shell=True)
 
         # Delete the boiling branch
         subprocess.check_call(["git", "branch", "-D", "boiling"])
