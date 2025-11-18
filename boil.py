@@ -936,31 +936,35 @@ def fix(command: T.List[str], num_iterations: int) -> bool:
     """
     # create branches at the current location
     ref = ctx().git_ref
-    ancestor_check = subprocess.call(
-        ["git", "merge-base", "--is-ancestor", ref, BOILING_BRANCH]
+    result = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", ref, BOILING_BRANCH],
+        capture_output=True,
     )
+    ancestor_check = result.returncode
     if ancestor_check == 1:
         print("existing boiling session is stale. Deleting")
         subprocess.call(["git", "branch", "-D", BOILING_BRANCH])
+        subprocess.call(["git", "branch", BOILING_BRANCH])
         # Also delete the boil directory
         os.system("rm -rf .boil")
+        action = "start"
     elif ancestor_check == 128:
         # branch doesn't exist
-        pass
+        subprocess.call(["git", "branch", BOILING_BRANCH])
+        action = "start"
     elif ancestor_check == 0:
         # branch exists and is a ancestor of HEAD. proceed.
+        action = "resume"
         pass
     else:
         raise ValueError("f{ancestor_check=}")
-
-    subprocess.call(["git", "branch", BOILING_BRANCH])
 
     start_commit = BOILING_BRANCH
 
     # add the current working directory to boil-start
     boil_commit = save_changes(
         parent=start_commit,
-        message=f"boil_start\n\n{' '.join(command)}",
+        message=f"boil_{action}\n\n{' '.join(command)}",
         branch_name=BOILING_BRANCH,
     )
 
