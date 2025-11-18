@@ -4,6 +4,7 @@ from collections import namedtuple
 from functools import wraps
 from contextlib import contextmanager
 
+class Dog:
     def __init__(self, name):
         self.name = name
 
