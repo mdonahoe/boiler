@@ -968,14 +968,15 @@ def fix(command: T.List[str], num_iterations: int) -> bool:
     os.makedirs(".boil", exist_ok=True)
     n = len(os.listdir(".boil"))
 
+    # bootstrap
+    stdout, stderr, code = run_command(command)
+    if code == 0:
+        # there is nothing to fix.
+        return True
+
     while True:
         n += 1
         print(f"Attempt {n}")
-        # Run the main command
-        stdout, stderr, code = run_command(command)
-        if code == 0:
-            # it worked!
-            return True
 
         if code == -1:
             # special case for FileNotFound
@@ -989,7 +990,7 @@ def fix(command: T.List[str], num_iterations: int) -> bool:
         print(stdout)
         print(stderr)
         err = stdout + stderr
-        with open(f".boil/iter{n}.{code}.out", "w") as out:
+        with open(f".boil/iter{n}.exit{code}.txt", "w") as out:
             out.write(err)
 
         exit = False
@@ -1009,6 +1010,16 @@ def fix(command: T.List[str], num_iterations: int) -> bool:
             message=f"boil_{n}\n\n{message}",
             branch_name=BOILING_BRANCH,
         )
+
+        if exit:
+            raise RuntimeError(message)
+
+        # re-run the main command
+        stdout, stderr, code = run_command(command)
+
+        if code == 0:
+            # the fix worked!
+            return True
 
         if num_iterations is not None and n >= num_iterations:
             print(f"Reached iteration limit {n}")
