@@ -4,6 +4,7 @@ import subprocess
 import typing as T
 
 import py_repair
+from session import ctx
 
 def run_command(command: T.List[str]) -> T.Tuple[str, str, int]:
     """
@@ -841,6 +842,8 @@ def handle_missing_test_output(err: str) -> bool:
     return success
 
 
+# Order matters.
+# Each handler is tested in order and the first to return True is used.
 HANDLERS = [
     handle_missing_test_output,
     handle_mypy_errors,

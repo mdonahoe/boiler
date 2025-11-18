@@ -1,5 +1,4 @@
 import argparse
-import dataclasses
 import os
 import subprocess
 import shutil
@@ -7,6 +6,8 @@ import sys
 import typing as T
 
 import handlers
+
+from session import ctx, new_session
 
 """
 git branch "boiling"
@@ -48,23 +49,6 @@ def save_changes(parent: str, message: str, branch_name: T.Optional[str] = None)
     return commit
 
 
-@dataclasses.dataclass
-class Session:
-    """
-    Common properties of the current boiling invocation
-    """
-
-    key: str
-    git_ref: str
-    iteration: int
-    command: T.List[str]
-
-
-CURRENT_SESSION = Session("", "HEAD", 0, [])
-
-
-def ctx() -> Session:
-    return CURRENT_SESSION
 
 
 
@@ -285,7 +269,6 @@ def abort_boiling() -> int:
 
 
 def main() -> int:
-    global CURRENT_SESSION
     parser = argparse.ArgumentParser(description="Boil your code.")
     parser.add_argument("-n", type=int, help="number of interations")
     parser.add_argument("--ref", type=str, default="HEAD", help="a working commit")
@@ -321,7 +304,7 @@ def main() -> int:
     command = unknown_args
 
     # set the global session
-    CURRENT_SESSION = Session("foo", args.ref, 0, command)
+    new_session("foo", args.ref, 0, command)
 
     # If the user passes the error output explicitly, we can handle it and exit.
     if args.handle_error:
@@ -336,14 +319,13 @@ def main() -> int:
         return 0
 
     # Otherwise, we iteratively run the command and fix errors, up to n times.
-    num_failing = 0
     success = fix(command, num_iterations=args.n)
     if not success:
         print(f"failed to fix: {command}")
-        num_failing += 1
+        return 1
     else:
         print("success")
-    return num_failing
+        return 0
 
 
 if __name__ == "__main__":
