@@ -1029,11 +1029,14 @@ def abort_boiling() -> int:
 
         print(f"Restoring to original commit: {original_commit}")
 
-        # Reset working directory to the original state
+        # Reset to the original commit
         subprocess.check_call(["git", "reset", "--hard", original_commit])
 
-        # then apply the changes to the working directory
+        # Then apply the changes to the working directory that existed when user called boil.py
         subprocess.check_call(f"git show {boil_start_commit} | git apply", shell=True)
+
+        # Delete the boiling branch
+        subprocess.check_call(["git", "branch", "-D", "boiling"])
 
         print("Successfully aborted boiling session.")
         print("Working directory has been restored to pre-boiling state.")
