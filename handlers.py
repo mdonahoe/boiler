@@ -26,11 +26,17 @@ def git_checkout(file_path: str, ref: str = "HEAD") -> bool:
         print(f"missing: {file_path}")
         return False
 
+    # For Python files, create empty file first and let py_repair handle restoration
     if file_path.endswith(".py"):
-        # special handling for python scripts
-        print(f"repairing checkout {file_path}")
-        return do_repair(file_path)
+        print(f"creating empty Python file: {file_path}")
+        # Create parent directories if needed
+        os.makedirs(os.path.dirname(file_path) or ".", exist_ok=True)
+        # Create empty Python file
+        with open(file_path, 'w') as f:
+            f.write("")
+        return True
 
+    # For non-Python files, do full checkout
     command = ["git", "checkout", ref, "--", file_path]
     stdout, stderr, code = run_command(command)
     if code != 0:
@@ -748,6 +754,154 @@ def handle_mypy_errors(stdout: str) -> bool:
     return True
 
 
+def handle_empty_python_file(err: str) -> bool:
+    """Handle test failures when Python file exists but is empty/missing expected code."""
+    # Look for pattern: AssertionError with "not found in" and mentions of Python constructs
+    # Also check for "0 lines" indicator showing file is empty
+    if "AssertionError:" not in err:
+        return False
+
+    # Pattern: Expected to see 'def something' but file appears empty
+    # Check for indicators that Python file is empty or missing content
+    code_patterns = [
+        r"'(def \w+)'.*not found",
+        r"'(class \w+)'.*not found",
+        r"Expected to see.*'(def \w+)'",
+        r"Expected to see.*'(class \w+)'",
+        r"Expected.*'(import \w+)'",
+    ]
+
+    for pattern in code_patterns:
+        match = re.search(pattern, err, re.IGNORECASE)
+        if match:
+            code_snippet = match.group(1)
+            print(f"Found missing Python code: {code_snippet}")
+
+            # Look for filename in the error
+            # First, try to find which file is actually being opened/tested
+            # Pattern: "filename.py - X lines" (common in test output)
+            # Match broadly then check against deleted files
+            test_file_pattern = r'([a-zA-Z0-9_-]+\.py)\s+-\s+\d+\s+lines'
+            all_matches = re.findall(test_file_pattern, err)
+
+            # Get deleted files
+            deleted_files = get_deleted_files(ref=ctx().git_ref)
+
+            # Find which match is actually a deleted/missing/existing file that needs repair
+            target_file = None
+            # First check existing files (they may need more content added)
+            for potential_file in all_matches:
+                if os.path.exists(potential_file):
+                    target_file = potential_file
+                    print(f"Target file from test output (existing): {target_file}")
+                    break
+            # Then check deleted files
+            if not target_file:
+                for potential_file in all_matches:
+                    if potential_file in deleted_files:
+                        target_file = potential_file
+                        print(f"Target file from test output (deleted): {target_file}")
+                        break
+
+            if target_file:
+
+                # Extract the name to restore
+                if code_snippet.startswith("def "):
+                    name = code_snippet.split()[1].rstrip("(:")
+                elif code_snippet.startswith("class "):
+                    name = code_snippet.split()[1].rstrip("(:")
+                else:
+                    name = code_snippet
+
+                # Create file if it doesn't exist
+                if not os.path.exists(target_file):
+                    os.makedirs(os.path.dirname(target_file) or ".", exist_ok=True)
+                    with open(target_file, 'w') as f:
+                        f.write("")
+
+                print(f"Using py_repair to restore '{name}' in {target_file}")
+                return do_repair(target_file, missing=name)
+
+            # Fallback: check all .py files mentioned
+            file_pattern = r'(\w+\.py)'
+            file_matches = re.findall(file_pattern, err)
+
+            # Prioritize deleted files first, then existing empty files
+            deleted_files = get_deleted_files(ref=ctx().git_ref)
+
+            # First check deleted .py files
+            for py_file in file_matches:
+                if py_file in deleted_files:
+                    print(f"Found deleted Python file: {py_file}")
+                    # Create empty file first
+                    os.makedirs(os.path.dirname(py_file) or ".", exist_ok=True)
+                    with open(py_file, 'w') as f:
+                        f.write("")
+
+                    # Extract the name to restore
+                    if code_snippet.startswith("def "):
+                        name = code_snippet.split()[1].rstrip("(:")
+                    elif code_snippet.startswith("class "):
+                        name = code_snippet.split()[1].rstrip("(:")
+                    else:
+                        name = code_snippet
+
+                    print(f"Using py_repair to restore '{name}' in {py_file}")
+                    return do_repair(py_file, missing=name)
+
+            # Then check existing files (empty or not)
+            for py_file in file_matches:
+                if os.path.exists(py_file):
+                    # Extract the name to restore
+                    if code_snippet.startswith("def "):
+                        name = code_snippet.split()[1].rstrip("(:")
+                    elif code_snippet.startswith("class "):
+                        name = code_snippet.split()[1].rstrip("(:")
+                    else:
+                        name = code_snippet
+
+                    print(f"Using py_repair to restore '{name}' in {py_file}")
+                    return do_repair(py_file, missing=name)
+
+    return False
+
+
+def handle_make_missing_makefile(err: str) -> bool:
+    """Handle make errors when the Makefile itself is missing."""
+    # Pattern: make: *** No rule to make target 'X'.  Stop.
+    # This usually means Makefile is missing
+    pattern = r"make: \*\*\* No rule to make target '([^']+)'\.\s+Stop\."
+    match = re.search(pattern, err)
+
+    if not match:
+        return False
+
+    # Check if Makefile is deleted
+    deleted_files = get_deleted_files(ref=ctx().git_ref)
+    makefile_names = ['Makefile', 'makefile', 'GNUmakefile']
+
+    for makefile in makefile_names:
+        if makefile in deleted_files:
+            print(f"Found missing Makefile: {makefile}")
+            return restore_missing_file(makefile)
+
+    return False
+
+
+def handle_make_missing_target(err: str) -> bool:
+    """Handle make errors when a required source file is missing."""
+    # Pattern: make: *** No rule to make target 'filename', needed by 'target'.  Stop.
+    pattern = r"make: \*\*\* No rule to make target '([^']+)', needed by"
+    match = re.search(pattern, err)
+
+    if not match:
+        return False
+
+    missing_file = match.group(1)
+    print(f"Found missing make target: {missing_file}")
+    return restore_missing_file(missing_file)
+
+
 def handle_fopen_test_failure(err: str) -> bool:
     """Handle test failures caused by fopen errors when files are missing."""
     # Look for 'fopen: No such file or directory' in assertion errors
@@ -759,14 +913,60 @@ def handle_fopen_test_failure(err: str) -> bool:
     pattern = r"AssertionError:.*?'([^']+\.\w+)'.*?fopen: No such file or directory"
     matches = re.findall(pattern, err, re.DOTALL)
 
-    if not matches:
+    if matches:
+        # Try to restore each filename found explicitly
+        for filename in matches:
+            print(f"Found potential missing file in fopen error: {filename}")
+            if restore_missing_file(filename):
+                return True
         return False
 
-    # Try to restore each filename found
-    for filename in matches:
-        print(f"Found potential missing file in fopen error: {filename}")
-        if restore_missing_file(filename):
-            return True
+    # Look for filenames mentioned anywhere in the test output
+    # Pattern: any word followed by a file extension like .md, .txt, .py, .c, etc
+    filename_pattern = r'\b([a-zA-Z0-9_-]+\.[a-zA-Z0-9]+)\b'
+    all_filenames = re.findall(filename_pattern, err)
+
+    # Filter to only check deleted files
+    deleted_files = get_deleted_files(ref=ctx().git_ref)
+
+    for filename in all_filenames:
+        if filename in deleted_files:
+            print(f"Found deleted file mentioned in error: {filename}")
+            if restore_missing_file(filename):
+                return True
+
+    # If no explicit filename found, try to infer from test name and deleted files
+    # Look for test function name in traceback
+    test_match = re.search(r'in (test_\w+)', err)
+    if test_match:
+        test_name = test_match.group(1)
+        print(f"Checking deleted files for test: {test_name}")
+
+        # Try to match file extension to test name
+        # e.g., test_syntax_highlighting_c -> look for .c files
+        # e.g., test_syntax_highlighting_python -> look for .py files
+        # e.g., test_open_readme -> look for .md files
+        if '_c' in test_name.lower():
+            # Look for .c files
+            for f in deleted_files:
+                if f.endswith('.c'):
+                    print(f"Found deleted .c file that may be needed: {f}")
+                    if restore_missing_file(f):
+                        return True
+        elif '_python' in test_name.lower() or '_py' in test_name.lower():
+            # Look for .py files
+            for f in deleted_files:
+                if f.endswith('.py'):
+                    print(f"Found deleted .py file that may be needed: {f}")
+                    if restore_missing_file(f):
+                        return True
+        elif '_readme' in test_name.lower():
+            # Look for README files
+            for f in deleted_files:
+                if 'readme' in f.lower():
+                    print(f"Found deleted README file that may be needed: {f}")
+                    if restore_missing_file(f):
+                        return True
 
     return False
 
@@ -868,6 +1068,9 @@ def handle_missing_test_output(err: str) -> bool:
 # Order matters.
 # Each handler is tested in order and the first to return True is used.
 HANDLERS = [
+    handle_make_missing_makefile,
+    handle_make_missing_target,
+    handle_empty_python_file,
     handle_fopen_test_failure,
     handle_missing_test_output,
     handle_mypy_errors,
