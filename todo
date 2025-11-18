@@ -1,0 +1,40 @@
+STARTER TASK
+-------------
+ok, please "cd /root/dim; boil make test".
+The boil command will fail because it doesn't know how to handle the error.
+The solution is "git checkout example.py" but boil doesn't know that.
+
+Help write a handler function for boil to handle this case.
+Only edit /root/boiler/handlers.py yourself.
+DO NOT EDIT ANY OTHER FILE.
+
+You can also call "boil --clear" to reset state in the dim repo.
+
+Recommended iteration loop:
+1. "boil make test"
+2. inspect the log from that command and see why it failed
+3. "git log HEAD..boiling" to see a list of commits that boil added while working.
+    It uses the "boiling" branch, rather than changing HEAD
+    You can "git show <commit>" to see the output of "make test" and any file changes boil attempted.
+4. Based on the error output, and your knowledge of what the true fix is, modify /root/boiler/handlers.py to handle this error.
+5. "boil --abort" to reset the session to the beginning, undoing any file changes boil make
+6. "boil --clear" will dlete the "boiling" branch and ".boil" directory, but keep changes to working dir.
+
+
+
+SECOND TASK
+-----------
+
+Iteration Loop:
+Pick a random file in dim and delete it
+"boil make test"
+fix handlers.py until boil can make the repair on it's own
+repeat with a new random file until boil can handle them all
+
+
+THIRD TASK
+----------
+
+Iteration loop:
+1. download neovim from github and get it's tests working
+2. boil the repo while keeping the tests untouched
