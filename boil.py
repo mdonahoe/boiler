@@ -1057,6 +1057,20 @@ def has_changes(verbose:bool=False) -> bool:
 
     return changed
 
+def clear_boiling() -> int:
+    """
+    Delete the boiling branch and the .boil folder
+    Does not otherwise change the working directory
+    """
+    subprocess.check_call(["git", "branch", "-D", BOILING_BRANCH])
+
+    # Clean up .boil directory
+    if os.path.isdir(".boil"):
+        print("Removing .boil directory...")
+        shutil.rmtree(".boil")
+
+        return 0
+
 def abort_boiling() -> int:
     """
     Abort the current boiling session and restore the working directory
@@ -1099,7 +1113,7 @@ def abort_boiling() -> int:
         subprocess.check_call(f"git show {boil_start_commit} | git apply --allow-empty", shell=True)
 
         # Delete the boiling branch
-        subprocess.check_call(["git", "branch", "-D", "boiling"])
+        subprocess.check_call(["git", "branch", "-D", BOILING_BRANCH])
 
         print("Successfully aborted boiling session.")
         print("Working directory has been restored to pre-boiling state.")
@@ -1127,6 +1141,11 @@ def main() -> int:
         help="abort current boiling session and restore working directory",
     )
     parser.add_argument(
+        "--clear",
+        action="store_true",
+        help="remove the boiling branch and folder but not the working directory state",
+    )
+    parser.add_argument(
         "--handle-error",
         type=str,
         default=None,
@@ -1139,6 +1158,9 @@ def main() -> int:
     # Handle abort command
     if args.abort:
         return abort_boiling()
+
+    if args.clear:
+        return clear_boiling()
 
     # Store the remaining arguments as a single command string
     # TODO(matt): parse leading --dash-commands and complain because they are probs typos.
