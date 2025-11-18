@@ -748,6 +748,29 @@ def handle_mypy_errors(stdout: str) -> bool:
     return True
 
 
+def handle_fopen_test_failure(err: str) -> bool:
+    """Handle test failures caused by fopen errors when files are missing."""
+    # Look for 'fopen: No such file or directory' in assertion errors
+    if 'fopen: No such file or directory' not in err:
+        return False
+
+    # Find all AssertionError lines mentioning filenames with extensions
+    # Pattern: AssertionError: ... 'filename.ext' ... 'fopen: No such file or directory'
+    pattern = r"AssertionError:.*?'([^']+\.\w+)'.*?fopen: No such file or directory"
+    matches = re.findall(pattern, err, re.DOTALL)
+
+    if not matches:
+        return False
+
+    # Try to restore each filename found
+    for filename in matches:
+        print(f"Found potential missing file in fopen error: {filename}")
+        if restore_missing_file(filename):
+            return True
+
+    return False
+
+
 def handle_missing_test_output(err: str) -> bool:
     """
     Handle the case where test output is missing from expected output.
@@ -845,6 +868,7 @@ def handle_missing_test_output(err: str) -> bool:
 # Order matters.
 # Each handler is tested in order and the first to return True is used.
 HANDLERS = [
+    handle_fopen_test_failure,
     handle_missing_test_output,
     handle_mypy_errors,
     handle_orphaned_method,
