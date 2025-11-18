@@ -316,6 +316,63 @@ def handle_future_annotations(stderr: str) -> bool:
     return do_repair(relative_path, missing="annotations")
 
 
+def handle_orphaned_method(stderr: str) -> bool:
+    """
+    Handle IndentationError caused by a method missing its class definition.
+    This happens when a class definition is deleted but the methods remain.
+
+    Example:
+        class Dog:  # <- This line deleted
+            def __init__(self, name):  # <- IndentationError: unexpected indent
+                self.name = name
+    """
+    # Look for "unexpected indent" pattern
+    if "IndentationError: unexpected indent" not in stderr:
+        return False
+
+    # Find the file and line number where the error occurred
+    file_lines = [line for line in stderr.split('\n') if 'File "' in line]
+    if not file_lines:
+        return False
+
+    last_file_line = file_lines[-1]
+    file_match = re.search(r'File "([^"]+)", line (\d+)', last_file_line)
+    if not file_match:
+        return False
+
+    filepath = file_match.group(1)
+    error_line_num = int(file_match.group(2))
+    relative_path = os.path.relpath(filepath)
+
+    # Read the file to see what's on the problematic line
+    try:
+        with open(filepath, 'r') as f:
+            lines = f.readlines()
+            if error_line_num <= len(lines):
+                error_line = lines[error_line_num - 1]
+
+                # Check if it's a method definition (def with leading whitespace)
+                if re.match(r'\s+def\s+(\w+)', error_line):
+                    print(f"Detected orphaned method on line {error_line_num}: {error_line.strip()}")
+                    print(f"Attempting to restore missing class definition in {relative_path}")
+
+                    # Try to restore the file with py_repair without specifying a missing item
+                    # This should restore the class that contains this method
+                    # We'll use the method name to help identify what needs restoring
+                    method_match = re.match(r'\s+def\s+(\w+)', error_line)
+                    if method_match:
+                        method_name = method_match.group(1)
+                        # Try restoring with the method name - py_repair should restore
+                        # the entire class context needed for this method
+                        print(f"Restoring context for method: {method_name}")
+                        return do_repair(relative_path, missing=method_name)
+    except (IOError, IndexError) as e:
+        print(f"Error reading file: {e}")
+        return False
+
+    return False
+
+
 def handle_indentation_error(stderr: str) -> bool:
     """
     Fix IndentationError by restoring missing imports or code blocks.
@@ -847,6 +904,7 @@ def handle_missing_test_output(err: str) -> bool:
 HANDLERS = [
     handle_missing_test_output,
     handle_mypy_errors,
+    handle_orphaned_method,
     handle_indentation_error,
     handle_future_annotations,
     handle_name_error,
