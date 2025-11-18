@@ -994,11 +994,69 @@ def has_changes(verbose:bool=False) -> bool:
 
     return changed
 
+def abort_boiling() -> int:
+    """
+    Abort the current boiling session and restore the working directory
+    to the state before boiling started.
+    """
+    # Check if boiling branch exists
+    check_branch = subprocess.run(
+        ["git", "rev-parse", "--verify", BOILING_BRANCH],
+        capture_output=True
+    )
+    if check_branch.returncode != 0:
+        print("No active boiling session found.")
+        return 1
+
+    # Find the boil_start commit
+    try:
+        boil_start_commit = subprocess.check_output(
+            ["git", "log", "--format=%H", "--grep", "boil_start", BOILING_BRANCH],
+            text=True
+        ).strip().split('\n')[0]  # Get the first (most recent) match
+
+        if not boil_start_commit:
+            print("Error: Could not find boil_start commit on boiling branch.")
+            return 1
+
+        print(f"Found boil_start commit: {boil_start_commit}")
+
+        # Get the parent of boil_start (the original state)
+        original_commit = subprocess.check_output(
+            ["git", "rev-parse", f"{boil_start_commit}^"],
+            text=True
+        ).strip()
+
+        print(f"Restoring to original commit: {original_commit}")
+
+        # Reset working directory to the original state
+        subprocess.check_call(["git", "reset", "--hard", original_commit])
+
+        print("Successfully aborted boiling session.")
+        print("Working directory has been restored to pre-boiling state.")
+
+        # Clean up .boil directory
+        if os.path.isdir(".boil"):
+            print("Removing .boil directory...")
+            shutil.rmtree(".boil")
+
+        return 0
+
+    except subprocess.CalledProcessError as e:
+        print(f"Error during abort: {e}")
+        return 1
+
+
 def main() -> int:
     global CURRENT_SESSION
     parser = argparse.ArgumentParser(description="Boil your code.")
     parser.add_argument("-n", type=int, help="number of interations")
     parser.add_argument("--ref", type=str, default="HEAD", help="a working commit")
+    parser.add_argument(
+        "--abort",
+        action="store_true",
+        help="abort current boiling session and restore working directory",
+    )
     parser.add_argument(
         "--handle-error",
         type=str,
@@ -1008,6 +1066,10 @@ def main() -> int:
 
     # Use parse_known_args to separate known and unknown arguments
     args, unknown_args = parser.parse_known_args()
+
+    # Handle abort command
+    if args.abort:
+        return abort_boiling()
 
     # Store the remaining arguments as a single command string
     # TODO(matt): parse leading --dash-commands and complain because they are probs typos.
