@@ -4,6 +4,18 @@ from collections import namedtuple
 from functools import wraps
 from contextlib import contextmanager
 
+class Dog:
+    def __init__(self, name):
+        self.name = name
+
+class Animal:
+    def speak(self):
+        return "Sound"
+
+class Cat(Animal):
+    def speak(self):
+        return "Meow"
+
 
 class PythonFeatureTests(unittest.TestCase):
     """Unit tests for 50 different Python features"""
@@ -146,24 +158,12 @@ class PythonFeatureTests(unittest.TestCase):
 
     def test_22_class_definition(self):
         """Test class definition and instantiation"""
-        class Dog:
-            def __init__(self, name):
-                self.name = name
-
         dog = Dog("Buddy")
         self.assertEqual(dog.name, "Buddy")
         print("22. Class definition: Dog('Buddy').name = 'Buddy'")
 
     def test_23_inheritance(self):
         """Test class inheritance"""
-        class Animal:
-            def speak(self):
-                return "Sound"
-
-        class Cat(Animal):
-            def speak(self):
-                return "Meow"
-
         cat = Cat()
         self.assertEqual(cat.speak(), "Meow")
         print("23. Inheritance: Cat inherits from Animal")
@@ -401,4 +401,4 @@ class PythonFeatureTests(unittest.TestCase):
 
 if __name__ == "__main__":
     # Run tests with verbose output
-    unittest.main(verbosity=2)
+    unittest.main()
