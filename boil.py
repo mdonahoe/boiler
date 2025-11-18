@@ -1011,7 +1011,7 @@ def abort_boiling() -> int:
     # Find the boil_start commit
     try:
         boil_start_commit = subprocess.check_output(
-            ["git", "log", "--format=%H", "--grep", "boil_start", f"HEAD..{BOILING_BRANCH}],
+            ["git", "log", "--format=%H", "--grep", "boil_start", f"HEAD..{BOILING_BRANCH}"],
             text=True
         ).strip().split('\n')[0]  # Get the first (most recent) match
 
