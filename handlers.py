@@ -971,6 +971,112 @@ def handle_fopen_test_failure(err: str) -> bool:
     return False
 
 
+def handle_c_linker_error(err: str) -> bool:
+    """
+    Handle C/C++ linker errors when object files or source files are missing.
+
+    Example error:
+        /usr/bin/ld: ./libtree-sitter.a(parser.o): in function `ts_parser__lex':
+        parser.c:(.text+0x22ea): undefined reference to `ts_language_is_wasm'
+        ...
+        collect2: error: ld returned 1 exit status
+    """
+    # Check if this is a linker error with undefined references
+    if "undefined reference to" not in err:
+        return False
+
+    # Extract all undefined symbols
+    undefined_symbols = set()
+    pattern = r"undefined reference to [`']([^'`]+)[`']"
+    for match in re.finditer(pattern, err):
+        symbol = match.group(1)
+        undefined_symbols.add(symbol)
+
+    if not undefined_symbols:
+        return False
+
+    print(f"Linker error: found {len(undefined_symbols)} undefined symbols")
+    for symbol in list(undefined_symbols)[:5]:  # Show first 5
+        print(f"  - {symbol}")
+
+    # Try to find C source files that might contain these symbols
+    # Look at the symbol names to guess the file name
+    # For example, ts_wasm_store_* suggests wasm_store.c
+    file_candidates = set()
+
+    for symbol in undefined_symbols:
+        # Extract potential file name from symbol
+        # Common patterns:
+        # - ts_wasm_store_* -> wasm_store.c
+        # - ts_language_* -> language.c
+        # - prefix_module_function -> module.c
+
+        parts = symbol.split('_')
+        if len(parts) >= 2:
+            # Try different combinations
+            # Skip common prefixes like ts_
+            start_idx = 1 if parts[0] in ['ts', 'c', 'cpp'] else 0
+
+            # Try 2-part and 3-part combinations
+            for i in range(start_idx, min(len(parts), start_idx + 3)):
+                if i + 1 < len(parts):
+                    potential_file = '_'.join(parts[start_idx:i+2]) + '.c'
+                    file_candidates.add(potential_file)
+
+    print(f"Potential source files: {file_candidates}")
+
+    # Try to restore each candidate file
+    restored_any = False
+    for candidate in file_candidates:
+        if restore_missing_file(candidate):
+            print(f"Successfully restored {candidate}")
+            restored_any = True
+
+    return restored_any
+
+
+def handle_c_compilation_error(err: str) -> bool:
+    """
+    Handle C/C++ compilation errors when header files or source files are missing.
+
+    Example error:
+        lib/src/language.c:2:10: fatal error: ./wasm_store.h: No such file or directory
+            2 | #include "./wasm_store.h"
+              |          ^~~~~~~~~~~~~~~~
+        compilation terminated.
+    """
+    # Pattern: fatal error: <filename>: No such file or directory
+    pattern = r"fatal error:\s+([^\s:]+):\s+No such file or directory"
+    match = re.search(pattern, err)
+
+    if not match:
+        return False
+
+    missing_file = match.group(1)
+    print(f"C compilation error: missing file {missing_file}")
+
+    # Remove ./ prefix if present
+    if missing_file.startswith("./"):
+        missing_file = missing_file[2:]
+
+    # For header files, also try to restore the corresponding .c file
+    restored_any = False
+    if missing_file.endswith(".h"):
+        # Try to restore both the header and the corresponding .c file
+        c_file = missing_file[:-2] + ".c"
+        print(f"Also attempting to restore corresponding C file: {c_file}")
+        if restore_missing_file(c_file):
+            print(f"Successfully restored {c_file}")
+            restored_any = True
+
+    # Try to restore the missing file
+    if restore_missing_file(missing_file):
+        print(f"Successfully restored {missing_file}")
+        restored_any = True
+
+    return restored_any
+
+
 def handle_missing_test_output(err: str) -> bool:
     """
     Handle the case where test output is missing from expected output.
@@ -1070,6 +1176,8 @@ def handle_missing_test_output(err: str) -> bool:
 HANDLERS = [
     handle_make_missing_makefile,
     handle_make_missing_target,
+    handle_c_compilation_error,
+    handle_c_linker_error,
     handle_empty_python_file,
     handle_fopen_test_failure,
     handle_missing_test_output,

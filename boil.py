@@ -49,10 +49,6 @@ def save_changes(parent: str, message: str, branch_name: T.Optional[str] = None)
     return commit
 
 
-
-
-
-
 def fix(command: T.List[str], num_iterations: int) -> bool:
     """
     Repeatedly run a command, repairing files until it is fixed.
