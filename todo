@@ -1,19 +1,20 @@
 STARTER TASK
 -------------
 
-You are going to be editing one repo (boiler) and running a tool in a different repo (dim).
+You are going to be editing one repo (boiler) and running a tool in a target repo.
+In the following instruction, the {target repo} is "/root/dim"
 
 Read boiler/README.md
 
-Then, please "cd /root/dim; boil make test".
+Then, please "cd /root/{target-repo}; boil make test".
 The boil command will fail because it doesn't know how to handle the error.
-The solution is "git checkout example.py" but boiler doesn't know that.
+The solution is "git checkout" a missing file, but boiler doesn't know which.
 
 Help write a handler function for boil to handle this case.
 Only edit /root/boiler/handlers.py yourself.
-DO NOT EDIT ANY OTHER FILE.
+DO NOT EDIT ANY FILE IN THE TARGET REPO.
 
-You can also call "boil --clear" to reset state in the dim repo.
+You can also call "boil --clear" to reset state in the target repo.
 
 Recommended iteration loop:
 1. "boil make test"
@@ -31,7 +32,7 @@ SECOND TASK
 -----------
 
 Iteration Loop:
-Pick a random file in dim and delete it.
+Pick a random file in target repo and delete it.
 "boil make test"
 fix handlers.py until boiler can make the repair on it's own.
 repeat with a new random file until boil can handle them all.
@@ -41,16 +42,20 @@ repeat with a new random file until boil can handle them all.
 THIRD TASK
 ----------
 
+Target repo = neovim
+
 Iteration loop:
-1. download neovim from github and get it's tests working.
+1. download target repo from github and get it's tests working.
 2. boil the repo while keeping the tests untouched.
-3. Add more handlers as necessary until you can delete all the source files in the repo and boil it back to life using only the tests.
+3. Add more handlers as necessary until you can delete all the source files in the target repo and boil it back to life using only the tests.
 
 
 
 FOURTH TASK
 -----------
 
+Target repo = your choice
+
 Iteration loop:
 1. download a random repo from github
-2. identity tests and boil.
+2. identify tests and boil.
