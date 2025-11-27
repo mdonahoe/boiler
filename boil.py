@@ -6,6 +6,7 @@ import sys
 import typing as T
 
 import handlers
+from handlers import HANDLERS
 
 from session import ctx, new_session
 
