@@ -999,37 +999,55 @@ def handle_c_linker_error(err: str) -> bool:
     for symbol in list(undefined_symbols)[:5]:  # Show first 5
         print(f"  - {symbol}")
 
-    # Try to find C source files that might contain these symbols
-    # Look at the symbol names to guess the file name
-    # For example, ts_wasm_store_* suggests wasm_store.c
-    file_candidates = set()
+    # Get the list of deleted C files
+    ref = ctx().git_ref
+    deleted_files = get_deleted_files(ref=ref)
+    deleted_c_files = [f for f in deleted_files if f.endswith('.c')]
 
-    for symbol in undefined_symbols:
-        # Extract potential file name from symbol
-        # Common patterns:
-        # - ts_wasm_store_* -> wasm_store.c
-        # - ts_language_* -> language.c
-        # - prefix_module_function -> module.c
+    print(f"Deleted C files: {deleted_c_files}")
 
-        parts = symbol.split('_')
-        if len(parts) >= 2:
-            # Try different combinations
-            # Skip common prefixes like ts_
-            start_idx = 1 if parts[0] in ['ts', 'c', 'cpp'] else 0
+    # Check each deleted C file to see if it contains any of the missing symbols
+    file_scores = {}
+    for c_file in deleted_c_files:
+        try:
+            # Use git show to get the file contents
+            result = subprocess.run(
+                ["git", "show", f"{ref}:{c_file}"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
 
-            # Try 2-part and 3-part combinations
-            for i in range(start_idx, min(len(parts), start_idx + 3)):
-                if i + 1 < len(parts):
-                    potential_file = '_'.join(parts[start_idx:i+2]) + '.c'
-                    file_candidates.add(potential_file)
+            if result.returncode != 0:
+                print(f"Could not get contents of {c_file}")
+                continue
 
-    print(f"Potential source files: {file_candidates}")
+            file_contents = result.stdout
 
-    # Try to restore each candidate file
+            # Count how many symbols are defined in this file
+            score = 0
+            matched_symbols = []
+            for symbol in undefined_symbols:
+                # Check if the symbol appears in the file
+                # Look for function definitions or declarations
+                if symbol in file_contents:
+                    score += 1
+                    matched_symbols.append(symbol)
+
+            if score > 0:
+                file_scores[c_file] = score
+                print(f"  {c_file}: {score} symbols matched {matched_symbols[:3]}")
+
+        except Exception as e:
+            print(f"Error checking {c_file}: {e}")
+            continue
+
+    # Try to restore files with the highest scores first
     restored_any = False
-    for candidate in file_candidates:
-        if restore_missing_file(candidate):
-            print(f"Successfully restored {candidate}")
+    for c_file, score in sorted(file_scores.items(), key=lambda x: x[1], reverse=True):
+        print(f"Restoring {c_file} which contains {score} undefined symbols")
+        if restore_missing_file(c_file):
+            print(f"Successfully restored {c_file}")
             restored_any = True
 
     return restored_any
