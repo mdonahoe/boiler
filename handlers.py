@@ -926,6 +926,358 @@ def handle_empty_python_file(err: str) -> bool:
     return False
 
 
+def handle_generic_no_such_file(err: str) -> bool:
+    """Handle generic 'No such file or directory' errors when we can't identify the specific file."""
+    # Pattern: No such file or directory (os error 2)
+    # This is a catch-all for runtime errors where the file isn't specified
+
+    if "No such file or directory (os error 2)" not in err:
+        return False
+
+    # First, check for commonly missing configuration files
+    # These are files that are often read at runtime
+    common_config_files = [
+        "test/fixtures/fixtures.json",
+        "fixtures.json",
+        "config.json",
+        ".config.json",
+    ]
+
+    deleted_files = get_deleted_files(ref=ctx().git_ref)
+
+    for config_file in common_config_files:
+        if config_file in deleted_files:
+            print(f"Found deleted config file that's likely needed: {config_file}")
+            if restore_missing_file(config_file):
+                return True
+
+    # If there's no other context, we can't fix it
+    # But let's look for any file paths mentioned nearby in the error
+    lines = err.split('\n')
+
+    # Look for potential file paths in the error
+    for i, line in enumerate(lines):
+        if "No such file or directory" in line:
+            # Check surrounding lines for file paths
+            context_start = max(0, i - 5)
+            context_end = min(len(lines), i + 5)
+            context = '\n'.join(lines[context_start:context_end])
+
+            # Look for common file path patterns
+            file_patterns = [
+                r'`([^`]+\.[a-z]+)`',  # Files in backticks
+                r'"([^"]+\.[a-z]+)"',  # Files in quotes
+                r"'([^']+\.[a-z]+')",  # Files in single quotes
+                r'\b([\w/-]+\.(?:txt|json|toml|rs|c|h|md))\b',  # Common extensions
+            ]
+
+            for pattern in file_patterns:
+                matches = re.findall(pattern, context)
+                for file_path in matches:
+                    print(f"Found potential missing file: {file_path}")
+                    if restore_missing_file(file_path):
+                        return True
+
+    print("Generic 'No such file' error but couldn't identify the file")
+    return False
+
+
+def handle_rust_env_not_defined(err: str) -> bool:
+    """Handle Rust compile-time environment variable errors that might indicate missing build.rs."""
+    # Pattern: error: environment variable `BUILD_TARGET` not defined at compile time
+    #          --> crates/loader/src/loader.rs:578:28
+    #          = help: use `std::env::var("BUILD_TARGET")` to read the variable at run time
+
+    if "environment variable" not in err or "not defined at compile time" not in err:
+        return False
+
+    # Extract the variable name and file location
+    var_match = re.search(r"environment variable `([^`]+)` not defined", err)
+    file_match = re.search(r"--> ([^:]+):(\d+):(\d+)", err)
+
+    if not var_match or not file_match:
+        return False
+
+    var_name = var_match.group(1)
+    source_file = file_match.group(1)
+
+    print(f"Environment variable {var_name} not defined in {source_file}")
+
+    # Usually compile-time env vars are set by build.rs
+    # Try to find and restore the build.rs file for this crate
+    # Extract crate directory from source file path (e.g., crates/loader/src/loader.rs -> crates/loader)
+    parts = source_file.split('/')
+    if 'src' in parts:
+        src_index = parts.index('src')
+        crate_dir = '/'.join(parts[:src_index])
+        build_rs_path = os.path.join(crate_dir, 'build.rs')
+
+        print(f"Looking for build script: {build_rs_path}")
+        if restore_missing_file(build_rs_path):
+            print(f"Restored {build_rs_path}")
+            return True
+
+    return False
+
+
+def handle_rust_module_not_found(err: str) -> bool:
+    """Handle Rust compiler errors for missing module files."""
+    # Pattern: error[E0583]: file not found for module `ffi`
+    #          --> lib/binding_rust/lib.rs:5:1
+    #          = help: to create the module `ffi`, create file "lib/binding_rust/ffi.rs"
+
+    if "file not found for module" not in err:
+        return False
+
+    # Extract module name and suggested file path
+    module_match = re.search(r"file not found for module `([^`]+)`", err)
+    if not module_match:
+        return False
+
+    module_name = module_match.group(1)
+    print(f"Missing Rust module: {module_name}")
+
+    # Extract suggested file path from help message
+    # Pattern: = help: to create the module `ffi`, create file "lib/binding_rust/ffi.rs" or "lib/binding_rust/ffi/mod.rs"
+    file_match = re.search(r'create file "([^"]+\.rs)"', err)
+    if file_match:
+        suggested_file = file_match.group(1)
+        print(f"Suggested file: {suggested_file}")
+
+        # Try to restore the suggested file
+        if restore_missing_file(suggested_file):
+            return True
+
+        # Also try the alternative path if mentioned (mod.rs)
+        alt_match = re.search(r'create file "[^"]+" or "([^"]+\.rs)"', err)
+        if alt_match:
+            alt_file = alt_match.group(1)
+            print(f"Trying alternative: {alt_file}")
+            if restore_missing_file(alt_file):
+                return True
+
+    return False
+
+
+def handle_rust_panic_no_such_file(err: str) -> bool:
+    """Handle Rust build script panics caused by missing files."""
+    # Pattern: thread 'main' panicked at path/to/file.rs:line:col:
+    #          called `Result::unwrap()` on an `Err` value: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+
+    if "panicked at" not in err or "NotFound" not in err:
+        return False
+
+    # Extract the file that caused the panic
+    panic_match = re.search(r"panicked at ([^:]+):(\d+):(\d+):", err)
+    if not panic_match:
+        return False
+
+    panic_file = panic_match.group(1)
+    panic_line = int(panic_match.group(2))
+
+    print(f"Build script panic at {panic_file}:{panic_line}")
+
+    # Try to find what file the build script was trying to access
+    # Common patterns in build scripts:
+    #   fs::copy("src/wasm/stdlib-symbols.txt", ...)
+    #   File::open("path/to/file")
+    #   include_str!("path/to/file")
+
+    # Look for file paths in quotes near the panic
+    file_patterns = [
+        r'["\']([\w/.-]+\.\w+)["\']',  # Generic quoted file paths
+        r'fs::copy\(["\']([^"\']+)["\']',  # fs::copy calls
+        r'File::open\(["\']([^"\']+)["\']',  # File::open calls
+        r'include_str!\(["\']([^"\']+)["\']',  # include_str! macro
+    ]
+
+    # Try to read the panic file to see what it's trying to access
+    try:
+        result = subprocess.run(
+            ["git", "show", f"HEAD:{panic_file}"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if result.returncode == 0:
+            lines = result.stdout.split('\n')
+            # Get the line that caused the panic (and a few around it for context)
+            if panic_line <= len(lines):
+                context_lines = lines[max(0, panic_line - 3):min(len(lines), panic_line + 2)]
+                context = '\n'.join(context_lines)
+
+                # Search for file paths in the context
+                for pattern in file_patterns:
+                    matches = re.findall(pattern, context)
+                    for file_path in matches:
+                        print(f"Found potential missing file in build script: {file_path}")
+                        if restore_missing_file(file_path):
+                            return True
+    except Exception as e:
+        print(f"Error analyzing panic file: {e}")
+
+    return False
+
+
+def handle_cargo_couldnt_read(err: str) -> bool:
+    """Handle cargo/rustc errors when it can't read a file."""
+    # Pattern: error: couldn't read `crates/language/build.rs`: No such file or directory
+    match = re.search(r"couldn't read `([^`]+)`:\s*No such file or directory", err)
+    if not match:
+        return False
+
+    missing_file = match.group(1)
+    print(f"Cargo couldn't read file: {missing_file}")
+    return restore_missing_file(missing_file)
+
+
+def handle_cargo_missing_library(err: str) -> bool:
+    """Handle cargo errors when a library file is missing."""
+    # Patterns:
+    #   can't find library `name`, rename file to `src/lib.rs` or specify lib.path
+    #   no targets specified in the manifest
+    #   either src/lib.rs, src/main.rs, a [lib] section, or [[bin]] section must be present
+
+    # Pattern 1: specific library/bench/bin missing
+    # can't find library `name`, rename file to `src/lib.rs`
+    # can't find `benchmark` bench at `benches/benchmark.rs` or `benches/benchmark/main.rs`
+    match = re.search(r"can't find (?:`([^`]+)` )?(?:library|bench|bin) (?:`([^`]+)` )?at `([^`]+)`", err)
+    if match:
+        target_name = match.group(1) or match.group(2)
+        suggested_path = match.group(3)
+        print(f"Missing target: {target_name}, suggested path: {suggested_path}")
+
+        # Try to extract the crate path from error
+        # Pattern: failed to parse manifest at `/root/tree-sitter/crates/cli/Cargo.toml`
+        crate_match = re.search(r"failed to parse manifest at [`']([^'`]+/Cargo\.toml)[`']", err)
+        if crate_match:
+            cargo_path = crate_match.group(1)
+            # Convert to relative path
+            if cargo_path.startswith('/root/tree-sitter/'):
+                cargo_path = cargo_path.replace('/root/tree-sitter/', '')
+
+            # Get the directory containing Cargo.toml
+            crate_dir = os.path.dirname(cargo_path)
+            print(f"Crate directory: {crate_dir}")
+
+            # Prepend crate directory to suggested path
+            full_path = os.path.join(crate_dir, suggested_path)
+            print(f"Full path: {full_path}")
+
+            # Try to restore the file
+            if restore_missing_file(full_path):
+                return True
+
+        # Try without crate directory (for workspace root)
+        if restore_missing_file(suggested_path):
+            return True
+
+        # Also try with underscores instead of hyphens (common Rust convention)
+        alt_path = suggested_path.replace("-", "_")
+        if alt_path != suggested_path:
+            print(f"Trying alternative path: {alt_path}")
+            if restore_missing_file(alt_path):
+                return True
+
+    # Pattern 1b: simpler library pattern
+    match = re.search(r"can't find library `([^`]+)`, rename file to `([^`]+)`", err)
+    if match:
+        library_name = match.group(1)
+        suggested_path = match.group(2)
+        print(f"Missing library: {library_name}, suggested path: {suggested_path}")
+
+        # Try to restore the suggested file
+        if restore_missing_file(suggested_path):
+            return True
+
+        # Also try with underscores instead of hyphens (common Rust convention)
+        alt_path = suggested_path.replace("-", "_")
+        if alt_path != suggested_path:
+            print(f"Trying alternative path: {alt_path}")
+            if restore_missing_file(alt_path):
+                return True
+
+    # Pattern 2: no targets specified
+    if "no targets specified in the manifest" in err or "either src/lib.rs, src/main.rs" in err:
+        print("Cargo manifest has no targets, looking for src/lib.rs or src/main.rs")
+
+        # Try to extract the crate path from error
+        # Pattern: failed to parse manifest at `/root/tree-sitter/crates/xtask/Cargo.toml`
+        crate_match = re.search(r"failed to parse manifest at [`']([^'`]+/Cargo\.toml)[`']", err)
+        if crate_match:
+            cargo_path = crate_match.group(1)
+            # Convert to relative path
+            if cargo_path.startswith('/root/tree-sitter/'):
+                cargo_path = cargo_path.replace('/root/tree-sitter/', '')
+
+            # Get the directory containing Cargo.toml
+            crate_dir = os.path.dirname(cargo_path)
+            print(f"Crate directory: {crate_dir}")
+
+            # Try to restore src/lib.rs and src/main.rs
+            restored_any = False
+            for target_file in ['src/lib.rs', 'src/main.rs']:
+                target_path = os.path.join(crate_dir, target_file)
+                print(f"Trying to restore: {target_path}")
+                if restore_missing_file(target_path):
+                    restored_any = True
+
+            if restored_any:
+                return True
+
+    return False
+
+
+def handle_cargo_toml_not_found(err: str) -> bool:
+    """Handle cargo errors when Cargo.toml is missing."""
+    # Patterns:
+    #   error: could not find `Cargo.toml` in `/path` or any parent directory
+    #   error: failed to load manifest for workspace member
+    #   failed to read `/path/to/Cargo.toml`
+    is_cargo_error = (
+        "could not find `Cargo.toml`" in err or
+        "failed to load manifest" in err or
+        ("failed to read" in err and "Cargo.toml" in err)
+    )
+
+    if not is_cargo_error:
+        return False
+
+    print("Cargo.toml not found, attempting to restore")
+
+    # Try to extract specific path from error
+    # Pattern: failed to read `/root/tree-sitter/crates/cli/Cargo.toml`
+    path_match = re.search(r"failed to read [`']([^'`]+Cargo\.toml)[`']", err)
+    if path_match:
+        specific_path = path_match.group(1)
+        # Convert to relative path
+        if specific_path.startswith('/root/tree-sitter/'):
+            relative_path = specific_path.replace('/root/tree-sitter/', '')
+            print(f"Attempting to restore specific Cargo.toml: {relative_path}")
+            if restore_missing_file(relative_path):
+                return True
+
+    # Try to restore Cargo.toml in current directory
+    if restore_missing_file("Cargo.toml"):
+        return True
+
+    # Check deleted files for any Cargo.toml and restore all of them
+    deleted_files = get_deleted_files(ref=ctx().git_ref)
+    cargo_files = [f for f in deleted_files if f.endswith("Cargo.toml")]
+
+    if cargo_files:
+        print(f"Found {len(cargo_files)} deleted Cargo.toml files")
+        # Restore all of them
+        restored_any = False
+        for cargo_file in cargo_files:
+            print(f"Restoring {cargo_file}")
+            if restore_missing_file(cargo_file):
+                restored_any = True
+        return restored_any
+
+    return False
+
+
 def handle_make_missing_makefile(err: str) -> bool:
     """Handle make errors when the Makefile itself is missing."""
     # Pattern: make: *** No rule to make target 'X'.  Stop.
@@ -1266,6 +1618,12 @@ def handle_missing_test_output(err: str) -> bool:
 # Order matters.
 # Each handler is tested in order and the first to return True is used.
 HANDLERS = [
+    handle_cargo_toml_not_found,
+    handle_cargo_missing_library,
+    handle_cargo_couldnt_read,
+    handle_rust_env_not_defined,
+    handle_rust_module_not_found,
+    handle_rust_panic_no_such_file,
     handle_make_missing_makefile,
     handle_make_missing_target,
     handle_c_compilation_error,
@@ -1294,5 +1652,6 @@ HANDLERS = [
     handle_ansible_variable,
     handle_file_not_found,
     handle_no_such_file_or_directory,
+    handle_generic_no_such_file,
     handle_missing_file,
 ]
