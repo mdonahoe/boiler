@@ -9,6 +9,10 @@ from session import ctx
 def run_command(command: T.List[str]) -> T.Tuple[str, str, int]:
     """
     Run a shell command and return its output, error and exit code.
+
+    Returns standard Unix exit codes:
+    - 126: Permission denied
+    - 127: Command not found
     """
     print(f"Running: {' '.join(command)}")
     try:
@@ -17,7 +21,11 @@ def run_command(command: T.List[str]) -> T.Tuple[str, str, int]:
         )
         return result.stdout, result.stderr, result.returncode
     except FileNotFoundError as e:
-        return "", str(e), -1
+        # Return exit code 127 (standard for "command not found")
+        return "", f"FileNotFoundError: {e}", 127
+    except PermissionError as e:
+        # Return exit code 126 (standard for "permission denied")
+        return "", f"PermissionError: {e}", 126
 
 def git_checkout(file_path: str, ref: str = "HEAD") -> bool:
     """Run git checkout for the given file path."""
@@ -639,11 +647,63 @@ def do_repair(
         return False
 
 
-def handle_executable_not_found(stderr: str) -> bool:
-    """Handle the case where the executable is missing."""
-    if "No such file or directory" not in stderr:
+def handle_permission_denied(err: str) -> bool:
+    """Handle the case where a file exists but doesn't have execute permissions."""
+    # Check for PermissionError prefix (from run_command exception)
+    # or standard "Permission denied" message
+    if "PermissionError:" not in err and "Permission denied" not in err:
         return False
-    missing_executable = stderr.split(":")[-1].strip().strip("'")
+
+    # Extract the file path from the error message
+    # Formats:
+    #   PermissionError: [Errno 13] Permission denied: './test_tree_print.py'
+    #   Permission denied: './test_tree_print.py'
+    match = re.search(r"Permission denied:\s*['\"]?([^'\"]+)['\"]?", err)
+    if not match:
+        print("Could not extract file path from permission error")
+        return False
+
+    file_path = match.group(1)
+    print(f"Permission denied for: {file_path}")
+
+    # If this is a modified file (not deleted), restore it from git
+    # to get the correct permissions
+    relative_path = os.path.relpath(file_path) if os.path.isabs(file_path) else file_path
+
+    # Check if the file exists
+    if not os.path.exists(relative_path):
+        print(f"File {relative_path} does not exist, trying to restore")
+        return restore_missing_file(relative_path)
+
+    # File exists but has wrong permissions - restore from git
+    print(f"File exists but has wrong permissions, restoring from git")
+    try:
+        subprocess.check_call(["git", "checkout", "HEAD", "--", relative_path])
+        print(f"Successfully restored {relative_path} with correct permissions")
+        return True
+    except subprocess.CalledProcessError:
+        print(f"Failed to restore {relative_path} from git")
+        return False
+
+
+def handle_executable_not_found(err: str) -> bool:
+    """Handle the case where the executable is missing."""
+    # Check for FileNotFoundError prefix (from run_command exception)
+    # or standard "No such file or directory" message
+    if "FileNotFoundError:" not in err and "No such file or directory" not in err:
+        return False
+
+    # Try to extract file path from FileNotFoundError format first
+    # Format: FileNotFoundError: [Errno 2] No such file or directory: './test.py'
+    file_match = re.search(r"FileNotFoundError:.*?['\"]([^'\"]+)['\"]", err)
+    if file_match:
+        missing_executable = file_match.group(1)
+    else:
+        # Fallback to old parsing
+        if "No such file or directory" not in err:
+            return False
+        missing_executable = err.split(":")[-1].strip().strip("'")
+
     print(f"Missing executable: {missing_executable}")
 
     # Handle paths with spaces by checking if it looks like a reasonable file path
@@ -899,6 +959,20 @@ def handle_make_missing_target(err: str) -> bool:
 
     missing_file = match.group(1)
     print(f"Found missing make target: {missing_file}")
+    return restore_missing_file(missing_file)
+
+
+def handle_cannot_open_file(err: str) -> bool:
+    """Handle errors when a program cannot open a file."""
+    # Pattern: "Error: Cannot open file 'example.c'"
+    pattern = r"[Ee]rror:?\s+Cannot open file ['\"]([^'\"]+)['\"]"
+    match = re.search(pattern, err)
+
+    if not match:
+        return False
+
+    missing_file = match.group(1)
+    print(f"Cannot open file: {missing_file}")
     return restore_missing_file(missing_file)
 
 
@@ -1196,6 +1270,9 @@ HANDLERS = [
     handle_make_missing_target,
     handle_c_compilation_error,
     handle_c_linker_error,
+    handle_cannot_open_file,
+    handle_permission_denied,
+    handle_executable_not_found,
     handle_empty_python_file,
     handle_fopen_test_failure,
     handle_missing_test_output,
@@ -1209,7 +1286,6 @@ HANDLERS = [
     handle_circular_import_error,
     handle_import_error2,
     handle_missing_pyc,
-    handle_executable_not_found,
     handle_missing_py_module,
     handle_missing_py_package,
     handle_import_error1,
