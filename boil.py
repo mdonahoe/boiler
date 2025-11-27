@@ -101,14 +101,6 @@ def fix(command: T.List[str], num_iterations: int) -> bool:
         n += 1
         print(f"Attempt {n}")
 
-        if code == -1:
-            # special case for FileNotFound
-            print("file not found")
-            if handlers.handle_executable_not_found(stderr):
-                continue
-            else:
-                raise ValueError("asdf")
-
         # Print the output for debugging purposes
         print(stdout)
         print(stderr)
