@@ -98,3 +98,41 @@ class MakeMissingTargetPlanner(Planner):
         ))
 
         return plans
+
+
+class MakeNoRulePlanner(Planner):
+    """
+    Plan fixes for 'No rule to make target' errors (often indicates missing Makefile).
+
+    Strategy:
+    - Check if Makefile, makefile, or GNUmakefile is deleted
+    - Restore the deleted Makefile
+    """
+
+    @property
+    def name(self) -> str:
+        return "MakeNoRulePlanner"
+
+    def can_handle(self, clue_type: str) -> bool:
+        return clue_type == "make_no_rule"
+
+    def plan(self, clue: ErrorClue, git_state: GitState) -> T.List[RepairPlan]:
+        plans = []
+
+        # Check for common Makefile names in deleted files
+        makefile_names = ['Makefile', 'makefile', 'GNUmakefile']
+
+        for makefile in makefile_names:
+            if makefile in git_state.deleted_files:
+                print(f"[Planner:MakeNoRulePlanner] Found deleted {makefile}")
+                plans.append(RepairPlan(
+                    plan_type="restore_file",
+                    priority=0,  # High priority - Makefile needed for build
+                    target_file=makefile,
+                    action="restore_full",
+                    params={"ref": git_state.ref},
+                    reason=f"Restore {makefile} (no rule to make target '{clue.context.get('target')}')",
+                    clue_source=clue
+                ))
+
+        return plans

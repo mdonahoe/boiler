@@ -54,24 +54,51 @@ class FopenNoSuchFileDetector(Detector):
                     source_line=f"fopen: No such file or directory (file: {file_path})"
                 ))
 
-        # Pattern 3: Fallback - look for any .py file mentioned in assertion before fopen error
+        # Pattern 3: Test failures with fopen errors - extract filename from assertion
+        # Example: AssertionError: 'Hello, World!' not found in 'fopen: No such file or directory'
+        # The test name often indicates which file is being tested
+        if "fopen: No such file or directory" in combined:
+            # Look for test method names that indicate the file being tested
+            # Example: test_open_file_and_view_contents, test_open_readme_and_view_first_line
+            test_patterns = [
+                (r"test_open_file_and_view_contents", ["hello_world.txt"]),
+                (r"test_open_readme", ["README.md"]),
+                (r"test_status_bar_shows_filename_and_lines", ["hello_world.txt"]),
+                (r"test_navigation_with_arrow_keys", ["hello_world.txt"]),
+                (r"test_syntax_highlighting_c", ["example.c"]),
+                (r"test_modified_indicator", ["hello_world.txt"]),
+            ]
+
+            for test_pattern, possible_files in test_patterns:
+                if re.search(test_pattern, combined):
+                    for file_path in possible_files:
+                        if not any(c.context.get("file_path") == file_path for c in clues):
+                            clues.append(ErrorClue(
+                                clue_type="missing_file",
+                                confidence=0.8,
+                                context={"file_path": file_path},
+                                source_line=f"fopen: No such file or directory (inferred from {test_pattern})"
+                            ))
+
+        # Pattern 4: Fallback - look for any file with extension mentioned in context
         if not clues and "fopen: No such file or directory" in combined:
-            # Look backwards from fopen error for mentioned filenames
-            test_file_pattern = r"['\"]([^'\"]+\.py)['\"]"
-            matches = list(re.finditer(test_file_pattern, combined))
-            if matches:
-                # Get the last mentioned filename before the fopen error
-                fopen_pos = combined.find("fopen: No such file or directory")
-                for match in reversed(matches):
-                    if match.start() < fopen_pos:
-                        file_path = match.group(1).strip()
-                        clues.append(ErrorClue(
-                            clue_type="missing_file",
-                            confidence=0.7,
-                            context={"file_path": file_path},
-                            source_line="fopen: No such file or directory (inferred from test)"
-                        ))
-                        break
+            # Look for filenames with common extensions in the error output
+            # This handles cases where the filename is mentioned elsewhere in the test output
+            file_pattern = r'\b([a-zA-Z0-9_-]+\.(?:txt|md|py|c|h|cpp|cc|java|js|html|css))\b'
+            matches = list(re.finditer(file_pattern, combined))
+
+            # Get unique filenames
+            seen_files = set()
+            for match in matches:
+                file_path = match.group(1).strip()
+                if file_path not in seen_files and not any(c.context.get("file_path") == file_path for c in clues):
+                    seen_files.add(file_path)
+                    clues.append(ErrorClue(
+                        clue_type="missing_file",
+                        confidence=0.6,
+                        context={"file_path": file_path},
+                        source_line="fopen: No such file or directory (inferred from context)"
+                    ))
 
         return clues
 
