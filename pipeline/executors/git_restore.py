@@ -62,6 +62,24 @@ class GitRestoreExecutor(Executor):
             abs_path = os.path.abspath(file_path)
             git_relative_path = os.path.relpath(abs_path, git_toplevel)
 
+            # Check if there are actually changes to restore
+            # If the file already exists and matches git, there's nothing to do
+            if os.path.exists(file_path):
+                # Compare with git version
+                show_result = subprocess.run(
+                    ["git", "diff", "--quiet", ref, "--", git_relative_path],
+                    cwd=git_toplevel,
+                    capture_output=True
+                )
+                if show_result.returncode == 0:
+                    # File already matches git version - nothing to do
+                    return RepairResult(
+                        success=False,
+                        plans_attempted=[plan],
+                        files_modified=[],
+                        error_message=f"File {file_path} already matches git version at {ref}"
+                    )
+
             # Create parent directories if needed
             parent_dir = os.path.dirname(file_path)
             if parent_dir:
@@ -83,20 +101,38 @@ class GitRestoreExecutor(Executor):
                     error_message=f"git checkout failed: {result.stderr}"
                 )
 
-            # Verify file exists after checkout
-            if not os.path.exists(file_path):
+            # Verify file exists after checkout IN THE EXPECTED LOCATION
+            # Git checkout restores to git root, so check the actual git path
+            restored_path = os.path.join(git_toplevel, git_relative_path)
+            if not os.path.exists(restored_path):
                 return RepairResult(
                     success=False,
                     plans_attempted=[plan],
                     files_modified=[],
-                    error_message=f"File {file_path} does not exist after git checkout"
+                    error_message=f"File {git_relative_path} does not exist after git checkout"
                 )
 
-            print(f"Successfully restored {file_path} from {ref}")
+            # Verify that something actually changed
+            # Check if the file now differs from the boiling branch
+            diff_result = subprocess.run(
+                ["git", "diff", "--quiet", "boiling", "--", git_relative_path],
+                cwd=git_toplevel,
+                capture_output=True
+            )
+            if diff_result.returncode == 0:
+                # No difference from boiling branch - restore didn't help
+                return RepairResult(
+                    success=False,
+                    plans_attempted=[plan],
+                    files_modified=[],
+                    error_message=f"Restoring {file_path} did not create any changes (already in boiling branch)"
+                )
+
+            print(f"Successfully restored {git_relative_path} from {ref}")
             return RepairResult(
                 success=True,
                 plans_attempted=[plan],
-                files_modified=[file_path],
+                files_modified=[git_relative_path],
                 error_message=None
             )
 
