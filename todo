@@ -2,7 +2,7 @@ STARTER TASK
 -------------
 
 You are going to be editing one repo (boiler) and running a tool in a target repo.
-In the following instruction, the {target repo} is "/root/dim"
+In the following instruction, the {target repo} is whatever user told you in the original prompt.
 
 Read boiler/README.md
 
@@ -42,7 +42,6 @@ repeat with a new random file until boil can handle them all.
 THIRD TASK
 ----------
 
-Target repo = neovim
 
 Iteration loop:
 1. download target repo from github and get it's tests working.
@@ -57,5 +56,5 @@ FOURTH TASK
 Target repo = your choice
 
 Iteration loop:
-1. download a random repo from github
+1. clone a random repo from github
 2. identify tests and boil.
