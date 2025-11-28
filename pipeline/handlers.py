@@ -10,7 +10,17 @@ from pipeline.executors.registry import register_executor
 
 # Import concrete implementations
 from pipeline.detectors.permissions import PermissionDeniedDetector
+from pipeline.detectors.make_errors import MakeMissingTargetDetector
+from pipeline.detectors.file_errors import (
+    FileNotFoundDetector,
+    ShellCannotOpenDetector,
+    ShellCommandNotFoundDetector,
+    CatNoSuchFileDetector,
+    DiffNoSuchFileDetector,
+    CCompilationErrorDetector,
+)
 from pipeline.planners.file_restore import PermissionFixPlanner, MissingFilePlanner
+from pipeline.planners.make_restore import MakeMissingTargetPlanner
 from pipeline.executors.git_restore import GitRestoreExecutor
 
 
@@ -32,10 +42,18 @@ def register_all_handlers():
 
     # Register detectors
     register_detector(PermissionDeniedDetector())
+    register_detector(MakeMissingTargetDetector())
+    register_detector(FileNotFoundDetector())
+    register_detector(ShellCannotOpenDetector())
+    register_detector(ShellCommandNotFoundDetector())
+    register_detector(CatNoSuchFileDetector())
+    register_detector(DiffNoSuchFileDetector())
+    register_detector(CCompilationErrorDetector())
 
     # Register planners
     register_planner(PermissionFixPlanner())
     register_planner(MissingFilePlanner())
+    register_planner(MakeMissingTargetPlanner())
 
     # Register executors
     register_executor(GitRestoreExecutor())
