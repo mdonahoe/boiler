@@ -28,30 +28,39 @@ def run_command(command: T.List[str]) -> T.Tuple[str, str, int]:
         return "", f"PermissionError: {e}", 126
 
 def git_checkout(file_path: str, ref: str = "HEAD") -> bool:
-    """Run git checkout for the given file path."""
+    """Run git checkout for the given file path.
+    
+    file_path should be relative to the git root (as returned by git diff).
+    """
     deleted_files = set(get_deleted_files(ref=ref))
     if file_path not in deleted_files:
         print(f"missing: {file_path}")
         return False
 
+    # Convert git-root-relative path to cwd-relative path for file operations
+    git_toplevel = get_git_toplevel()
+    cwd = os.getcwd()
+    abs_path = os.path.join(git_toplevel, file_path)
+    cwd_relative_path = os.path.relpath(abs_path, cwd)
+
     # For Python files, create empty file first and let py_repair handle restoration
     if file_path.endswith(".py"):
-        print(f"creating empty Python file: {file_path}")
+        print(f"creating empty Python file: {cwd_relative_path}")
         # Create parent directories if needed
-        os.makedirs(os.path.dirname(file_path) or ".", exist_ok=True)
+        os.makedirs(os.path.dirname(cwd_relative_path) or ".", exist_ok=True)
         # Create empty Python file
-        with open(file_path, 'w') as f:
+        with open(cwd_relative_path, 'w') as f:
             f.write("")
         return True
 
-    # For non-Python files, do full checkout
-    command = ["git", "checkout", ref, "--", file_path]
+    # For non-Python files, do full checkout from git root
+    command = ["git", "-C", git_toplevel, "checkout", ref, "--", file_path]
     stdout, stderr, code = run_command(command)
     if code != 0:
         print("stdout:", stdout)
         print("stderr:", stderr)
         raise ValueError(file_path)
-    success = os.path.exists(file_path)
+    success = os.path.exists(cwd_relative_path)
     print(f"success = {success}")
     return success
 
@@ -66,10 +75,28 @@ def get_python_init_path(module_name: str) -> str:
     return module_name.replace(".", "/") + "/__init__.py"
 
 
+def get_git_toplevel() -> str:
+    """Get the git repository root directory."""
+    return subprocess.check_output(
+        ["git", "rev-parse", "--show-toplevel"], text=True
+    ).strip()
+
+
 def get_deleted_files(ref: str = "HEAD") -> T.Set[str]:
     """Get the list of deleted files from `git status`."""
+    # First, check if we're in an active boiling session with a saved list of deleted files
+    if os.path.exists(".boil/deleted_files.txt"):
+        try:
+            with open(".boil/deleted_files.txt", "r") as f:
+                deleted_files = set(line.strip() for line in f if line.strip())
+                print(f"Using {len(deleted_files)} deleted files from .boil/deleted_files.txt")
+                return deleted_files
+        except Exception as e:
+            print(f"Error reading deleted_files.txt: {e}")
+    
+    # Fallback: use the working directory state
     result = subprocess.run(
-        ["git", "diff", "--name-status", ref], stdout=subprocess.PIPE, text=True
+        ["git", "diff", "--name-status"], stdout=subprocess.PIPE, text=True
     )
     # TODO: what if result fails?
     return set(
@@ -83,8 +110,19 @@ def restore_missing_file(missing_file: str, ref: T.Optional[str] = None) -> bool
     """
     print(f"Restoring missing file {missing_file}")
     ref = ref or ctx().git_ref
-    # Convert the absolute path to a relative path (assuming your repo's root is in your current working directory)
-    relative_path = os.path.relpath(missing_file)
+    
+    # Get git toplevel to compute paths relative to repo root
+    git_toplevel = get_git_toplevel()
+    cwd = os.getcwd()
+    
+    # Convert the file path to be relative to git root (not cwd)
+    # First resolve relative to cwd, then make relative to git root
+    abs_path = os.path.abspath(missing_file)
+    relative_path = os.path.relpath(abs_path, git_toplevel)
+    
+    # Also compute the cwd-relative path from git_toplevel
+    cwd_relative_to_git = os.path.relpath(cwd, git_toplevel)
+    
     deleted_files = get_deleted_files(ref=ref)
 
     if relative_path in deleted_files:
@@ -146,6 +184,27 @@ def restore_missing_file(missing_file: str, ref: T.Optional[str] = None) -> bool
         if success_count > 0:
             print(f"Successfully restored {success_count}/{len(broad_matching_dirs)} files from {dir_base} pattern")
             return True
+    
+    # If we're in a subdirectory, try prefixing the relative path with the subdirectory name
+    # This handles the case where error messages report filenames without directory prefixes
+    # but the git diff shows them with the subdirectory prefix
+    if cwd_relative_to_git != ".":
+        # Only add the prefix if relative_path doesn't already start with it
+        if not relative_path.startswith(cwd_relative_to_git):
+            subdir_prefixed = os.path.join(cwd_relative_to_git, relative_path)
+            print(f"Trying with subdirectory prefix: {subdir_prefixed}")
+            
+            if subdir_prefixed in deleted_files:
+                if git_checkout(subdir_prefixed, ref=ref):
+                    return True
+            
+            # Also try matching with this prefixed path
+            matching_files = [f for f in deleted_files if subdir_prefixed in f]
+            if matching_files:
+                for path in matching_files:
+                    print(f"Found matching path with subdirectory prefix: {path}")
+                    if git_checkout(path):
+                        return True
     
     return False
 

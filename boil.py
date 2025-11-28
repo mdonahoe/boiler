@@ -25,6 +25,13 @@ git restore --source boiling -- .
 BOILING_BRANCH = "boiling"
 
 
+def get_git_dir() -> str:
+    """Get the .git directory path, works from any subdirectory of a git repo."""
+    return subprocess.check_output(
+        ["git", "rev-parse", "--git-dir"], text=True
+    ).strip()
+
+
 def save_changes(parent: str, message: str, branch_name: T.Optional[str] = None) -> str:
     """
     Commit the current working directory, relative to a parent.
@@ -32,8 +39,9 @@ def save_changes(parent: str, message: str, branch_name: T.Optional[str] = None)
 
     Returns the created commit hash.
     """
-    index_file = ".git/boil.index"
-    shutil.copyfile(".git/index", index_file)
+    git_dir = get_git_dir()
+    index_file = os.path.join(git_dir, "boil.index")
+    shutil.copyfile(os.path.join(git_dir, "index"), index_file)
     env = os.environ.copy()
     env["GIT_INDEX_FILE"] = index_file
     if os.path.isdir(".boil"):
@@ -90,7 +98,29 @@ def fix(command: T.List[str], num_iterations: int) -> bool:
 
     # load the iteration number from the .boil dir
     os.makedirs(".boil", exist_ok=True)
-    n = len(os.listdir(".boil"))
+    
+    # Capture the original deleted files at the start of boiling
+    # This way we can correctly identify which files need to be restored throughout the session
+    if not os.path.exists(".boil/deleted_files.txt"):  # Only on the first iteration
+        try:
+            result = subprocess.run(
+                ["git", "diff", "--name-status"],
+                stdout=subprocess.PIPE,
+                text=True
+            )
+            deleted_files = [
+                line.split()[-1] for line in result.stdout.splitlines()
+                if line.startswith("D")
+            ]
+            with open(".boil/deleted_files.txt", "w") as f:
+                for fname in deleted_files:
+                    f.write(fname + "\n")
+            print(f"Saved {len(deleted_files)} deleted files to .boil/deleted_files.txt")
+        except Exception as e:
+            print(f"Warning: Could not save deleted files list: {e}")
+    
+    # Count only iter files, not deleted_files.txt
+    n = len([f for f in os.listdir(".boil") if f.startswith("iter")])
 
     # bootstrap
     stdout, stderr, code = handlers.run_command(command)
@@ -147,7 +177,8 @@ def has_changes(verbose:bool=False) -> bool:
     """
     Look for changes in the working directory relative to the boiling branch
     """
-    index_file = ".git/boil.index"
+    git_dir = get_git_dir()
+    index_file = os.path.join(git_dir, "boil.index")
     env = os.environ.copy()
     env["GIT_INDEX_FILE"] = index_file
 
