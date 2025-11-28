@@ -195,6 +195,7 @@ register_executor(MyExecutor())  # if new executor needed
   - diff_no_such_file (bonus)
 - **Fallback**: Active - if pipeline doesn't fix, falls back to old handlers
 - **Safety**: High - old system unchanged, new system adds validation
+- **Loop prevention**: Executor validates that restorations actually create changes
 - **Debug output**: JSON files track detections, plans, and legacy handler usage
 - **Success rate**: ~86% in heirloom-ex-vi test (12/14 iterations)
 
