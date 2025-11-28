@@ -10,6 +10,10 @@ from handlers import HANDLERS
 
 from session import ctx, new_session
 
+# Import new pipeline system
+from pipeline import run_pipeline, GitState, has_pipeline_handlers
+from pipeline.handlers import register_all_handlers
+
 """
 git branch "boiling"
 cp .git/index .git/boil.index
@@ -120,13 +124,37 @@ def fix(command: T.List[str], num_iterations: int) -> bool:
             out.write(err)
 
         exit = False
-        for handler in handlers.HANDLERS:
-            if handler(err) and has_changes():
-                message = f"fixed with {handler}"
-                break
-        else:
-            message = "failed to handle this type of error"
-            exit = True
+        message = ""
+
+        # Try new pipeline system first
+        if has_pipeline_handlers():
+            print("[Pipeline] Attempting repair with new pipeline system...")
+
+            # Build git state
+            git_state = GitState(
+                ref=ref,
+                deleted_files=handlers.get_deleted_files(ref=ref),
+                git_toplevel=handlers.get_git_toplevel()
+            )
+
+            # Run pipeline
+            result = run_pipeline(stderr, stdout, git_state, debug=True)
+
+            if result.success and has_changes():
+                message = f"fixed with pipeline (modified {len(result.files_modified)} file(s))"
+                print(f"[Pipeline] Success: {message}")
+            else:
+                print("[Pipeline] Pipeline did not produce a fix, falling back to old handlers...")
+
+        # Fall back to old handler system if pipeline didn't fix it
+        if not message:
+            for handler in handlers.HANDLERS:
+                if handler(err) and has_changes():
+                    message = f"fixed with {handler}"
+                    break
+            else:
+                message = "failed to handle this type of error"
+                exit = True
 
         if not has_changes(verbose=True):
             raise RuntimeError("no change")
@@ -311,6 +339,10 @@ def main() -> int:
 
     # set the global session
     new_session("foo", args.ref, 0, command)
+
+    # Register pipeline handlers
+    print("[Pipeline] Registering pipeline handlers...")
+    register_all_handlers()
 
     # If the user passes the error output explicitly, we can handle it and exit.
     if args.handle_error:
