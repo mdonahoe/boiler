@@ -188,14 +188,21 @@ def clear_boiling() -> int:
     Delete the boiling branch and the .boil folder
     Does not otherwise change the working directory
     """
-    subprocess.check_call(["git", "branch", "-D", BOILING_BRANCH])
+    # Try to delete the branch, but don't fail if it doesn't exist
+    result = subprocess.run(["git", "branch", "-D", BOILING_BRANCH], 
+                           capture_output=True, text=True)
+    if result.returncode != 0:
+        if "not found" in result.stderr:
+            print(f"Branch '{BOILING_BRANCH}' does not exist, nothing to delete")
+        else:
+            print(f"Warning: could not delete branch: {result.stderr}")
 
     # Clean up .boil directory
     if os.path.isdir(".boil"):
         print("Removing .boil directory...")
         shutil.rmtree(".boil")
 
-        return 0
+    return 0
 
 def abort_boiling() -> int:
     """
