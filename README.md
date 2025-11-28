@@ -169,6 +169,8 @@ This ensures only necessary code is restored, not everything from history.
 2. Add .h/.c support instead of just .py
 3. If boiler knows the filetype and can parse the file, it can do a partial restore. Otherwise, it must do full restore
 4. Research "tree-shaking" techniques
+5. Partial restores on files that dont need it are bad. Check it the restore would even do anything. py_repair should fail if the restore results in no change.
+6. split handler functions into 3 phases: first, match on keywords in the stderr and return clue tokens. Like PermissionError or "not found". Then produce a list of candidate files and what might be wrong with them. Then attempt repairs on those files or just restore them. Dont let handlers make arbitiray edits. All reapairs must go through sometimes that ensures the file is a subset of what is checked into disk.
 
 ## Troubleshooting
 
