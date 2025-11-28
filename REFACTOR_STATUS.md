@@ -94,7 +94,10 @@ Test 3: Missing File Validation - PASSED
 1. **Easier to write handlers**: Each stage is 10-20 lines instead of 50-100
 2. **Better testing**: Each stage testable independently
 3. **Better validation**: Executors validate all operations before executing
-4. **Better debugging**: Clear separation of detect → plan → execute
+4. **Better debugging**:
+   - Clear separation of detect → plan → execute
+   - **JSON debug files** saved to `.boil/iterN.pipeline.json` for each iteration
+   - Shows exactly what was detected, planned, and executed
 5. **Better prioritization**: Plans sorted by priority before execution
 
 ## Next Steps

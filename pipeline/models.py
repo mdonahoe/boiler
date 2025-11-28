@@ -56,10 +56,51 @@ class RepairResult:
     plans_attempted: T.List[RepairPlan]
     files_modified: T.List[str]
     error_message: T.Optional[str]
+    # Debug information
+    clues_detected: T.Optional[T.List[ErrorClue]] = None
+    plans_generated: T.Optional[T.List[RepairPlan]] = None
 
     def __repr__(self) -> str:
         status = "SUCCESS" if self.success else "FAILED"
         return f"RepairResult({status}, modified={len(self.files_modified)} files)"
+
+    def to_dict(self) -> T.Dict[str, T.Any]:
+        """Convert to dictionary for JSON serialization"""
+        return {
+            "success": self.success,
+            "files_modified": self.files_modified,
+            "error_message": self.error_message,
+            "clues_detected": [
+                {
+                    "clue_type": c.clue_type,
+                    "confidence": c.confidence,
+                    "context": c.context,
+                    "source_line": c.source_line
+                }
+                for c in (self.clues_detected or [])
+            ],
+            "plans_generated": [
+                {
+                    "plan_type": p.plan_type,
+                    "priority": p.priority,
+                    "target_file": p.target_file,
+                    "action": p.action,
+                    "params": p.params,
+                    "reason": p.reason
+                }
+                for p in (self.plans_generated or [])
+            ],
+            "plans_attempted": [
+                {
+                    "plan_type": p.plan_type,
+                    "priority": p.priority,
+                    "target_file": p.target_file,
+                    "action": p.action,
+                    "reason": p.reason
+                }
+                for p in self.plans_attempted
+            ]
+        }
 
 
 @dataclasses.dataclass

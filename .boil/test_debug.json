@@ -1,0 +1,38 @@
+{
+  "success": true,
+  "files_modified": [
+    "./test.py"
+  ],
+  "error_message": null,
+  "clues_detected": [
+    {
+      "clue_type": "permission_denied",
+      "confidence": 1.0,
+      "context": {
+        "file_path": "./test.py"
+      },
+      "source_line": "Permission denied: './test.py'"
+    }
+  ],
+  "plans_generated": [
+    {
+      "plan_type": "restore_permissions",
+      "priority": 1,
+      "target_file": "./test.py",
+      "action": "restore_full",
+      "params": {
+        "ref": "HEAD"
+      },
+      "reason": "File ./test.py has wrong permissions, restoring from git"
+    }
+  ],
+  "plans_attempted": [
+    {
+      "plan_type": "restore_permissions",
+      "priority": 1,
+      "target_file": "./test.py",
+      "action": "restore_full",
+      "reason": "File ./test.py has wrong permissions, restoring from git"
+    }
+  ]
+}

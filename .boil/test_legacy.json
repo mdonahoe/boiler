@@ -1,0 +1,9 @@
+{
+  "success": false,
+  "files_modified": [],
+  "error_message": "No error clues detected by any detector",
+  "clues_detected": [],
+  "plans_generated": [],
+  "plans_attempted": [],
+  "legacy_handler_used": "handle_syntax_error"
+}

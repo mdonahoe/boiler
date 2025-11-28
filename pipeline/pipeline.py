@@ -42,7 +42,9 @@ def run_pipeline(stderr: str, stdout: str, git_state: GitState, debug: bool = Fa
             success=False,
             plans_attempted=[],
             files_modified=[],
-            error_message="No error clues detected by any detector"
+            error_message="No error clues detected by any detector",
+            clues_detected=[],
+            plans_generated=[]
         )
 
     if debug:
@@ -63,7 +65,9 @@ def run_pipeline(stderr: str, stdout: str, git_state: GitState, debug: bool = Fa
             success=False,
             plans_attempted=[],
             files_modified=[],
-            error_message="No repair plans could be generated for detected errors"
+            error_message="No repair plans could be generated for detected errors",
+            clues_detected=clues,
+            plans_generated=[]
         )
 
     if debug:
@@ -77,6 +81,10 @@ def run_pipeline(stderr: str, stdout: str, git_state: GitState, debug: bool = Fa
         print("\n--- STAGE 3: EXECUTION ---")
     executor_registry = get_executor_registry()
     result = executor_registry.execute_plans(plans)
+
+    # Add debug information to result
+    result.clues_detected = clues
+    result.plans_generated = plans
 
     if debug:
         print(f"\nExecution result: {result}")
