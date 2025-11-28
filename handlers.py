@@ -84,16 +84,6 @@ def get_git_toplevel() -> str:
 
 def get_deleted_files(ref: str = "HEAD") -> T.Set[str]:
     """Get the list of deleted files from `git status`."""
-    # First, check if we're in an active boiling session with a saved list of deleted files
-    if os.path.exists(".boil/deleted_files.txt"):
-        try:
-            with open(".boil/deleted_files.txt", "r") as f:
-                deleted_files = set(line.strip() for line in f if line.strip())
-                print(f"Using {len(deleted_files)} deleted files from .boil/deleted_files.txt")
-                return deleted_files
-        except Exception as e:
-            print(f"Error reading deleted_files.txt: {e}")
-    
     # Fallback: use the working directory state
     result = subprocess.run(
         ["git", "diff", "--name-status"], stdout=subprocess.PIPE, text=True
@@ -820,12 +810,17 @@ def handle_permission_denied(err: str) -> bool:
     # Formats:
     #   PermissionError: [Errno 13] Permission denied: './test_tree_print.py'
     #   Permission denied: './test_tree_print.py'
+    #   /bin/sh: 1: ./testty.py: Permission denied
     match = re.search(r"Permission denied:\s*['\"]?([^'\"]+)['\"]?", err)
+    if not match:
+        # Try the /bin/sh format: "path: Permission denied"
+        match = re.search(r":\s*([^\s:]+):\s*Permission denied", err)
+    
     if not match:
         print("Could not extract file path from permission error")
         return False
 
-    file_path = match.group(1)
+    file_path = match.group(1).strip()
     print(f"Permission denied for: {file_path}")
 
     # If this is a modified file (not deleted), restore it from git
@@ -840,8 +835,15 @@ def handle_permission_denied(err: str) -> bool:
     # File exists but has wrong permissions - restore from git
     print(f"File exists but has wrong permissions, restoring from git")
     try:
-        subprocess.check_call(["git", "checkout", "HEAD", "--", relative_path])
-        print(f"Successfully restored {relative_path} with correct permissions")
+        git_toplevel = get_git_toplevel()
+        cwd = os.getcwd()
+        
+        # Convert relative path to git-root-relative path for git checkout
+        abs_path = os.path.abspath(relative_path)
+        git_relative_path = os.path.relpath(abs_path, git_toplevel)
+        
+        subprocess.check_call(["git", "-C", git_toplevel, "checkout", "HEAD", "--", git_relative_path])
+        print(f"Successfully restored {relative_path} with correct permissions from git")
         return True
     except subprocess.CalledProcessError:
         print(f"Failed to restore {relative_path} from git")
