@@ -3,6 +3,7 @@ Planners for file restoration operations.
 """
 
 import os
+import subprocess
 import typing as T
 from pipeline.planners.base import Planner
 from pipeline.models import ErrorClue, RepairPlan, GitState
@@ -85,6 +86,32 @@ class MissingFilePlanner(Planner):
         # Make path relative if it's absolute
         if os.path.isabs(file_path):
             file_path = os.path.relpath(file_path)
+
+        # Check if file actually exists and matches git
+        if os.path.exists(file_path):
+            # File exists - check if it matches git version
+            try:
+                git_toplevel = subprocess.check_output(
+                    ["git", "rev-parse", "--show-toplevel"],
+                    text=True
+                ).strip()
+                abs_path = os.path.abspath(file_path)
+                git_relative_path = os.path.relpath(abs_path, git_toplevel)
+
+                # Compare with git version
+                diff_result = subprocess.run(
+                    ["git", "diff", "--quiet", git_state.ref, "--", git_relative_path],
+                    cwd=git_toplevel,
+                    capture_output=True
+                )
+
+                if diff_result.returncode == 0:
+                    # File already matches git - no plan needed
+                    print(f"[Planner] {file_path} already exists and matches git, skipping")
+                    return []
+            except Exception as e:
+                # If we can't check, proceed with the plan anyway
+                print(f"[Planner] Warning: Could not verify {file_path}: {e}")
 
         return [RepairPlan(
             plan_type="restore_file",
