@@ -1,9 +1,7 @@
 {
-  "success": true,
-  "files_modified": [
-    "./test.py"
-  ],
-  "error_message": null,
+  "success": false,
+  "files_modified": [],
+  "error_message": "All repair plans failed",
   "clues_detected": [
     {
       "clue_type": "permission_denied",
