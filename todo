@@ -34,8 +34,10 @@ SECOND TASK
 Iteration Loop:
 Pick a random file in target repo and delete it.
 "boil make test"
-fix handlers.py until boiler can make the repair on it's own.
-repeat with a new random file until boil can handle them all.
+Fix the pipeline until boiler can make the repair on it's own.
+Use "boil --abort" to undo any boil-initiated repairs so you can retry.
+"boil --clear" will delete the boiling session so you are ready for a new one.
+Repeat with a new random file until boil can handle them all.
 
 
 
