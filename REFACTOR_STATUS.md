@@ -15,8 +15,13 @@
   - `PermissionDeniedDetector` (Stage 1)
   - `PermissionFixPlanner` (Stage 2)
   - `GitRestoreExecutor` (Stage 3)
+- [x] Migrated `handle_make_missing_target` to 3-stage system:
+  - `MakeMissingTargetDetector` (Stage 1)
+  - `MakeMissingTargetPlanner` (Stage 2)
+  - `GitRestoreExecutor` (Stage 3 - reused)
 - [x] Integrated pipeline into boil.py with fallback to old handlers
 - [x] Created test suite for pipeline
+- [x] Added JSON debug output with legacy handler tracking
 
 ## How It Works
 
@@ -178,10 +183,20 @@ register_executor(MyExecutor())  # if new executor needed
 
 ## Current System Status
 
-- **Old handlers**: 70+ handlers in handlers.py (still active as fallback)
-- **New pipeline**: 1 handler migrated (permission_denied)
+- **Old handlers**: 71+ handlers in handlers.py (still active as fallback)
+- **New pipeline**: 8 handlers migrated
+  - permission_denied
+  - make_missing_target
+  - file_not_found
+  - sh_cannot_open
+  - shell_command_not_found
+  - cat_no_such_file
+  - c_compilation_error
+  - diff_no_such_file (bonus)
 - **Fallback**: Active - if pipeline doesn't fix, falls back to old handlers
 - **Safety**: High - old system unchanged, new system adds validation
+- **Debug output**: JSON files track detections, plans, and legacy handler usage
+- **Success rate**: ~86% in heirloom-ex-vi test (12/14 iterations)
 
 ## Performance
 
