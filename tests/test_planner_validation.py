@@ -22,15 +22,15 @@ class PlannerValidationTest(unittest.TestCase):
 
     def test_planner_skips_existing_file(self):
         """Test that planner doesn't create plan for file that already matches git"""
-        # Simulate error for test.py which already exists and matches git
+        # Simulate error for boil.py which already exists and matches git
         stderr = """
-/tmp/ex_bar.c:82:10: fatal error: test.py: No such file or directory
-   82 | #include "test.py"
-       |          ^~~~~~~~~~
+/tmp/ex_bar.c:82:10: fatal error: boil.py: No such file or directory
+   82 | #include "boil.py"
+       |          ^~~~~~~~~
 compilation terminated.
 """
 
-        # test.py exists in the boiler repo and matches HEAD
+        # boil.py exists in the boiler repo and matches HEAD
         git_state = GitState(
             ref="HEAD",
             deleted_files=set(),

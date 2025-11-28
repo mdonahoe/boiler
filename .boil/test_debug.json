@@ -14,23 +14,15 @@
   ],
   "plans_generated": [
     {
-      "plan_type": "restore_permissions",
-      "priority": 1,
+      "plan_type": "restore_file",
+      "priority": 0,
       "target_file": "./test.py",
       "action": "restore_full",
       "params": {
         "ref": "HEAD"
       },
-      "reason": "File ./test.py has wrong permissions, restoring from git"
+      "reason": "File ./test.py is missing (permission error implies it should exist)"
     }
   ],
-  "plans_attempted": [
-    {
-      "plan_type": "restore_permissions",
-      "priority": 1,
-      "target_file": "./test.py",
-      "action": "restore_full",
-      "reason": "File ./test.py has wrong permissions, restoring from git"
-    }
-  ]
+  "plans_attempted": []
 }
