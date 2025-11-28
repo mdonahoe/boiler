@@ -978,116 +978,7 @@ def handle_mypy_errors(stdout: str) -> bool:
     return True
 
 
-def handle_empty_python_file(err: str) -> bool:
-    """Handle test failures when Python file exists but is empty/missing expected code."""
-    # Look for pattern: AssertionError with "not found in" and mentions of Python constructs
-    # Also check for "0 lines" indicator showing file is empty
-    if "AssertionError:" not in err:
-        return False
 
-    # Pattern: Expected to see 'def something' but file appears empty
-    # Check for indicators that Python file is empty or missing content
-    code_patterns = [
-        r"'(def \w+)'.*not found",
-        r"'(class \w+)'.*not found",
-        r"Expected to see.*'(def \w+)'",
-        r"Expected to see.*'(class \w+)'",
-        r"Expected.*'(import \w+)'",
-    ]
-
-    for pattern in code_patterns:
-        match = re.search(pattern, err, re.IGNORECASE)
-        if match:
-            code_snippet = match.group(1)
-            print(f"Found missing Python code: {code_snippet}")
-
-            # Look for filename in the error
-            # First, try to find which file is actually being opened/tested
-            # Pattern: "filename.py - X lines" (common in test output)
-            # Match broadly then check against deleted files
-            test_file_pattern = r'([a-zA-Z0-9_-]+\.py)\s+-\s+\d+\s+lines'
-            all_matches = re.findall(test_file_pattern, err)
-
-            # Get deleted files
-            deleted_files = get_deleted_files(ref=ctx().git_ref)
-
-            # Find which match is actually a deleted/missing/existing file that needs repair
-            target_file = None
-            # First check existing files (they may need more content added)
-            for potential_file in all_matches:
-                if os.path.exists(potential_file):
-                    target_file = potential_file
-                    print(f"Target file from test output (existing): {target_file}")
-                    break
-            # Then check deleted files
-            if not target_file:
-                for potential_file in all_matches:
-                    if potential_file in deleted_files:
-                        target_file = potential_file
-                        print(f"Target file from test output (deleted): {target_file}")
-                        break
-
-            if target_file:
-
-                # Extract the name to restore
-                if code_snippet.startswith("def "):
-                    name = code_snippet.split()[1].rstrip("(:")
-                elif code_snippet.startswith("class "):
-                    name = code_snippet.split()[1].rstrip("(:")
-                else:
-                    name = code_snippet
-
-                # Create file if it doesn't exist
-                if not os.path.exists(target_file):
-                    os.makedirs(os.path.dirname(target_file) or ".", exist_ok=True)
-                    with open(target_file, 'w') as f:
-                        f.write("")
-
-                print(f"Using py_repair to restore '{name}' in {target_file}")
-                return do_repair(target_file, missing=name)
-
-            # Fallback: check all .py files mentioned
-            file_pattern = r'(\w+\.py)'
-            file_matches = re.findall(file_pattern, err)
-
-            # Prioritize deleted files first, then existing empty files
-            deleted_files = get_deleted_files(ref=ctx().git_ref)
-
-            # First check deleted .py files
-            for py_file in file_matches:
-                if py_file in deleted_files:
-                    print(f"Found deleted Python file: {py_file}")
-                    # Create empty file first
-                    os.makedirs(os.path.dirname(py_file) or ".", exist_ok=True)
-                    with open(py_file, 'w') as f:
-                        f.write("")
-
-                    # Extract the name to restore
-                    if code_snippet.startswith("def "):
-                        name = code_snippet.split()[1].rstrip("(:")
-                    elif code_snippet.startswith("class "):
-                        name = code_snippet.split()[1].rstrip("(:")
-                    else:
-                        name = code_snippet
-
-                    print(f"Using py_repair to restore '{name}' in {py_file}")
-                    return do_repair(py_file, missing=name)
-
-            # Then check existing files (empty or not)
-            for py_file in file_matches:
-                if os.path.exists(py_file):
-                    # Extract the name to restore
-                    if code_snippet.startswith("def "):
-                        name = code_snippet.split()[1].rstrip("(:")
-                    elif code_snippet.startswith("class "):
-                        name = code_snippet.split()[1].rstrip("(:")
-                    else:
-                        name = code_snippet
-
-                    print(f"Using py_repair to restore '{name}' in {py_file}")
-                    return do_repair(py_file, missing=name)
-
-    return False
 
 
 def handle_generic_no_such_file(err: str) -> bool:
@@ -1992,7 +1883,6 @@ HANDLERS = [
     handle_cannot_open_file,
     handle_permission_denied,
     handle_executable_not_found,
-    handle_empty_python_file,
     handle_fopen_test_failure,
     handle_missing_test_output,
     handle_mypy_errors,

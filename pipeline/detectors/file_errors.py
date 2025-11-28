@@ -8,6 +8,74 @@ from pipeline.detectors.base import Detector
 from pipeline.models import ErrorClue
 
 
+class FopenNoSuchFileDetector(Detector):
+    """
+    Detect fopen errors when a file cannot be opened.
+
+    Matches patterns like:
+    - fopen: No such file or directory
+    - fopen: example.py: No such file or directory
+    - AssertionError: 'example.py' not found in 'fopen: No such file or directory'
+    """
+
+    @property
+    def name(self) -> str:
+        return "FopenNoSuchFileDetector"
+
+    def detect(self, stderr: str, stdout: str = "") -> T.List[ErrorClue]:
+        combined = stderr + "\n" + stdout
+
+        if "fopen:" not in combined and "fopen: No such file or directory" not in combined:
+            return []
+
+        clues = []
+
+        # Pattern 1: fopen: filename: No such file or directory
+        pattern1 = r"fopen:\s+([^\s:]+?):\s*No such file or directory"
+        for match in re.finditer(pattern1, combined):
+            file_path = match.group(1).strip()
+            clues.append(ErrorClue(
+                clue_type="missing_file",
+                confidence=0.95,
+                context={"file_path": file_path},
+                source_line=match.group(0)
+            ))
+
+        # Pattern 2: AssertionError mentioning a file that fopen can't open
+        # Example: AssertionError: 'example.py' not found in 'fopen: No such file or directory'
+        if "fopen: No such file or directory" in combined:
+            assertion_pattern = r"AssertionError:\s*['\"]([^'\"]+\.py)['\"].*fopen: No such file or directory"
+            for match in re.finditer(assertion_pattern, combined):
+                file_path = match.group(1).strip()
+                clues.append(ErrorClue(
+                    clue_type="missing_file",
+                    confidence=0.9,
+                    context={"file_path": file_path},
+                    source_line=f"fopen: No such file or directory (file: {file_path})"
+                ))
+
+        # Pattern 3: Fallback - look for any .py file mentioned in assertion before fopen error
+        if not clues and "fopen: No such file or directory" in combined:
+            # Look backwards from fopen error for mentioned filenames
+            test_file_pattern = r"['\"]([^'\"]+\.py)['\"]"
+            matches = list(re.finditer(test_file_pattern, combined))
+            if matches:
+                # Get the last mentioned filename before the fopen error
+                fopen_pos = combined.find("fopen: No such file or directory")
+                for match in reversed(matches):
+                    if match.start() < fopen_pos:
+                        file_path = match.group(1).strip()
+                        clues.append(ErrorClue(
+                            clue_type="missing_file",
+                            confidence=0.7,
+                            context={"file_path": file_path},
+                            source_line="fopen: No such file or directory (inferred from test)"
+                        ))
+                        break
+
+        return clues
+
+
 class FileNotFoundDetector(Detector):
     """
     Detect FileNotFoundError in various formats.
@@ -211,6 +279,77 @@ class DiffNoSuchFileDetector(Detector):
         return clues
 
 
+class CLinkerErrorDetector(Detector):
+    """
+    Detect C/C++ linker errors when object files or libraries are missing.
+
+    Matches patterns like:
+    - /usr/bin/ld: /tmp/cckoAdDP.o: in function `print_node_text':
+    - tree_print.c:(.text+0x137): undefined reference to `ts_node_start_byte'
+    - /usr/bin/ld: cannot find -lsomelibrary: No such file or directory
+    """
+
+    @property
+    def name(self) -> str:
+        return "CLinkerErrorDetector"
+
+    def detect(self, stderr: str, stdout: str = "") -> T.List[ErrorClue]:
+        combined = stderr + "\n" + stdout
+
+        # Check if this is a linker error
+        if "undefined reference to" not in combined and "cannot find" not in combined:
+            return []
+
+        clues = []
+
+        # Pattern 1: undefined reference to symbol
+        # Example: undefined reference to `ts_parser_new'
+        if "undefined reference to" in combined:
+            # Extract all undefined symbols
+            undefined_symbols = set()
+            pattern = r"undefined reference to [`']([^'`]+)[`']"
+            for match in re.finditer(pattern, combined):
+                symbol = match.group(1)
+                undefined_symbols.add(symbol)
+
+            if undefined_symbols:
+                clues.append(ErrorClue(
+                    clue_type="linker_undefined_symbols",
+                    confidence=1.0,
+                    context={"symbols": list(undefined_symbols)},
+                    source_line=f"Found {len(undefined_symbols)} undefined references"
+                ))
+
+        # Pattern 3: cannot find object file (check this first as it's more specific)
+        # Example: /usr/bin/ld: cannot find exrecover.o: No such file or directory
+        pattern3 = r"cannot find\s+([^\s:]+\.o):\s+No such file or directory"
+        for match in re.finditer(pattern3, combined):
+            obj_file = match.group(1).strip()
+            clues.append(ErrorClue(
+                clue_type="missing_object_file",
+                confidence=1.0,
+                context={"object_file": obj_file},
+                source_line=match.group(0)
+            ))
+
+        # Pattern 2: cannot find library (only if it's not an object file)
+        # Example: /usr/bin/ld: cannot find -lsomelibrary: No such file or directory
+        pattern2 = r"cannot find\s+([^\s:]+):\s+No such file or directory"
+        for match in re.finditer(pattern2, combined):
+            library = match.group(1).strip()
+            # Skip if already matched as object file
+            if library.endswith('.o'):
+                continue
+            clues.append(ErrorClue(
+                clue_type="missing_library",
+                confidence=1.0,
+                context={"library": library},
+                source_line=match.group(0)
+            ))
+
+        return clues
+
+
 class CCompilationErrorDetector(Detector):
     """
     Detect C/C++ compilation errors when header files are missing.
@@ -218,6 +357,7 @@ class CCompilationErrorDetector(Detector):
     Matches patterns like:
     - /tmp/ex_bar.c:82:10: fatal error: ex.h: No such file or directory
     -    82 | #include "ex.h"
+    - lib/src/node.c:2:10: fatal error: ./point.h: No such file or directory
     """
 
     @property
@@ -234,15 +374,38 @@ class CCompilationErrorDetector(Detector):
 
         # Pattern: fatal error: filename: No such file or directory
         pattern = r"fatal error:\s+([^\s:]+):\s+No such file or directory"
+        
+        # Try to find the source file being compiled - look for patterns like:
+        # cc ... lib/src/node.c
+        # gcc -o tree_print tree_print.c ...
+        source_file_pattern = r"(?:cc|gcc|clang|g\+\+|c\+\+)\s+[^:]*?\s+([^\s]+\.c+)\s+"
+        
         for match in re.finditer(pattern, combined):
             file_path = match.group(1).strip()
             # Remove ./ prefix if present
             if file_path.startswith("./"):
                 file_path = file_path[2:]
+            
+            context = {
+                "file_path": file_path,
+                "is_header": file_path.endswith(".h"),
+            }
+            
+            # Try to find the source file being compiled for better context
+            source_match = re.search(source_file_pattern, combined)
+            if source_match:
+                source_file = source_match.group(1).strip()
+                context["source_file"] = source_file
+                # Extract the directory of the source file to search for the header
+                import os
+                source_dir = os.path.dirname(source_file)
+                if source_dir:
+                    context["source_dir"] = source_dir
+            
             clues.append(ErrorClue(
                 clue_type="missing_file",
                 confidence=1.0,
-                context={"file_path": file_path, "is_header": file_path.endswith(".h")},
+                context=context,
                 source_line=match.group(0)
             ))
 
