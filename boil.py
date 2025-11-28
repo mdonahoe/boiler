@@ -99,27 +99,7 @@ def fix(command: T.List[str], num_iterations: int) -> bool:
     # load the iteration number from the .boil dir
     os.makedirs(".boil", exist_ok=True)
     
-    # Capture the original deleted files at the start of boiling
-    # This way we can correctly identify which files need to be restored throughout the session
-    if not os.path.exists(".boil/deleted_files.txt"):  # Only on the first iteration
-        try:
-            result = subprocess.run(
-                ["git", "diff", "--name-status"],
-                stdout=subprocess.PIPE,
-                text=True
-            )
-            deleted_files = [
-                line.split()[-1] for line in result.stdout.splitlines()
-                if line.startswith("D")
-            ]
-            with open(".boil/deleted_files.txt", "w") as f:
-                for fname in deleted_files:
-                    f.write(fname + "\n")
-            print(f"Saved {len(deleted_files)} deleted files to .boil/deleted_files.txt")
-        except Exception as e:
-            print(f"Warning: Could not save deleted files list: {e}")
-    
-    # Count only iter files, not deleted_files.txt
+    # Count only iter files
     n = len([f for f in os.listdir(".boil") if f.startswith("iter")])
 
     # bootstrap
