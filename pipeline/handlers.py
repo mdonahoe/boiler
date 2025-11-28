@@ -12,15 +12,17 @@ from pipeline.executors.registry import register_executor
 from pipeline.detectors.permissions import PermissionDeniedDetector
 from pipeline.detectors.make_errors import MakeMissingTargetDetector
 from pipeline.detectors.file_errors import (
+    FopenNoSuchFileDetector,
     FileNotFoundDetector,
     ShellCannotOpenDetector,
     ShellCommandNotFoundDetector,
     CatNoSuchFileDetector,
     DiffNoSuchFileDetector,
     CCompilationErrorDetector,
+    CLinkerErrorDetector,
 )
 from pipeline.detectors.python_code import MissingPythonCodeDetector
-from pipeline.planners.file_restore import PermissionFixPlanner, MissingFilePlanner
+from pipeline.planners.file_restore import PermissionFixPlanner, MissingFilePlanner, LinkerUndefinedSymbolsPlanner
 from pipeline.planners.make_restore import MakeMissingTargetPlanner
 from pipeline.planners.python_code_restore import MissingPythonCodePlanner
 from pipeline.executors.git_restore import GitRestoreExecutor
@@ -47,16 +49,19 @@ def register_all_handlers():
     register_detector(PermissionDeniedDetector())
     register_detector(MakeMissingTargetDetector())
     register_detector(MissingPythonCodeDetector())
+    register_detector(FopenNoSuchFileDetector())
     register_detector(FileNotFoundDetector())
     register_detector(ShellCannotOpenDetector())
     register_detector(ShellCommandNotFoundDetector())
     register_detector(CatNoSuchFileDetector())
     register_detector(DiffNoSuchFileDetector())
+    register_detector(CLinkerErrorDetector())
     register_detector(CCompilationErrorDetector())
 
     # Register planners
     register_planner(PermissionFixPlanner())
     register_planner(MissingFilePlanner())
+    register_planner(LinkerUndefinedSymbolsPlanner())
     register_planner(MakeMissingTargetPlanner())
     register_planner(MissingPythonCodePlanner())
 
