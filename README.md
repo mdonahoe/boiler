@@ -4,20 +4,21 @@ Automatically restore missing code from git history by iteratively running tests
 
 ## What is boil.py?
 
-`boil.py` helps you restore deleted code by "boiling" it back to life. When you delete code and tests fail, boil.py:
+When you delete code and tests fail, `boil.py` automatically restores only the code that's actually needed:
+
 1. Runs your test command
-2. Analyzes the error output
-3. Restores only the necessary code from git history
-4. Repeats until tests pass
+2. Analyzes the error output using a pipeline of detectors
+3. Generates repair plans (restore files, restore code elements, etc.)
+4. Executes repairs and repeats until tests pass
 
 This is useful for:
 - Aggressively deleting unused code and seeing what actually breaks
 - Minimizing dependencies by removing code and restoring only what's needed
-- "Tree-shaking" your codebase to find dead code
+- Tree-shaking your codebase to find dead code
 
 ## Installation
 
-No installation needed. Just have `boil.py` and `py_repair.py` in your directory.
+Make sure the `boil` script is on your PATH
 
 Requirements:
 - Python 3.x
@@ -27,16 +28,16 @@ Requirements:
 
 ```bash
 # Basic: run until tests pass
-python3 boil.py python3 test_my_code.py
+boil make test
 
 # Limit iterations (useful for testing)
-python3 boil.py -n 5 python3 test_my_code.py
+boil -n 5 python3 test_my_code.py
 
 # Use a different git reference
-python3 boil.py --ref HEAD~10 python3 test_my_code.py
+boil --ref HEAD~10 python3 -m pytest
 
 # Abort and restore original state
-python3 boil.py --abort
+boil --abort
 ```
 
 ## How It Works
@@ -45,19 +46,19 @@ python3 boil.py --abort
 2. **Saves initial state**: Creates a `boil_start` commit with your current working directory
 3. **Iterative fixing**:
    - Runs your test command
-   - If it fails, analyzes the error (NameError, ImportError, etc.)
-   - Uses `py_repair.py` to restore missing code from git history
-   - Commits the fix to the boiling branch
-   - Repeats
+   - If it fails, analyzes the error using detectors (permission denied, missing files, missing Python code, etc.)
+   - Creates repair plans (restore files, restore code, fix permissions, etc.)
+   - Executes the highest-priority plan
+   - Repeats until tests pass or iteration limit reached
 4. **Stops when**: Tests pass OR iteration limit reached
 
 ## The Boiling Branch
 
 Boil.py creates a branch called `boiling` to track its progress:
 - Each fix attempt is a separate commit
-- You can inspect the history: `git log boiling`
-- The branch persists after boiling completes
+- Inspect history: `git log boiling`
 - Use `--abort` to clean up and restore original state
+- If boiling succeeds, use `--clear` to just delete the .boil directory and `boiling` branch, leaving the working directory as-is.
 
 ## Command Line Options
 
@@ -65,123 +66,73 @@ Boil.py creates a branch called `boiling` to track its progress:
 - `--ref <commit>`: Git reference to restore code from (default: HEAD)
 - `--abort`: Abort current boiling session and restore working directory
 
+## The Pipeline System
+
+Boil.py uses a three-stage pipeline for error analysis and repair:
+
+### Stage 1: Detection
+Detectors analyze error output to identify issues:
+- **PermissionDeniedDetector**: Permission errors
+- **MakeMissingTargetDetector**: Missing make targets
+- **MissingPythonCodeDetector**: Missing Python classes/functions/imports
+- **FileNotFoundDetector**: Missing files (Python, shell, C compilation)
+
+### Stage 2: Planning
+Planners create repair strategies for each detected error:
+- **PermissionFixPlanner**: Restore files with wrong permissions
+- **MissingFilePlanner**: Restore deleted files
+- **MakeMissingTargetPlanner**: Restore files missing from make
+- **MissingPythonCodePlanner**: Restore missing code elements in existing files
+
+### Stage 3: Execution
+Executors perform the repairs:
+- **GitRestoreExecutor**: Restore entire files from git
+- **PythonCodeRestoreExecutor**: Restore specific Python code elements using py_repair
+
 ## Examples
 
-### Example 1: Delete code and restore what's needed
+### Example 1: Restore missing code
 
 ```bash
-# Delete a bunch of code
-rm src/unused.py
-git diff > my_deletions.patch
-
-# Try to boil it back
-python3 boil.py -n 10 python3 -m pytest tests/
-
-# If it works, commit the minimal changes
-# If it doesn't, use --abort and try a different approach
+# Delete a function from a file
+# Tests fail: "class TestClass not found"
+# Boil.py detects the error, creates a plan, uses py_repair to restore just the class
+boil python3 test_suite.py
 ```
 
 ### Example 2: Find dead code
 
 ```bash
-# Delete suspicious code
-rm src/maybe_unused.py
+# Delete a file
+rm src/suspicious.py
 
 # See if tests pass
-python3 boil.py python3 -m pytest
+boil python3 -m pytest
 
 # If boil.py doesn't restore it, it was dead code!
 ```
 
-### Example 3: Minimize dependencies
-
-```bash
-# Remove an entire module
-git rm -r src/big_dependency/
-
-# Restore only what's actually used
-python3 boil.py -n 50 python3 test_suite.py
-```
-
-## Understanding Iterations
-
-The `-n` parameter limits total iterations, not just fix attempts.
-
-- Iteration 1: Run test → fails → apply fix
-- Iteration 2: Run test → check if fix worked
-- Iteration 3: Run test again if still failing → apply another fix
-- etc.
-
-**Important**: Always use `-n` ≥ 2 to allow boil.py to verify its fixes worked!
-
-## Aborting a Session
-
-If boiling goes wrong or you want to start over:
-
-```bash
-python3 boil.py --abort
-```
-
-This will:
-1. Find the `boil_start` commit (your original state)
-2. Reset your working directory to before boiling started
-3. Delete the boiling branch
-4. Clean up the `.boil` directory
-
-## Error Handlers
-
-Boil.py includes handlers for common Python errors:
-- `NameError`: Restores missing class/function definitions
-- `ImportError`: Restores missing modules
-- `IndentationError`: Restores missing class definitions for orphaned methods
-- `AttributeError`: Restores missing class methods
-- `ModuleNotFoundError`: Restores missing packages
-- And more...
-
-## How py_repair.py Works
-
-`py_repair.py` is the core restoration engine:
-1. Analyzes your current code to see what's allowed (existing classes, functions, imports)
-2. Fetches the git version of a file
-3. Adds the missing item (e.g., "class Dog") to the allowed list
-4. Filters the git version to include only allowed items
-5. Writes the filtered result back to disk
-
-This ensures only necessary code is restored, not everything from history.
-
 ## Tips
 
-1. **Start small**: Use `-n 5` when testing to avoid infinite loops
-2. **Check the boiling branch**: `git log boiling` shows what was restored
-3. **Use --abort liberally**: Don't be afraid to abort and try again
-4. **Commit before boiling**: Have a clean git state before starting
-5. **Check .boil/ directory**: Contains error output from each iteration
-
-## Known Issues
-
-1. Restoring "name 'T' is not defined" will restore anything with a T in it
-2. Restoring enum will make __init__ functions appear
-3. Named globals aren't supported and thus always get restored
-
-## TODO
-
-1. Get more test code and have something that deletes random lines from it. Can boil fix it?
-2. Add .h/.c support instead of just .py
-3. If boiler knows the filetype and can parse the file, it can do a partial restore. Otherwise, it must do full restore
-4. Research "tree-shaking" techniques
-5. Partial restores on files that dont need it are bad. Check it the restore would even do anything. py_repair should fail if the restore results in no change.
-6. split handler functions into 3 phases: first, match on keywords in the stderr and return clue tokens. Like PermissionError or "not found". Then produce a list of candidate files and what might be wrong with them. Then attempt repairs on those files or just restore them. Dont let handlers make arbitiray edits. All reapairs must go through sometimes that ensures the file is a subset of what is checked into disk.
+1. **Always commit a valid repo state before boiling**: boiler assumes that the ref commit is good, and the current working directory is bad. If your ref is also bad, the tests will never pass.
+2. **Start small**: Use `-n 5` when testing to avoid long loops
+3. **Check the boiling branch**: `git log boiling` shows what was restored
+4. **Use --abort liberally**: Don't be afraid to abort and try again
+5. **Check .boil/ directory**: Contains debug output from each iteration
 
 ## Troubleshooting
 
-**Q: Boil.py says "failed to fix" but tests actually pass**
-A: You probably used `-n1`. The test passed but there wasn't another iteration to verify. Use `-n2` or higher.
-
-**Q: Boil.py restored too much code**
-A: Try `--abort` and be more specific with your deletions, or adjust the handlers in boil.py.
+**Q: Boiling restored too much code**
+A: Try `--abort` and be more specific with your deletions.
 
 **Q: The boiling branch has weird commits**
-A: This is normal. Each fix attempt is a separate commit. Use `git log boiling` to inspect.
+A: This is normal. Each fix attempt is a separate commit.
 
-**Q: Can I use boil.py on non-Python code?**
-A: Currently only Python is fully supported. The error handlers are Python-specific.
+**Q: Can I boil non-Python code?**
+A: File-level restoration works on any language. Python code element restoration is Python-specific.
+
+## Known Issues
+
+1. Named globals aren't supported and always get restored
+2. Enum restoration makes __init__ functions appear
+3. File restoration doesn't verify the fix actually solved the problem (future: add validation)
