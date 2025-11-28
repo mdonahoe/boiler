@@ -1333,26 +1333,6 @@ def handle_cargo_toml_not_found(err: str) -> bool:
     return False
 
 
-def handle_make_missing_makefile(err: str) -> bool:
-    """Handle make errors when the Makefile itself is missing."""
-    # Pattern: make: *** No rule to make target 'X'.  Stop.
-    # This usually means Makefile is missing
-    pattern = r"make: \*\*\* No rule to make target '([^']+)'\.\s+Stop\."
-    match = re.search(pattern, err)
-
-    if not match:
-        return False
-
-    # Check if Makefile is deleted
-    deleted_files = get_deleted_files(ref=ctx().git_ref)
-    makefile_names = ['Makefile', 'makefile', 'GNUmakefile']
-
-    for makefile in makefile_names:
-        if makefile in deleted_files:
-            print(f"Found missing Makefile: {makefile}")
-            return restore_missing_file(makefile)
-
-    return False
 
 
 def handle_make_no_makefile_found(err: str) -> bool:
@@ -1498,73 +1478,6 @@ def handle_cannot_open_file(err: str) -> bool:
     return restore_missing_file(missing_file)
 
 
-def handle_fopen_test_failure(err: str) -> bool:
-    """Handle test failures caused by fopen errors when files are missing."""
-    # Look for 'fopen: No such file or directory' in assertion errors
-    if 'fopen: No such file or directory' not in err:
-        return False
-
-    # Find all AssertionError lines mentioning filenames with extensions
-    # Pattern: AssertionError: ... 'filename.ext' ... 'fopen: No such file or directory'
-    pattern = r"AssertionError:.*?'([^']+\.\w+)'.*?fopen: No such file or directory"
-    matches = re.findall(pattern, err, re.DOTALL)
-
-    if matches:
-        # Try to restore each filename found explicitly
-        for filename in matches:
-            print(f"Found potential missing file in fopen error: {filename}")
-            if restore_missing_file(filename):
-                return True
-        return False
-
-    # Look for filenames mentioned anywhere in the test output
-    # Pattern: any word followed by a file extension like .md, .txt, .py, .c, etc
-    filename_pattern = r'\b([a-zA-Z0-9_-]+\.[a-zA-Z0-9]+)\b'
-    all_filenames = re.findall(filename_pattern, err)
-
-    # Filter to only check deleted files
-    deleted_files = get_deleted_files(ref=ctx().git_ref)
-
-    for filename in all_filenames:
-        if filename in deleted_files:
-            print(f"Found deleted file mentioned in error: {filename}")
-            if restore_missing_file(filename):
-                return True
-
-    # If no explicit filename found, try to infer from test name and deleted files
-    # Look for test function name in traceback
-    test_match = re.search(r'in (test_\w+)', err)
-    if test_match:
-        test_name = test_match.group(1)
-        print(f"Checking deleted files for test: {test_name}")
-
-        # Try to match file extension to test name
-        # e.g., test_syntax_highlighting_c -> look for .c files
-        # e.g., test_syntax_highlighting_python -> look for .py files
-        # e.g., test_open_readme -> look for .md files
-        if '_c' in test_name.lower():
-            # Look for .c files
-            for f in deleted_files:
-                if f.endswith('.c'):
-                    print(f"Found deleted .c file that may be needed: {f}")
-                    if restore_missing_file(f):
-                        return True
-        elif '_python' in test_name.lower() or '_py' in test_name.lower():
-            # Look for .py files
-            for f in deleted_files:
-                if f.endswith('.py'):
-                    print(f"Found deleted .py file that may be needed: {f}")
-                    if restore_missing_file(f):
-                        return True
-        elif '_readme' in test_name.lower():
-            # Look for README files
-            for f in deleted_files:
-                if 'readme' in f.lower():
-                    print(f"Found deleted README file that may be needed: {f}")
-                    if restore_missing_file(f):
-                        return True
-
-    return False
 
 
 def handle_c_linker_missing_object(err: str) -> bool:
@@ -1872,7 +1785,6 @@ HANDLERS = [
     handle_rust_env_not_defined,
     handle_rust_module_not_found,
     handle_rust_panic_no_such_file,
-    handle_make_missing_makefile,
     handle_make_no_makefile_found,
     handle_make_missing_target,
     handle_make_recipe_failed,
@@ -1883,7 +1795,6 @@ HANDLERS = [
     handle_cannot_open_file,
     handle_permission_denied,
     handle_executable_not_found,
-    handle_fopen_test_failure,
     handle_missing_test_output,
     handle_mypy_errors,
     handle_orphaned_method,

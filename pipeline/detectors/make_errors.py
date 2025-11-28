@@ -57,3 +57,42 @@ class MakeMissingTargetDetector(Detector):
             ))
 
         return clues
+
+
+class MakeNoRuleDetector(Detector):
+    """
+    Detect make errors when no rule exists for a target (often means Makefile is missing).
+
+    Matches patterns like:
+    - make: *** No rule to make target 'test'.  Stop.
+    """
+
+    @property
+    def name(self) -> str:
+        return "MakeNoRuleDetector"
+
+    def detect(self, stderr: str, stdout: str = "") -> T.List[ErrorClue]:
+        combined = stderr + "\n" + stdout
+
+        # Early exit if no make error
+        if "No rule to make target" not in combined:
+            return []
+
+        clues = []
+
+        # Pattern: make: *** No rule to make target 'X'.  Stop.
+        # This is different from MakeMissingTargetDetector - it has no ", needed by" part
+        pattern = r"make(?:\[\d+\])?: \*\*\* No rule to make target '([^']+)'\.\s+Stop\."
+        for match in re.finditer(pattern, combined):
+            target = match.group(1)
+
+            clues.append(ErrorClue(
+                clue_type="make_no_rule",
+                confidence=0.9,
+                context={
+                    "target": target,
+                },
+                source_line=match.group(0)
+            ))
+
+        return clues
