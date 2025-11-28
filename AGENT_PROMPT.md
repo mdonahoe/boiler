@@ -40,9 +40,10 @@ Analyze the debugging information in [TARGET_REPO]/.boil/ and improve boiler to 
 4. **Validate**
    - Run `make test` in boiler - all tests must pass
    - Test on [TARGET_REPO]:
-     - Reset: `git reset --hard HEAD && rm -rf .boil`
-     - Run: `python3 ~/boiler/boil.py [test-command]`
+     - Reset to pre-boil state: `boil --abort` (restores working directory and removes .boil)
+     - Run: `boil [test-command]` or `python3 ~/boiler/boil.py [test-command]`
      - Verify it fixes the errors without infinite loops
+     - After testing, if the repo is now fixed, you can use `boil --abort` again to return to the broken state for another test iteration
 
 5. **Document**
    - Update `notes/` with what was added and why
@@ -54,6 +55,10 @@ Analyze the debugging information in [TARGET_REPO]/.boil/ and improve boiler to 
 - Use py_repair when restoring code elements, not for full file restoration
 - Planners should only create plans for files they can actually fix
 - Executors should validate before attempting fixes
+- **Understanding boil --abort**: This command resets the repository to its pre-boil state (the state when boil was first started), which is often a broken state with deleted files or errors. This is useful for:
+  - Testing your fixes from a clean slate
+  - Iterating on improvements (abort → make changes → test again)
+  - After a successful boil run, if you want to test improvements without re-breaking the repo manually
 ```
 
 ## Usage

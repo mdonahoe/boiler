@@ -1546,86 +1546,6 @@ def handle_ar_missing_object(err: str) -> bool:
     return restored_any
 
 
-def handle_c_linker_error(err: str) -> bool:
-    """
-    Handle C/C++ linker errors when object files or source files are missing.
-
-    Example error:
-        /usr/bin/ld: ./libtree-sitter.a(parser.o): in function `ts_parser__lex':
-        parser.c:(.text+0x22ea): undefined reference to `ts_language_is_wasm'
-        ...
-        collect2: error: ld returned 1 exit status
-    """
-    # Check if this is a linker error with undefined references
-    if "undefined reference to" not in err:
-        return False
-
-    # Extract all undefined symbols
-    undefined_symbols = set()
-    pattern = r"undefined reference to [`']([^'`]+)[`']"
-    for match in re.finditer(pattern, err):
-        symbol = match.group(1)
-        undefined_symbols.add(symbol)
-
-    if not undefined_symbols:
-        return False
-
-    print(f"Linker error: found {len(undefined_symbols)} undefined symbols")
-    for symbol in list(undefined_symbols)[:5]:  # Show first 5
-        print(f"  - {symbol}")
-
-    # Get the list of deleted C files
-    ref = ctx().git_ref
-    deleted_files = get_deleted_files(ref=ref)
-    deleted_c_files = [f for f in deleted_files if f.endswith('.c')]
-
-    print(f"Deleted C files: {deleted_c_files}")
-
-    # Check each deleted C file to see if it contains any of the missing symbols
-    file_scores = {}
-    for c_file in deleted_c_files:
-        try:
-            # Use git show to get the file contents
-            result = subprocess.run(
-                ["git", "show", f"{ref}:{c_file}"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-
-            if result.returncode != 0:
-                print(f"Could not get contents of {c_file}")
-                continue
-
-            file_contents = result.stdout
-
-            # Count how many symbols are defined in this file
-            score = 0
-            matched_symbols = []
-            for symbol in undefined_symbols:
-                # Check if the symbol appears in the file
-                # Look for function definitions or declarations
-                if symbol in file_contents:
-                    score += 1
-                    matched_symbols.append(symbol)
-
-            if score > 0:
-                file_scores[c_file] = score
-                print(f"  {c_file}: {score} symbols matched {matched_symbols[:3]}")
-
-        except Exception as e:
-            print(f"Error checking {c_file}: {e}")
-            continue
-
-    # Try to restore files with the highest scores first
-    restored_any = False
-    for c_file, score in sorted(file_scores.items(), key=lambda x: x[1], reverse=True):
-        print(f"Restoring {c_file} which contains {score} undefined symbols")
-        if restore_missing_file(c_file):
-            print(f"Successfully restored {c_file}")
-            restored_any = True
-
-    return restored_any
 
 
 def handle_c_compilation_error(err: str) -> bool:
@@ -1779,7 +1699,6 @@ HANDLERS = [
     handle_c_compilation_error,
     handle_c_linker_missing_object,
     handle_ar_missing_object,
-    handle_c_linker_error,
     handle_cannot_open_file,
     handle_permission_denied,
     handle_executable_not_found,
