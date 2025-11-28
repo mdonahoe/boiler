@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import subprocess
 import shutil
@@ -127,6 +128,8 @@ def fix(command: T.List[str], num_iterations: int) -> bool:
         message = ""
 
         # Try new pipeline system first
+        pipeline_result = None
+        legacy_handler_used = None
         if has_pipeline_handlers():
             print("[Pipeline] Attempting repair with new pipeline system...")
 
@@ -138,10 +141,10 @@ def fix(command: T.List[str], num_iterations: int) -> bool:
             )
 
             # Run pipeline
-            result = run_pipeline(stderr, stdout, git_state, debug=True)
+            pipeline_result = run_pipeline(stderr, stdout, git_state, debug=True)
 
-            if result.success and has_changes():
-                message = f"fixed with pipeline (modified {len(result.files_modified)} file(s))"
+            if pipeline_result.success and has_changes():
+                message = f"fixed with pipeline (modified {len(pipeline_result.files_modified)} file(s))"
                 print(f"[Pipeline] Success: {message}")
             else:
                 print("[Pipeline] Pipeline did not produce a fix, falling back to old handlers...")
@@ -150,11 +153,25 @@ def fix(command: T.List[str], num_iterations: int) -> bool:
         if not message:
             for handler in handlers.HANDLERS:
                 if handler(err) and has_changes():
+                    legacy_handler_used = handler.__name__
                     message = f"fixed with {handler}"
+                    print(f"[Legacy] Used legacy handler: {legacy_handler_used}")
                     break
             else:
                 message = "failed to handle this type of error"
                 exit = True
+
+        # Save debug JSON with legacy handler info
+        if pipeline_result:
+            debug_json_path = f".boil/iter{n}.pipeline.json"
+            try:
+                debug_data = pipeline_result.to_dict()
+                debug_data["legacy_handler_used"] = legacy_handler_used
+                with open(debug_json_path, "w") as f:
+                    json.dump(debug_data, f, indent=2)
+                print(f"[Pipeline] Debug info saved to {debug_json_path}")
+            except Exception as e:
+                print(f"[Pipeline] Warning: Could not save debug JSON: {e}")
 
         if not has_changes(verbose=True):
             raise RuntimeError("no change")
