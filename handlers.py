@@ -156,10 +156,16 @@ def handle_shell_command_not_found(stderr: str) -> bool:
     Example errors:
         ./test.sh: 2: ./configure: not found
         /bin/sh: ./script.sh: not found
+        ./test.sh: line 3: ./configure: No such file or directory
     """
-    # Pattern: line_num: ./command: not found
+    # Pattern 1: line_num: ./command: not found
     pattern = r":\s*\d+:\s*([^\s:]+):\s*not found"
     match = re.search(pattern, stderr)
+    
+    # Pattern 2: line N: ./command: No such file or directory
+    if not match:
+        pattern = r": line \d+:\s*([^\s:]+):\s*No such file or directory"
+        match = re.search(pattern, stderr)
     
     if not match:
         return False
@@ -192,6 +198,24 @@ def handle_cat_no_such_file(stderr: str) -> bool:
     return restore_missing_file(missing_file)
 
 
+def handle_diff_no_such_file(stderr: str) -> bool:
+    """Handle diff errors when a file is missing.
+    
+    Example error:
+        diff: test.txt: No such file or directory
+    """
+    pattern = r"diff:\s*([^\s:]+):\s*No such file or directory"
+    match = re.search(pattern, stderr)
+    
+    if not match:
+        return False
+    
+    missing_file = match.group(1).strip()
+    print(f"diff: missing file: {missing_file}")
+    
+    return restore_missing_file(missing_file)
+
+
 def handle_sh_cannot_open(stderr: str) -> bool:
     """Handle sh errors when a file cannot be opened.
     
@@ -208,6 +232,25 @@ def handle_sh_cannot_open(stderr: str) -> bool:
     print(f"sh: cannot open: {missing_file}")
     
     return restore_missing_file(missing_file)
+
+
+def handle_sh_cant_cd(stderr: str) -> bool:
+    """Handle sh errors when cd fails because directory doesn't exist.
+    
+    Example error:
+        /bin/sh: 1: cd: can't cd to libuxre
+    """
+    pattern = r"cd: can't cd to\s+([^\s]+)"
+    match = re.search(pattern, stderr)
+    
+    if not match:
+        return False
+    
+    missing_dir = match.group(1).strip()
+    print(f"sh: can't cd to: {missing_dir}")
+    
+    # Restore all files in that directory
+    return restore_missing_file(missing_dir)
 
 
 def handle_no_such_file_or_directory(stderr: str) -> bool:
@@ -1363,11 +1406,13 @@ def handle_make_missing_makefile(err: str) -> bool:
 def handle_make_no_makefile_found(err: str) -> bool:
     """Handle make errors when no makefile is found in a subdirectory.
     
-    Example error:
+    Example errors:
         make[1]: *** No targets specified and no makefile found.  Stop.
         make: *** [Makefile:278: libterm/libtermlib.a] Error 2
+        
+        make[1]: Makefile: No such file or directory
     """
-    if "no makefile found" not in err.lower():
+    if "no makefile found" not in err.lower() and "Makefile: No such file or directory" not in err:
         return False
     
     # Try to find which subdirectory is missing the Makefile
@@ -1410,7 +1455,8 @@ def handle_make_no_makefile_found(err: str) -> bool:
 def handle_make_missing_target(err: str) -> bool:
     """Handle make errors when a required source file is missing."""
     # Pattern: make: *** No rule to make target 'filename', needed by 'target'.  Stop.
-    pattern = r"make: \*\*\* No rule to make target '([^']+)', needed by"
+    # or: make[N]: *** No rule to make target 'filename', needed by 'target'.  Stop.
+    pattern = r"make(?:\[\d+\])?: \*\*\* No rule to make target '([^']+)', needed by"
     match = re.search(pattern, err)
 
     if not match:
@@ -1418,6 +1464,41 @@ def handle_make_missing_target(err: str) -> bool:
 
     missing_file = match.group(1)
     print(f"Found missing make target: {missing_file}")
+    
+    # Check if this is from a subdirectory make
+    # Look for "Entering directory" to get the subdir path
+    dir_match = re.search(r"make\[\d+\]: Entering directory '([^']+)'", err)
+    subdir = ""
+    if dir_match:
+        fulldir = dir_match.group(1)
+        cwd = os.getcwd()
+        if fulldir.startswith(cwd):
+            subdir = fulldir[len(cwd):].lstrip('/')
+            print(f"Subdirectory context: {subdir}")
+    
+    # If looking for an object file (.o), try to restore the source file instead
+    if missing_file.endswith('.o'):
+        # Try common source extensions
+        base = missing_file[:-2]
+        for ext in ['.c', '.cc', '.cpp', '.cxx', '.C']:
+            source_file = base + ext
+            # Try with subdirectory prefix first
+            if subdir:
+                full_path = os.path.join(subdir, source_file)
+                print(f"Trying to restore source file: {full_path}")
+                if restore_missing_file(full_path):
+                    return True
+            print(f"Trying to restore source file: {source_file}")
+            if restore_missing_file(source_file):
+                return True
+    
+    # Try with subdirectory prefix first
+    if subdir:
+        full_path = os.path.join(subdir, missing_file)
+        print(f"Trying with subdirectory: {full_path}")
+        if restore_missing_file(full_path):
+            return True
+    
     return restore_missing_file(missing_file)
 
 
@@ -1532,6 +1613,84 @@ def handle_fopen_test_failure(err: str) -> bool:
                         return True
 
     return False
+
+
+def handle_c_linker_missing_object(err: str) -> bool:
+    """
+    Handle C/C++ linker errors when object files are missing.
+
+    Example error:
+        /usr/bin/ld: cannot find exrecover.o: No such file or directory
+        collect2: error: ld returned 1 exit status
+    """
+    # Pattern: /usr/bin/ld: cannot find X.o: No such file or directory
+    pattern = r"/usr/bin/ld: cannot find ([^\s:]+\.o): No such file or directory"
+    matches = re.findall(pattern, err)
+    
+    if not matches:
+        return False
+    
+    print(f"Linker error: missing object files: {matches}")
+    
+    restored_any = False
+    for obj_file in matches:
+        # Try to restore the corresponding source file
+        base = obj_file[:-2]
+        for ext in ['.c', '.cc', '.cpp', '.cxx', '.C']:
+            source_file = base + ext
+            print(f"Trying to restore source file: {source_file}")
+            if restore_missing_file(source_file):
+                restored_any = True
+                break
+    
+    return restored_any
+
+
+def handle_ar_missing_object(err: str) -> bool:
+    """
+    Handle ar (archiver) errors when object files are missing.
+
+    Example error:
+        ar: onefile.o: No such file or directory
+    """
+    # Pattern: ar: X.o: No such file or directory
+    pattern = r"ar: ([^\s:]+\.o): No such file or directory"
+    matches = re.findall(pattern, err)
+    
+    if not matches:
+        return False
+    
+    print(f"ar error: missing object files: {matches}")
+    
+    # Check if this is from a subdirectory make
+    dir_match = re.search(r"make\[\d+\]: Entering directory '([^']+)'", err)
+    subdir = ""
+    if dir_match:
+        fulldir = dir_match.group(1)
+        cwd = os.getcwd()
+        if fulldir.startswith(cwd):
+            subdir = fulldir[len(cwd):].lstrip('/')
+            print(f"Subdirectory context: {subdir}")
+    
+    restored_any = False
+    for obj_file in matches:
+        # Try to restore the corresponding source file
+        base = obj_file[:-2]
+        for ext in ['.c', '.cc', '.cpp', '.cxx', '.C']:
+            source_file = base + ext
+            # Try with subdirectory prefix first
+            if subdir:
+                full_path = os.path.join(subdir, source_file)
+                print(f"Trying to restore source file: {full_path}")
+                if restore_missing_file(full_path):
+                    restored_any = True
+                    break
+            print(f"Trying to restore source file: {source_file}")
+            if restore_missing_file(source_file):
+                restored_any = True
+                break
+    
+    return restored_any
 
 
 def handle_c_linker_error(err: str) -> bool:
@@ -1766,6 +1925,8 @@ HANDLERS = [
     handle_make_missing_target,
     handle_make_recipe_failed,
     handle_c_compilation_error,
+    handle_c_linker_missing_object,
+    handle_ar_missing_object,
     handle_c_linker_error,
     handle_cannot_open_file,
     handle_permission_denied,
@@ -1792,7 +1953,9 @@ HANDLERS = [
     handle_file_not_found,
     handle_shell_command_not_found,
     handle_cat_no_such_file,
+    handle_diff_no_such_file,
     handle_sh_cannot_open,
+    handle_sh_cant_cd,
     handle_no_such_file_or_directory,
     handle_generic_no_such_file,
     handle_missing_file,
