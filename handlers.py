@@ -150,6 +150,66 @@ def restore_missing_file(missing_file: str, ref: T.Optional[str] = None) -> bool
     return False
 
 
+def handle_shell_command_not_found(stderr: str) -> bool:
+    """Handle shell errors when a command/script is not found.
+    
+    Example errors:
+        ./test.sh: 2: ./configure: not found
+        /bin/sh: ./script.sh: not found
+    """
+    # Pattern: line_num: ./command: not found
+    pattern = r":\s*\d+:\s*([^\s:]+):\s*not found"
+    match = re.search(pattern, stderr)
+    
+    if not match:
+        return False
+    
+    missing_cmd = match.group(1).strip()
+    print(f"Shell command not found: {missing_cmd}")
+    
+    # Remove ./ prefix if present for file lookup
+    if missing_cmd.startswith("./"):
+        missing_cmd = missing_cmd[2:]
+    
+    return restore_missing_file(missing_cmd)
+
+
+def handle_cat_no_such_file(stderr: str) -> bool:
+    """Handle cat errors when a file is missing.
+    
+    Example error:
+        cat: Makefile.in: No such file or directory
+    """
+    pattern = r"cat:\s*([^\s:]+):\s*No such file or directory"
+    match = re.search(pattern, stderr)
+    
+    if not match:
+        return False
+    
+    missing_file = match.group(1).strip()
+    print(f"cat: missing file: {missing_file}")
+    
+    return restore_missing_file(missing_file)
+
+
+def handle_sh_cannot_open(stderr: str) -> bool:
+    """Handle sh errors when a file cannot be opened.
+    
+    Example error:
+        sh: 0: cannot open makeoptions: No such file
+    """
+    pattern = r"sh:\s*\d+:\s*cannot open\s+([^\s:]+):\s*No such file"
+    match = re.search(pattern, stderr)
+    
+    if not match:
+        return False
+    
+    missing_file = match.group(1).strip()
+    print(f"sh: cannot open: {missing_file}")
+    
+    return restore_missing_file(missing_file)
+
+
 def handle_no_such_file_or_directory(stderr: str) -> bool:
     """Handle the case where a missing executable or file is reported."""
     match = re.search(r"([^\s]+): (\[Errno \d\])? No such file or directory", stderr)
@@ -1300,6 +1360,53 @@ def handle_make_missing_makefile(err: str) -> bool:
     return False
 
 
+def handle_make_no_makefile_found(err: str) -> bool:
+    """Handle make errors when no makefile is found in a subdirectory.
+    
+    Example error:
+        make[1]: *** No targets specified and no makefile found.  Stop.
+        make: *** [Makefile:278: libterm/libtermlib.a] Error 2
+    """
+    if "no makefile found" not in err.lower():
+        return False
+    
+    # Try to find which subdirectory is missing the Makefile
+    # Look for the make[N]: Entering directory pattern
+    dir_match = re.search(r"make\[\d+\]: Entering directory '([^']+)'", err)
+    if not dir_match:
+        return False
+    
+    subdir = dir_match.group(1)
+    print(f"Make failed in subdirectory: {subdir}")
+    
+    # Get relative path
+    cwd = os.getcwd()
+    if subdir.startswith(cwd):
+        subdir = subdir[len(cwd):].lstrip('/')
+    
+    # Look for Makefile in that subdirectory
+    deleted_files = get_deleted_files(ref=ctx().git_ref)
+    makefile_names = ['Makefile', 'makefile', 'GNUmakefile', 'Makefile.in']
+    
+    for makefile in makefile_names:
+        makefile_path = os.path.join(subdir, makefile)
+        if makefile_path in deleted_files:
+            print(f"Found missing Makefile: {makefile_path}")
+            return restore_missing_file(makefile_path)
+    
+    # Also try to restore all files in that subdirectory
+    subdir_files = [f for f in deleted_files if f.startswith(subdir + '/')]
+    if subdir_files:
+        print(f"Restoring {len(subdir_files)} files from {subdir}/")
+        restored_any = False
+        for f in subdir_files:
+            if restore_missing_file(f):
+                restored_any = True
+        return restored_any
+    
+    return False
+
+
 def handle_make_missing_target(err: str) -> bool:
     """Handle make errors when a required source file is missing."""
     # Pattern: make: *** No rule to make target 'filename', needed by 'target'.  Stop.
@@ -1312,6 +1419,36 @@ def handle_make_missing_target(err: str) -> bool:
     missing_file = match.group(1)
     print(f"Found missing make target: {missing_file}")
     return restore_missing_file(missing_file)
+
+
+def handle_make_recipe_failed(err: str) -> bool:
+    """Handle make errors when a recipe fails to build a target.
+    
+    If the target file is tracked in git and deleted, restore it directly
+    instead of trying to run the failing recipe.
+    
+    Example error:
+        make: *** [Makefile:291: ex_vars.h] Error 1
+    """
+    # Pattern: make: *** [Makefile:line: target] Error N
+    pattern = r"make: \*\*\* \[Makefile:\d+: ([^\]]+)\] Error \d+"
+    match = re.search(pattern, err)
+    
+    if not match:
+        return False
+    
+    target = match.group(1).strip()
+    print(f"Make recipe failed for target: {target}")
+    
+    # Check if target is a deleted file we can restore
+    ref = ctx().git_ref
+    deleted_files = get_deleted_files(ref=ref)
+    
+    if target in deleted_files:
+        print(f"Target {target} is a deleted file, restoring directly from git")
+        return restore_missing_file(target)
+    
+    return False
 
 
 def handle_cannot_open_file(err: str) -> bool:
@@ -1625,7 +1762,9 @@ HANDLERS = [
     handle_rust_module_not_found,
     handle_rust_panic_no_such_file,
     handle_make_missing_makefile,
+    handle_make_no_makefile_found,
     handle_make_missing_target,
+    handle_make_recipe_failed,
     handle_c_compilation_error,
     handle_c_linker_error,
     handle_cannot_open_file,
@@ -1651,6 +1790,9 @@ HANDLERS = [
     handle_ansible_file_not_found,
     handle_ansible_variable,
     handle_file_not_found,
+    handle_shell_command_not_found,
+    handle_cat_no_such_file,
+    handle_sh_cannot_open,
     handle_no_such_file_or_directory,
     handle_generic_no_such_file,
     handle_missing_file,
