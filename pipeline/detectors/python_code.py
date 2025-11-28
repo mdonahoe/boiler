@@ -32,7 +32,8 @@ class MissingPythonCodeDetector(Detector):
 
         # Look for patterns indicating missing Python constructs
         # Pattern 1: 'def something' not found in '...filename.py - N lines...'
-        pattern1 = r"'((?:def|class|import)\s+\w+(?:\s*\(.*\))?)'.*?not found.*?([a-zA-Z0-9_-]+\.py)\s+-\s+\d+\s+lines"
+        # Note: The filename might be preceded by escaped newlines (\\n) or actual whitespace
+        pattern1 = r"'((?:def|class|import)\s+\w+(?:\s*\(.*\))?)'.*?not found.*?(?:\\n|[\s\n])*?([a-zA-Z0-9_-]+\.py)\s+-\s+\d+\s+lines"
         for match in re.finditer(pattern1, combined, re.DOTALL):
             code_element = match.group(1).strip()
             file_path = match.group(2).strip()
@@ -63,7 +64,7 @@ class MissingPythonCodeDetector(Detector):
                 # Try to find the filename nearby
                 # Look for .py files mentioned in the surrounding context
                 context_window = combined[max(0, match.start() - 500):match.end() + 500]
-                file_match = re.search(r'([a-zA-Z0-9_-]+\.py)\s+-\s+\d+\s+lines', context_window)
+                file_match = re.search(r'(?:\\n|[\s\n])*?([a-zA-Z0-9_-]+\.py)\s+-\s+\d+\s+lines', context_window)
 
                 if file_match:
                     file_path = file_match.group(1)

@@ -76,6 +76,27 @@ class MissingPythonCodeTest(unittest.TestCase):
         # Plans should be empty (file doesn't exist)
         self.assertEqual(len(result.plans_generated or []), 0)
 
+    def test_missing_class_with_escaped_newlines(self):
+        """Test detection when filename is preceded by escaped newlines (\\n)"""
+        # This mimics the actual error from the dim test suite
+        stderr = r"AssertionError: 'class TestClass' not found in '#!/usr/bin/env python3\n\"\"\"\nTest Python file\n\"\"\"\n\ndef hello_world():\n    print(\"Hello\")\n~\n~\nexample.py - 12 lines                                              python | 1/12\nhl_counts = 179, lines = 12' : Expected to see class definition"
+
+        git_state = GitState(
+            ref="HEAD",
+            deleted_files=set(),
+            git_toplevel="/root/boiler"
+        )
+
+        result = run_pipeline(stderr, "", git_state, debug=False)
+
+        # Should detect the missing class with correct filename (not "nexample.py")
+        self.assertIsNotNone(result.clues_detected, "Should detect clues")
+        self.assertGreater(len(result.clues_detected), 0, "Should have at least one clue")
+        self.assertEqual(result.clues_detected[0].clue_type, "missing_python_code")
+        self.assertEqual(result.clues_detected[0].context.get("element_name"), "TestClass")
+        self.assertEqual(result.clues_detected[0].context.get("file_path"), "example.py",
+                        "Should extract correct filename, not 'nexample.py'")
+
 
 if __name__ == "__main__":
     unittest.main()
