@@ -240,9 +240,11 @@ class LinkerUndefinedSymbolsPlanner(Planner):
                 score = 0
                 matched_symbols = []
                 for symbol in symbols:
-                    # Look for the symbol in the file (function definition or declaration)
-                    # Pattern: symbol(...) or symbol (...)
-                    if re.search(rf'\b{re.escape(symbol)}\s*\(', file_contents):
+                    # Look for the symbol in the file (function definition, declaration, or variable)
+                    # Pattern 1: symbol(...) - function call/definition
+                    # Pattern 2: \bsymbol\b - variable/symbol as a word boundary
+                    if (re.search(rf'\b{re.escape(symbol)}\s*\(', file_contents) or
+                        re.search(rf'\b{re.escape(symbol)}\b', file_contents)):
                         score += 1
                         matched_symbols.append(symbol)
 
