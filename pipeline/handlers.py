@@ -21,10 +21,10 @@ from pipeline.detectors.file_errors import (
     CCompilationErrorDetector,
     CLinkerErrorDetector,
 )
-from pipeline.detectors.python_code import MissingPythonCodeDetector
+from pipeline.detectors.python_code import MissingPythonCodeDetector, PythonNameErrorDetector
 from pipeline.planners.file_restore import PermissionFixPlanner, MissingFilePlanner, LinkerUndefinedSymbolsPlanner
 from pipeline.planners.make_restore import MakeMissingTargetPlanner, MakeNoRulePlanner
-from pipeline.planners.python_code_restore import MissingPythonCodePlanner
+from pipeline.planners.python_code_restore import MissingPythonCodePlanner, PythonNameErrorPlanner
 from pipeline.executors.git_restore import GitRestoreExecutor
 from pipeline.executors.python_code_restore import PythonCodeRestoreExecutor
 
@@ -50,6 +50,7 @@ def register_all_handlers():
     register_detector(MakeMissingTargetDetector())
     register_detector(MakeNoRuleDetector())
     register_detector(MissingPythonCodeDetector())
+    register_detector(PythonNameErrorDetector())
     register_detector(FopenNoSuchFileDetector())
     register_detector(FileNotFoundDetector())
     register_detector(ShellCannotOpenDetector())
@@ -66,6 +67,7 @@ def register_all_handlers():
     register_planner(MakeMissingTargetPlanner())
     register_planner(MakeNoRulePlanner())
     register_planner(MissingPythonCodePlanner())
+    register_planner(PythonNameErrorPlanner())
 
     # Register executors
     register_executor(PythonCodeRestoreExecutor())

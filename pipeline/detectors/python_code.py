@@ -86,3 +86,64 @@ class MissingPythonCodeDetector(Detector):
                             ))
 
         return clues
+
+
+class PythonNameErrorDetector(Detector):
+    """
+    Detect Python NameError exceptions indicating missing imports or code.
+
+    Matches patterns like:
+    - NameError: name 'fcntl' is not defined
+    - NameError: global name 'SomeClass' is not defined
+    """
+
+    @property
+    def name(self) -> str:
+        return "PythonNameErrorDetector"
+
+    def detect(self, stderr: str, stdout: str = "") -> T.List[ErrorClue]:
+        combined = stderr + "\n" + stdout
+
+        if "NameError:" not in combined:
+            return []
+
+        clues = []
+
+        # Parse traceback to find file and undefined name
+        # Pattern: NameError: name 'something' is not defined
+        # or: NameError: global name 'something' is not defined
+        name_error_pattern = r"NameError: (?:global )?name '(\w+)' is not defined"
+
+        # Also look for the file path in the traceback
+        # Pattern: File "/path/to/file.py", line 123, in function_name
+        file_pattern = r'File "([^"]+\.py)", line (\d+),'
+
+        # Find all file references
+        file_matches = list(re.finditer(file_pattern, combined))
+
+        # Find all NameErrors
+        for match in re.finditer(name_error_pattern, combined):
+            undefined_name = match.group(1)
+
+            # Find the last file reference before this NameError
+            file_path = None
+            line_num = None
+            for file_match in reversed(file_matches):
+                if file_match.start() < match.start():
+                    file_path = file_match.group(1)
+                    line_num = file_match.group(2)
+                    break
+
+            if file_path:
+                clues.append(ErrorClue(
+                    clue_type="python_name_error",
+                    confidence=1.0,
+                    context={
+                        "file_path": file_path,
+                        "undefined_name": undefined_name,
+                        "line_number": line_num,
+                    },
+                    source_line=match.group(0)
+                ))
+
+        return clues

@@ -66,8 +66,20 @@ class PythonCodeRestoreExecutor(Executor):
             with open(file_path, 'r') as f:
                 current_content = f.read()
 
-            # If the element is already in the current content, we're done
-            if element_name in current_content:
+            # Check if the element is already properly defined in the current content
+            # Use py_repair's get_labels to see if it's actually there as a code element
+            from py_repair import get_labels
+            current_labels = get_labels(current_content)
+
+            # Check if this element already exists as an import, class, or function
+            element_patterns = [
+                f"import:{element_name}",
+                f"alias:{element_name}",
+                f"class:{element_name}",
+                f"function:{element_name}",
+            ]
+
+            if any(pattern in current_labels for pattern in element_patterns):
                 return RepairResult(
                     success=False,
                     plans_attempted=[plan],

@@ -374,18 +374,6 @@ def parse_import_error(error_message: str) -> T.Tuple[T.Optional[str], T.Optiona
     return None, None
 
 
-def handle_name_error(stderr: str) -> bool:
-    """
-    Fix a NameError
-    """
-    # regex to find the filename and the name causing the NameError
-    filepath, name = parse_traceback(stderr)
-    if filepath is None:
-        return False
-
-    relative_path = os.path.relpath(filepath)
-    print(f"repairing {relative_path} for {name=}")
-    return do_repair(relative_path, missing=name)
 
 
 def handle_future_annotations(stderr: str) -> bool:
@@ -1800,7 +1788,6 @@ HANDLERS = [
     handle_orphaned_method,
     handle_indentation_error,
     handle_future_annotations,
-    handle_name_error,
     handle_module_attribute_error,
     handle_object_attribute_error,
     handle_circular_import_error,
