@@ -460,6 +460,35 @@ class CImplicitDeclarationDetector(Detector):
 
         clues = []
 
+        # Common standard library functions that require specific headers
+        # If we see these, it's almost certainly a missing include, not a missing function
+        stdlib_functions = {
+            # stdio.h
+            'printf', 'fprintf', 'sprintf', 'scanf', 'fscanf', 'fopen', 'fclose', 'fread', 'fwrite',
+            'fgets', 'fputs', 'getchar', 'putchar', 'puts', 'gets',
+            # stdlib.h
+            'malloc', 'calloc', 'realloc', 'free', 'atoi', 'atol', 'strtol', 'rand', 'srand',
+            # string.h
+            'strlen', 'strcpy', 'strncpy', 'strcat', 'strncat', 'strcmp', 'strncmp', 'strchr', 'strstr',
+            'memcpy', 'memmove', 'memset', 'memcmp',
+            # unistd.h
+            'read', 'write', 'open', 'close', 'lseek', 'fork', 'exec', 'exit', 'sleep', 'usleep',
+            # fcntl.h
+            'open', 'fcntl', 'dup', 'dup2',
+            # signal.h
+            'signal', 'kill', 'raise', 'pause',
+            # sys/stat.h
+            'stat', 'fstat', 'lstat', 'chmod', 'mkdir',
+            # time.h
+            'time', 'localtime', 'gmtime', 'strftime', 'clock',
+            # stdarg.h
+            'va_start', 'va_end', 'va_arg', 'va_copy',
+            # math.h
+            'sin', 'cos', 'tan', 'sqrt', 'pow', 'abs', 'fabs',
+            # ctype.h
+            'isalpha', 'isdigit', 'isspace', 'tolower', 'toupper',
+        }
+
         # Pattern for implicit declaration error
         # example.c:5:5: error: implicit declaration of function 'printf'
         # Note: Support both regular ' and Unicode ' quotes
@@ -498,7 +527,6 @@ class CImplicitDeclarationDetector(Detector):
             }
 
             # If there's a suggested include, it's a missing include problem
-            # Otherwise, it's likely a missing function definition in the same file
             if include_name:
                 context["suggested_include"] = include_name
                 clues.append(ErrorClue(
@@ -507,8 +535,15 @@ class CImplicitDeclarationDetector(Detector):
                     context=context,
                     source_line=implicit_match.group(0)
                 ))
+            # Check if it's a known stdlib function - if so, it's likely missing include
+            elif function_name.lower() in stdlib_functions:
+                # Guess the header based on common patterns
+                # For a real solution, we could maintain a full mapping
+                print(f"[Detector] Note: '{function_name}' is likely from a stdlib header, not a project function")
+                # Skip this - don't create a clue since we can't determine the header without compiler hints
+                continue
             else:
-                # No include suggestion - likely a missing function definition
+                # No include suggestion and not a stdlib function - likely a missing function definition
                 clues.append(ErrorClue(
                     clue_type="missing_c_function",
                     confidence=0.8,
@@ -582,6 +617,19 @@ class CUndeclaredIdentifierDetector(Detector):
         # Also detect undeclared identifiers without include suggestions (missing functions)
         # Pattern: filename.c:line:col: error: 'identifier' undeclared (first use in this function)
         # Note: GCC may output fancy Unicode quotes (') so we need to match both ASCII and Unicode quotes
+        
+        # Common stdlib constants/macros (uppercase names, usually from headers)
+        stdlib_constants = {
+            # fcntl.h
+            'O_RDWR', 'O_RDONLY', 'O_WRONLY', 'O_CREAT', 'O_APPEND', 'O_EXCL', 'O_TRUNC',
+            # signal.h
+            'SIGTERM', 'SIGKILL', 'SIGUSR1', 'SIGUSR2', 'SIGINT', 'SIGSTOP',
+            # errno.h
+            'EACCES', 'ENOENT', 'EINVAL', 'EAGAIN', 'ENOMEM',
+            # sys/wait.h
+            'WIFEXITED', 'WEXITSTATUS', 'WIFSIGNALED', 'WTERMSIG',
+        }
+        
         undeclared_no_include_pattern = r"^([a-zA-Z0-9_./\-]+\.c):(\d+):\d+:\s+error:\s+['\u2018]([^'\u2019]+)['\u2019]\s+undeclared\s+\(first use"
         
         # Find all undeclared identifiers without include suggestions
@@ -598,6 +646,11 @@ class CUndeclaredIdentifierDetector(Detector):
                 identifier in c.context.get("suggested_include", "")
                 for c in clues
             )
+            
+            # Skip stdlib constants - these need headers, not function definitions
+            if identifier in stdlib_constants:
+                print(f"[Detector] Note: '{identifier}' is likely from a stdlib header, not a project function")
+                continue
             
             if not already_has_include:
                 clues.append(ErrorClue(
