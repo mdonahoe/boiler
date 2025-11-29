@@ -10,7 +10,20 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from py_repair import filter_code, get_labels, LineAnnotator
 
 
-EXAMPLE = """
+EXAMPLE_C = """
+// some comment
+#include "something.h"
+int x = 1;
+int foo() {
+    return 0;
+};
+int bar() { return 1; };
+const char* name = "hello world";
+// the end
+"""
+
+
+EXAMPLE_PY = """
 import some_package
 import typing as T
 from another_package import a_module as diff_name
@@ -47,7 +60,7 @@ class PyRepairTest(unittest.TestCase):
         """
         Ensure a complicated example has expected line annotations
         """
-        code = EXAMPLE
+        code = EXAMPLE_PY
         annotator = LineAnnotator(code)
         annotations = annotator.annotate()
         expected = [
@@ -148,6 +161,18 @@ class Snake:
             "function:bite",
         ])
         self.assertSetEqual(expected, labels)
+
+    def test_filter_code_c(self) -> None:
+        """
+        Filter c code
+        """
+        output = "\n".join(filter_code(EXAMPLE_C, set(), language="c"))
+        # confirm that all the functions and includes got filtered out
+        expected = """// some comment
+int x = 1;
+const char* name = "hello world";
+// the end"""
+        self.assertMultiLineEqual(expected, output)
 
 
 class PythonFeatureTest(unittest.TestCase):
