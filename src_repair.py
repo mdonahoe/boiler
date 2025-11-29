@@ -4,7 +4,7 @@ Line Repair
 Restores lines to a python file based on syntactic pattern-matching.
 
 Example Usage:
-    python3 py_repair.py path/to/myfile.py --missing foobar
+    python3 src_repair.py path/to/myfile.py --missing foobar
 
 That will restore any lines of codewith imports, classes or functions named
 `foobar`.
@@ -324,13 +324,15 @@ def filter_code(
             yield line
 
 
-def infer_language(filename: str) -> str:
+def _infer_language(filename: str) -> str:
     _, ext = os.path.splitext(filename)
     if ext == ".py":
-        source_language = "python"
+        return "python"
     elif ext in (".h", ".c"):
         # *might* be c
-        source_language = "c"
+        return "c"
+    else:
+        raise ValueError(filename, ext)
 
 def repair(
     filename: str, commit: str, missing: T.Optional[str] = None, verbose: bool = False
@@ -344,7 +346,12 @@ def repair(
     if missing is not None:
         if ":" not in missing:
             # Assume this is just a name, and match types that introduce names.
-            missing = "(class|function|import|alias):" + missing
+            if lang == "python":
+                missing = "(class|function|import|alias):" + missing
+            elif lang == "c":
+                missing = "(function|include):" + missing
+            else:
+                raise ValueError(lang)
         allowed_patterns.add(missing)
     lines = list(filter_code(git_code, allowed_patterns, verbose=verbose, lang=lang))
     with open(filename, "w") as f:

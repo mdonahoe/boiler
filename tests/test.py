@@ -7,7 +7,7 @@ import difflib
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from py_repair import filter_code, get_labels, LineAnnotator
+from src_repair import filter_code, get_labels, LineAnnotator
 
 
 EXAMPLE_C = """// some comment

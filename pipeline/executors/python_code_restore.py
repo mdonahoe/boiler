@@ -11,9 +11,9 @@ from pipeline.models import RepairPlan, RepairResult
 
 class PythonCodeRestoreExecutor(Executor):
     """
-    Execute restoration of missing Python code (classes, functions, imports) using py_repair.
+    Execute restoration of missing Python code (classes, functions, imports) using src_repair.
 
-    This executor handles the "restore_python_element" action by using py_repair
+    This executor handles the "restore_python_element" action by using src_repair
     to selectively restore only the missing code element to a file.
     """
 
@@ -39,19 +39,19 @@ class PythonCodeRestoreExecutor(Executor):
         return (True, None)
 
     def execute(self, plan: RepairPlan) -> RepairResult:
-        """Execute py_repair to restore the missing code element"""
+        """Execute src_repair to restore the missing code element"""
         file_path = plan.target_file
         element_name = plan.params.get("element_name")
         ref = plan.params.get("ref", "HEAD")
 
         try:
-            # Import py_repair from git root
+            # Import src_repair from git root
             import sys
             git_toplevel = self._get_git_toplevel()
             if git_toplevel not in sys.path:
                 sys.path.insert(0, git_toplevel)
 
-            from py_repair import repair
+            from src_repair import repair
 
             # Check if file exists first
             if not os.path.exists(file_path):
@@ -67,8 +67,8 @@ class PythonCodeRestoreExecutor(Executor):
                 current_content = f.read()
 
             # Check if the element is already properly defined in the current content
-            # Use py_repair's get_labels to see if it's actually there as a code element
-            from py_repair import get_labels
+            # Use src_repair's get_labels to see if it's actually there as a code element
+            from src_repair import get_labels
             current_labels = get_labels(current_content)
 
             # Check if this element already exists as an import, class, or function
@@ -87,13 +87,13 @@ class PythonCodeRestoreExecutor(Executor):
                     error_message=f"'{element_name}' already exists in {file_path}"
                 )
 
-            # Use py_repair.repair() directly
+            # Use src_repair.repair() directly
             # This will restore the file with all existing code elements PLUS the missing element
             abs_path = os.path.abspath(file_path)
             git_toplevel = self._get_git_toplevel()
             git_relative_path = os.path.relpath(abs_path, git_toplevel)
 
-            # Call py_repair.repair() with the missing element
+            # Call src_repair.repair() with the missing element
             # This preserves the current file's structure and only adds the missing code
             repair(file_path, ref, missing=element_name, verbose=False)
 
