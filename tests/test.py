@@ -10,8 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from py_repair import filter_code, get_labels, LineAnnotator
 
 
-EXAMPLE_C = """
-// some comment
+EXAMPLE_C = """// some comment
 #include "something.h"
 int x = 1;
 int foo() {
@@ -150,7 +149,7 @@ def func(): pass
 class Snake:
     def bite(): pass
 # end"""
-        labels = get_labels(code)
+        labels = get_labels(code, "python")
         expected = set([
             "import:foo",
             "import:bar",
@@ -166,7 +165,7 @@ class Snake:
         """
         Filter c code
         """
-        output = "\n".join(filter_code(EXAMPLE_C, set(), language="c"))
+        output = "\n".join(filter_code(EXAMPLE_C, set(), lang="c"))
         # confirm that all the functions and includes got filtered out
         expected = """// some comment
 int x = 1;
