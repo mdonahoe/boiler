@@ -168,4 +168,4 @@ Based on the analysis, the next highest-priority handlers to migrate are likely:
 2. Other build system errors (cargo, rust)
 3. File system errors (cat, diff, shell commands)
 
-Run `python3 analyze_legacy_handlers.py` after your next test run to see updated priorities.
+Run `python3 analyze_boil_logs.py` after your next test run to see updated priorities.
