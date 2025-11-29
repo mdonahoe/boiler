@@ -188,12 +188,29 @@ def get_codes(filename: str, commit: str) -> T.Tuple[str, str]:
     return index_code, git_code
 
 
+def get_c_code_annotations(code_str) -> T.List[T.List[str]]:
+    annotations = []
+    # TODO(claude): implement using a subprocess call to "/root/tree-sitter/tree_print --json <filename>"
+    # to get the ast as json, then walk the ast, adding line annotations for:
+    #   include:<name> and function:<name>
+    # on each line that is part of an #include or a function_definition
+    # For reference, you can observe how LineAnnotator annotates lines of python code
+    # by implementing ast.NodeVisitor
+    return annotations
+
+
 def filter_code(
-    code: str, patterns: T.Set[str], verbose: bool = False
+        code: str, patterns: T.Set[str], verbose: bool = False, language: str = "python"
 ) -> T.Generator[str, None, None]:
     """Remove lines from code that doesn't match the set of syntactic patterns"""
-    annotator = LineAnnotator(code)
-    annotations = annotator.annotate()
+    if language == "python":
+        annotator = LineAnnotator(code)
+        annotations = annotator.annotate()
+    elif language == "c":
+        annotations = get_c_code_annotations(code)
+    else:
+        raise ValueError(language)
+
     for lineno, (line, labels) in enumerate(
         zip(code.splitlines(), annotations), start=1
     ):
