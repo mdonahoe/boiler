@@ -62,6 +62,11 @@ class CCodeRestoreExecutor(Executor):
                     error_message=f"File {file_path} does not exist"
                 )
 
+            # Capture the file state before repair
+            with open(file_path, 'r') as f:
+                before_content = f.read()
+            before_hash = hash(before_content)
+
             # Note: We don't check if the element already exists here because:
             # 1. It may exist but not be declared before its first use (forward declaration needed)
             # 2. src_repair can handle both cases (existing code and new additions)
@@ -76,6 +81,20 @@ class CCodeRestoreExecutor(Executor):
             # Call src_repair.repair() with the missing element
             # This preserves the current file's structure and only adds the missing code
             repair(file_path, ref, missing=element_name, verbose=False)
+
+            # Verify the file actually changed
+            with open(file_path, 'r') as f:
+                after_content = f.read()
+            after_hash = hash(after_content)
+
+            if before_hash == after_hash:
+                print(f"[Executor:CCodeRestoreExecutor] WARNING: File unchanged after repair attempt for '{element_name}'")
+                return RepairResult(
+                    success=False,
+                    plans_attempted=[plan],
+                    files_modified=[],
+                    error_message=f"Repair did not modify {file_path} ('{element_name}' may not exist in git history)"
+                )
 
             print(f"[Executor:CCodeRestoreExecutor] Successfully restored '{element_name}' to {file_path}")
             return RepairResult(
