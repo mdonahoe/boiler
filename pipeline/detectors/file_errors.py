@@ -529,6 +529,9 @@ class CUndeclaredIdentifierDetector(Detector):
     Matches patterns like:
     - error: 'NULL' undeclared here (not in a function)
     - note: 'NULL' is defined in header '<stddef.h>'; did you forget to '#include <stddef.h>'?
+    
+    Also detects undeclared identifiers without include suggestions (missing functions):
+    - error: 'disableRawMode' undeclared (first use in this function)
     """
 
     @property
@@ -574,6 +577,38 @@ class CUndeclaredIdentifierDetector(Detector):
                         "suggested_include": include_name,
                     },
                     source_line=f"Suggested include: {include_name}"
+                ))
+
+        # Also detect undeclared identifiers without include suggestions (missing functions)
+        # Pattern: filename.c:line:col: error: 'identifier' undeclared (first use in this function)
+        # Note: GCC may output fancy Unicode quotes (') so we need to match both ASCII and Unicode quotes
+        undeclared_no_include_pattern = r"^([a-zA-Z0-9_./\-]+\.c):(\d+):\d+:\s+error:\s+['\u2018]([^'\u2019]+)['\u2019]\s+undeclared\s+\(first use"
+        
+        # Find all undeclared identifiers without include suggestions
+        for match in re.finditer(undeclared_no_include_pattern, combined, re.MULTILINE):
+            source_file = match.group(1).strip()
+            line_number = int(match.group(2))
+            identifier = match.group(3).strip()
+
+            # Only add if we haven't already added an include suggestion for this identifier
+            # (avoid duplicates)
+            already_has_include = any(
+                c.clue_type == "missing_c_include" and 
+                c.context.get("file_path") == source_file and
+                identifier in c.context.get("suggested_include", "")
+                for c in clues
+            )
+            
+            if not already_has_include:
+                clues.append(ErrorClue(
+                    clue_type="missing_c_function",
+                    confidence=0.8,
+                    context={
+                        "file_path": source_file,
+                        "line_number": line_number,
+                        "symbols": [identifier],
+                    },
+                    source_line=match.group(0)
                 ))
 
         return clues
