@@ -437,3 +437,67 @@ class CCompilationErrorDetector(Detector):
             ))
 
         return clues
+
+
+class CImplicitDeclarationDetector(Detector):
+    """
+    Detect C implicit function declaration errors that suggest missing includes.
+
+    Matches patterns like:
+    - error: implicit declaration of function 'printf' [-Werror=implicit-function-declaration]
+    - note: include '<stdio.h>' or provide a declaration of 'printf'
+    """
+
+    @property
+    def name(self) -> str:
+        return "CImplicitDeclarationDetector"
+
+    def detect(self, stderr: str, stdout: str = "") -> T.List[ErrorClue]:
+        combined = stderr + "\n" + stdout
+
+        if "implicit declaration of function" not in combined:
+            return []
+
+        clues = []
+
+        # Pattern for implicit declaration error
+        # example.c:5:5: error: implicit declaration of function 'printf'
+        # Note: Support both regular ' and Unicode ' quotes
+        implicit_pattern = r"([^:]+):(\d+):\d+:\s+(?:error|warning):\s+implicit declaration of function ['\u2018]([^'\u2019]+)['\u2019]"
+
+        # Pattern for include suggestion
+        # note: include '<stdio.h>' or provide a declaration of 'printf'
+        include_pattern = r"note:\s+include\s+['\u2018]<([^>]+)>['\u2019]\s+or provide a declaration"
+
+        # Find all implicit declarations
+        implicit_matches = list(re.finditer(implicit_pattern, combined))
+        include_matches = list(re.finditer(include_pattern, combined))
+
+        # Match them up - the include suggestion usually comes after the error
+        for i, implicit_match in enumerate(implicit_matches):
+            source_file = implicit_match.group(1).strip()
+            line_number = int(implicit_match.group(2))
+            function_name = implicit_match.group(3).strip()
+
+            # Try to find the corresponding include suggestion
+            include_name = None
+            if i < len(include_matches):
+                include_name = include_matches[i].group(1).strip()
+
+            context = {
+                "file_path": source_file,
+                "line_number": line_number,
+                "function_name": function_name,
+            }
+
+            if include_name:
+                context["suggested_include"] = include_name
+
+            clues.append(ErrorClue(
+                clue_type="missing_c_include",
+                confidence=1.0,
+                context=context,
+                source_line=implicit_match.group(0)
+            ))
+
+        return clues

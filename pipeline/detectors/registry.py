@@ -43,7 +43,9 @@ class DetectorRegistry:
                     print(f"[Detector:{detector.name}] Found {len(clues)} clue(s)")
                     all_clues.extend(clues)
             except Exception as e:
+                import traceback
                 print(f"[Detector:{detector.name}] Error: {e}")
+                traceback.print_exc()
                 # Continue with other detectors
 
         return all_clues
