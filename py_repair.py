@@ -143,12 +143,19 @@ def pattern_match(
     return None
 
 
-def get_labels(code: str) -> T.Set[str]:
+def _annotate(code: str, lang: str) -> T.List[T.List[str]]:
+    if lang == "python":
+        annotator = LineAnnotator(code)
+        return annotator.annotate()
+    if lang == "c":
+        return get_c_code_annotations(code)
+    return []
+
+
+def get_labels(code: str, lang: str) -> T.Set[str]:
     """Return all the annotations in the code"""
-    annotator = LineAnnotator(code)
-    annotations = annotator.annotate()
     all_labels = set()
-    for line_annotations in annotations:
+    for line_annotations in _annotate(code, lang):
         for label in line_annotations:
             all_labels.add(label)
     return all_labels
@@ -189,28 +196,116 @@ def get_codes(filename: str, commit: str) -> T.Tuple[str, str]:
 
 
 def get_c_code_annotations(code_str) -> T.List[T.List[str]]:
-    annotations = []
-    # TODO(claude): implement using a subprocess call to "/root/tree-sitter/tree_print --json <filename>"
-    # to get the ast as json, then walk the ast, adding line annotations for:
-    #   include:<name> and function:<name>
-    # on each line that is part of an #include or a function_definition
-    # For reference, you can observe how LineAnnotator annotates lines of python code
-    # by implementing ast.NodeVisitor
+    import json
+    import tempfile
+
+    # Initialize annotations list based on number of lines in code
+    lines = code_str.splitlines()
+    annotations = [[] for _ in range(len(lines))]
+
+    # Write code to temporary file
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.c', delete=False) as f:
+        f.write(code_str)
+        temp_filename = f.name
+
+    try:
+        # Run tree_print to get AST as JSON
+        result = subprocess.run(
+            ["/root/tree-sitter/tree_print", "--json", temp_filename],
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode != 0:
+            print(f"tree_print failed: {result.stderr}")
+            return annotations
+
+        # Parse JSON output
+        ast_data = json.loads(result.stdout)
+
+        # Walk the AST and annotate lines
+        def walk_ast(node):
+            node_type = node.get("type", "")
+
+            # Handle #include statements
+            if node_type == "preproc_include":
+                # Find the include name from children
+                include_name = None
+                for child in node.get("children", []):
+                    child_type = child.get("type", "")
+                    if child_type == "system_lib_string":
+                        # Extract name from <stdio.h> format
+                        text = child.get("text", "")
+                        include_name = text.strip("<>")
+                    elif child_type == "string_literal":
+                        # Extract name from "something.h" format
+                        for subchild in child.get("children", []):
+                            if subchild.get("type") == "string_content":
+                                include_name = subchild.get("text", "")
+
+                if include_name:
+                    # Annotate all lines in this include statement
+                    # Tree-sitter uses 0-indexed rows, end row/column is exclusive
+                    start_line = node.get("start", {}).get("row", 0)
+                    end_line = node.get("end", {}).get("row", 0)
+                    # If end column is 0, it means the previous line is the last line
+                    end_col = node.get("end", {}).get("column", 0)
+                    if end_col == 0 and end_line > 0:
+                        end_line -= 1
+                    for lineno in range(start_line, end_line + 1):
+                        if 0 <= lineno < len(annotations):
+                            annotations[lineno].append(f"include:{include_name}")
+
+            # Handle function definitions
+            elif node_type == "function_definition":
+                # Find the function name from the function_declarator
+                func_name = None
+                for child in node.get("children", []):
+                    if child.get("type") == "function_declarator":
+                        # Direct function declarator
+                        for subchild in child.get("children", []):
+                            if subchild.get("type") == "identifier":
+                                func_name = subchild.get("text", "")
+                    elif child.get("type") == "pointer_declarator":
+                        # Pointer return type (e.g., char* foo())
+                        for subchild in child.get("children", []):
+                            if subchild.get("type") == "function_declarator":
+                                for subsubchild in subchild.get("children", []):
+                                    if subsubchild.get("type") == "identifier":
+                                        func_name = subsubchild.get("text", "")
+
+                if func_name:
+                    # Annotate all lines in this function definition
+                    # Tree-sitter uses 0-indexed rows, end row/column is exclusive
+                    start_line = node.get("start", {}).get("row", 0)
+                    end_line = node.get("end", {}).get("row", 0)
+                    # If end column is 0, it means the previous line is the last line
+                    end_col = node.get("end", {}).get("column", 0)
+                    if end_col == 0 and end_line > 0:
+                        end_line -= 1
+                    for lineno in range(start_line, end_line + 1):
+                        if 0 <= lineno < len(annotations):
+                            annotations[lineno].append(f"function:{func_name}")
+
+            # Recursively walk children
+            for child in node.get("children", []):
+                walk_ast(child)
+
+        # Start walking from root
+        walk_ast(ast_data)
+
+    finally:
+        # Clean up temporary file
+        os.unlink(temp_filename)
+
     return annotations
 
 
 def filter_code(
-        code: str, patterns: T.Set[str], verbose: bool = False, language: str = "python"
+        code: str, patterns: T.Set[str], verbose: bool = False, lang: str = "python"
 ) -> T.Generator[str, None, None]:
     """Remove lines from code that doesn't match the set of syntactic patterns"""
-    if language == "python":
-        annotator = LineAnnotator(code)
-        annotations = annotator.annotate()
-    elif language == "c":
-        annotations = get_c_code_annotations(code)
-    else:
-        raise ValueError(language)
-
+    annotations = _annotate(code, lang)
     for lineno, (line, labels) in enumerate(
         zip(code.splitlines(), annotations), start=1
     ):
@@ -229,20 +324,29 @@ def filter_code(
             yield line
 
 
+def infer_language(filename: str) -> str:
+    _, ext = os.path.splitext(filename)
+    if ext == ".py":
+        source_language = "python"
+    elif ext in (".h", ".c"):
+        # *might* be c
+        source_language = "c"
+
 def repair(
     filename: str, commit: str, missing: T.Optional[str] = None, verbose: bool = False
 ) -> None:
     """Restore deleted lines to a file that match the `missing` pattern."""
     print(f"repairing {filename} from {commit} missing {missing}")
+    lang = _infer_language(filename)
     index_code, git_code = get_codes(filename, commit)
-    raw_labels = get_labels(index_code)
+    raw_labels = get_labels(index_code, lang)
     allowed_patterns = {x for x in raw_labels if not x.startswith("decorator:")}
     if missing is not None:
         if ":" not in missing:
             # Assume this is just a name, and match types that introduce names.
             missing = "(class|function|import|alias):" + missing
         allowed_patterns.add(missing)
-    lines = list(filter_code(git_code, allowed_patterns, verbose=verbose))
+    lines = list(filter_code(git_code, allowed_patterns, verbose=verbose, lang=lang))
     with open(filename, "w") as f:
         for line in lines:
             f.write(line + "\n")
