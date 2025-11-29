@@ -198,10 +198,6 @@ class LinkerUndefinedSymbolsPlanner(Planner):
         deleted_files = git_state.deleted_files
         deleted_c_files = [f for f in deleted_files if f.endswith(('.c', '.cpp', '.cc', '.cxx', '.C'))]
 
-        if not deleted_c_files:
-            # No deleted C files - linker error might be from other causes
-            return []
-
         # Check if lib.c is deleted - it's a special case
         lib_c_candidates = [f for f in deleted_c_files if 'lib.c' in f or f.endswith('/lib.c')]
         if lib_c_candidates:
@@ -269,5 +265,56 @@ class LinkerUndefinedSymbolsPlanner(Planner):
                 reason=f"File {c_file} contains {score} undefined symbols: {', '.join(matched_symbols[:3])}...",
                 clue_source=clue
             ))
+
+        # If no deleted files matched, check existing C files and use src_repair
+        if not plans:
+            print(f"[Planner] No deleted C files matched, checking existing C files")
+            # Look for existing C files that might need functions restored
+            import glob
+            existing_c_files = glob.glob("*.c") + glob.glob("**/*.c", recursive=True)
+
+            for c_file in existing_c_files:
+                if not os.path.exists(c_file):
+                    continue
+
+                try:
+                    # Check if this file exists in git
+                    result = subprocess.run(
+                        ["git", "show", f"{git_state.ref}:{c_file}"],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                        cwd=git_state.git_toplevel
+                    )
+
+                    if result.returncode != 0:
+                        continue
+
+                    git_contents = result.stdout
+
+                    # Check if any undefined symbols are defined in the git version
+                    for symbol in symbols:
+                        # Look for function definitions (not just declarations)
+                        # Pattern: return_type symbol(...) { or symbol(...) {
+                        if re.search(rf'\b{re.escape(symbol)}\s*\([^)]*\)\s*\{{', git_contents):
+                            print(f"[Planner] Found function definition for '{symbol}' in {c_file} (git version)")
+                            # Create a plan to restore this specific function
+                            plans.append(RepairPlan(
+                                plan_type="restore_c_code",
+                                priority=0,
+                                target_file=c_file,
+                                action="restore_c_element",
+                                params={
+                                    "ref": git_state.ref,
+                                    "element_name": symbol,
+                                    "element_type": "function",
+                                },
+                                reason=f"Restore function '{symbol}' to {c_file}",
+                                clue_source=clue
+                            ))
+
+                except Exception as e:
+                    print(f"[Planner] Error checking {c_file}: {e}")
+                    continue
 
         return plans

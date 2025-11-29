@@ -463,15 +463,22 @@ class CImplicitDeclarationDetector(Detector):
         # Pattern for implicit declaration error
         # example.c:5:5: error: implicit declaration of function 'printf'
         # Note: Support both regular ' and Unicode ' quotes
-        implicit_pattern = r"([^:]+):(\d+):\d+:\s+(?:error|warning):\s+implicit declaration of function ['\u2018]([^'\u2019]+)['\u2019]"
+        # Only match lines that start with a path-like pattern (no leading spaces/brackets)
+        implicit_pattern = r"^([a-zA-Z0-9_./\-]+\.c):(\d+):\d+:\s+(?:error|warning):\s+implicit declaration of function ['\u2018]([^'\u2019]+)['\u2019]"
 
-        # Pattern for include suggestion
+        # Pattern for include suggestion - format 1
         # note: include '<stdio.h>' or provide a declaration of 'printf'
-        include_pattern = r"note:\s+include\s+['\u2018]<([^>]+)>['\u2019]\s+or provide a declaration"
+        include_pattern1 = r"note:\s+include\s+['\u2018]<([^>]+)>['\u2019]\s+or provide a declaration"
+
+        # Pattern for include suggestion - format 2
+        # note: 'NULL' is defined in header '<stddef.h>'; did you forget to '#include <stddef.h>'?
+        include_pattern2 = r"note:.*is defined in header\s+['\u2018]<([^>]+)>['\u2019]"
 
         # Find all implicit declarations
-        implicit_matches = list(re.finditer(implicit_pattern, combined))
-        include_matches = list(re.finditer(include_pattern, combined))
+        implicit_matches = list(re.finditer(implicit_pattern, combined, re.MULTILINE))
+        include_matches1 = list(re.finditer(include_pattern1, combined))
+        include_matches2 = list(re.finditer(include_pattern2, combined))
+        include_matches = include_matches1 + include_matches2
 
         # Match them up - the include suggestion usually comes after the error
         for i, implicit_match in enumerate(implicit_matches):
@@ -490,14 +497,83 @@ class CImplicitDeclarationDetector(Detector):
                 "function_name": function_name,
             }
 
+            # If there's a suggested include, it's a missing include problem
+            # Otherwise, it's likely a missing function definition in the same file
             if include_name:
                 context["suggested_include"] = include_name
+                clues.append(ErrorClue(
+                    clue_type="missing_c_include",
+                    confidence=1.0,
+                    context=context,
+                    source_line=implicit_match.group(0)
+                ))
+            else:
+                # No include suggestion - likely a missing function definition
+                clues.append(ErrorClue(
+                    clue_type="missing_c_function",
+                    confidence=0.8,
+                    context={
+                        "file_path": source_file,
+                        "symbols": [function_name],
+                    },
+                    source_line=implicit_match.group(0)
+                ))
 
-            clues.append(ErrorClue(
-                clue_type="missing_c_include",
-                confidence=1.0,
-                context=context,
-                source_line=implicit_match.group(0)
-            ))
+        return clues
+
+
+class CUndeclaredIdentifierDetector(Detector):
+    """
+    Detect C compilation errors for undeclared identifiers with include suggestions.
+
+    Matches patterns like:
+    - error: 'NULL' undeclared here (not in a function)
+    - note: 'NULL' is defined in header '<stddef.h>'; did you forget to '#include <stddef.h>'?
+    """
+
+    @property
+    def name(self) -> str:
+        return "CUndeclaredIdentifierDetector"
+
+    def detect(self, stderr: str, stdout: str = "") -> T.List[ErrorClue]:
+        combined = stderr + "\n" + stdout
+
+        if "undeclared" not in combined and "unknown type name" not in combined:
+            return []
+
+        clues = []
+
+        # Pattern for include suggestions
+        # note: 'NULL' is defined in header '<stddef.h>'; did you forget to '#include <stddef.h>'?
+        # note: 'atexit' is defined in header '<stdlib.h>'; did you forget to '#include <stdlib.h>'?
+        include_pattern = r"note:.*is defined in header\s+['\u2018]<([^>]+)>['\u2019]"
+
+        # Find all include suggestions
+        for match in re.finditer(include_pattern, combined):
+            include_name = match.group(1).strip()
+
+            # Try to find the associated error line (should be a few lines before)
+            # Look backwards from this position
+            error_context = combined[:match.start()]
+
+            # Find the most recent filename:line reference
+            file_pattern = r"^([a-zA-Z0-9_./\-]+\.c):(\d+):"
+            file_matches = list(re.finditer(file_pattern, error_context, re.MULTILINE))
+
+            if file_matches:
+                last_match = file_matches[-1]
+                source_file = last_match.group(1).strip()
+                line_number = int(last_match.group(2))
+
+                clues.append(ErrorClue(
+                    clue_type="missing_c_include",
+                    confidence=1.0,
+                    context={
+                        "file_path": source_file,
+                        "line_number": line_number,
+                        "suggested_include": include_name,
+                    },
+                    source_line=f"Suggested include: {include_name}"
+                ))
 
         return clues
