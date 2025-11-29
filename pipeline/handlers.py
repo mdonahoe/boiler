@@ -20,13 +20,16 @@ from pipeline.detectors.file_errors import (
     DiffNoSuchFileDetector,
     CCompilationErrorDetector,
     CLinkerErrorDetector,
+    CImplicitDeclarationDetector,
 )
 from pipeline.detectors.python_code import MissingPythonCodeDetector, PythonNameErrorDetector
 from pipeline.planners.file_restore import PermissionFixPlanner, MissingFilePlanner, LinkerUndefinedSymbolsPlanner
 from pipeline.planners.make_restore import MakeMissingTargetPlanner, MakeNoRulePlanner
 from pipeline.planners.python_code_restore import MissingPythonCodePlanner, PythonNameErrorPlanner
+from pipeline.planners.c_code_restore import MissingCIncludePlanner
 from pipeline.executors.git_restore import GitRestoreExecutor
 from pipeline.executors.python_code_restore import PythonCodeRestoreExecutor
+from pipeline.executors.c_code_restore import CCodeRestoreExecutor
 
 
 # Track if handlers have been registered
@@ -59,6 +62,7 @@ def register_all_handlers():
     register_detector(DiffNoSuchFileDetector())
     register_detector(CLinkerErrorDetector())
     register_detector(CCompilationErrorDetector())
+    register_detector(CImplicitDeclarationDetector())
 
     # Register planners
     register_planner(PermissionFixPlanner())
@@ -68,9 +72,11 @@ def register_all_handlers():
     register_planner(MakeNoRulePlanner())
     register_planner(MissingPythonCodePlanner())
     register_planner(PythonNameErrorPlanner())
+    register_planner(MissingCIncludePlanner())
 
     # Register executors
     register_executor(PythonCodeRestoreExecutor())
+    register_executor(CCodeRestoreExecutor())
     register_executor(GitRestoreExecutor())
 
     _handlers_registered = True
