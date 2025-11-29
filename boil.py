@@ -339,6 +339,12 @@ def main() -> int:
         default=None,
         help="path to pre-existing command output for error analysis",
     )
+    parser.add_argument(
+        "--test-detectors",
+        type=str,
+        default=None,
+        help="test all detectors on the given error file and show verbose output",
+    )
 
     # Use parse_known_args to separate known and unknown arguments
     args, unknown_args = parser.parse_known_args()
@@ -349,6 +355,37 @@ def main() -> int:
 
     if args.clear:
         return clear_boiling()
+
+    # Handle test-detectors command
+    if args.test_detectors:
+        err = open(args.test_detectors).read()
+        print(f"Testing detectors with error file: {args.test_detectors}")
+        print(f"Error content length: {len(err)}")
+        print(f"Error content (first 500 chars):")
+        print(err[:500])
+        print("\n" + "=" * 80)
+
+        register_all_handlers()
+        from pipeline.detectors.registry import get_detector_registry
+        registry = get_detector_registry()
+
+        print(f"\nTesting {len(registry.list_detectors())} detectors:")
+        for detector in registry._detectors:
+            print(f"\n--- {detector.name} ---")
+            try:
+                clues = detector.detect(err, "")
+                print(f"Result: {len(clues)} clue(s) found")
+                for i, clue in enumerate(clues):
+                    print(f"  Clue {i+1}:")
+                    print(f"    Type: {clue.clue_type}")
+                    print(f"    Confidence: {clue.confidence}")
+                    print(f"    Context: {clue.context}")
+                    print(f"    Source: {clue.source_line[:100] if clue.source_line else ''}")
+            except Exception as e:
+                import traceback
+                print(f"Error: {e}")
+                traceback.print_exc()
+        return 0
 
     # Store the remaining arguments as a single command string
     # TODO(matt): parse leading --dash-commands and complain because they are probs typos.
