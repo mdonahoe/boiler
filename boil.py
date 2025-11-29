@@ -401,6 +401,23 @@ def main() -> int:
     # If the user passes the error output explicitly, we can handle it and exit.
     if args.handle_error:
         err = open(args.handle_error).read()
+
+        # Try pipeline first
+        if has_pipeline_handlers():
+            print("[Pipeline] Attempting repair with new pipeline system...")
+            git_state = GitState(
+                ref="HEAD",
+                deleted_files=handlers.get_deleted_files(ref="HEAD"),
+                git_toplevel=handlers.get_git_toplevel()
+            )
+            # Assume error output is in stderr
+            pipeline_result = run_pipeline(err, "", git_state, debug=True)
+            if pipeline_result.success:
+                print(f"[Pipeline] Fixed with pipeline (modified {len(pipeline_result.files_modified)} file(s))")
+                return 0
+            print("[Pipeline] Pipeline did not produce a fix, falling back to old handlers...")
+
+        # Fall back to old handlers
         for i, handler in enumerate(HANDLERS):
             print(handler)
             if handler(err):
