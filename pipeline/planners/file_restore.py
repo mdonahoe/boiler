@@ -272,6 +272,57 @@ class LinkerUndefinedSymbolsPlanner(Planner):
             # Look for existing C files that might need functions restored
             import glob
             existing_c_files = glob.glob("*.c") + glob.glob("**/*.c", recursive=True)
+            
+            # For linker errors, prioritize files that are likely compilation targets
+            # This makes the tool generic - it works for any repo
+            priority_files = []
+            other_files = []
+            
+            # Get modified files from git to understand what's being actively worked on
+            modified_set = set()
+            try:
+                result = subprocess.run(
+                    ["git", "diff", "--name-only"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    cwd=git_state.git_toplevel
+                )
+                modified_set = set(line.strip() for line in result.stdout.splitlines())
+            except:
+                pass
+            
+            deleted_set = set(git_state.deleted_files)
+            
+            for f in existing_c_files:
+                # Normalize path for comparison
+                abs_f = os.path.abspath(f)
+                git_relative = os.path.relpath(abs_f, git_state.git_toplevel)
+                
+                # Prioritize based on:
+                # 1. Files that are modified in git (actively being worked on)
+                # 2. Files in the deleted set (previously had content)
+                # 3. Files in the root directory (likely main compilation target)
+                score = 0
+                if git_relative in modified_set:
+                    score += 10  # Heavily prioritize modified files
+                if git_relative in deleted_set:
+                    score += 5
+                if '/' not in f:
+                    score += 1  # Slight priority for root directory files
+                
+                if score > 0:
+                    priority_files.append((score, f))
+                else:
+                    other_files.append(f)
+            
+            # Sort priority files by score (highest first) and extract just the filenames
+            priority_files.sort(key=lambda x: x[0], reverse=True)
+            existing_c_files = [f for _, f in priority_files] + other_files
+
+            # Track which symbols we've already created plans for to avoid duplicates
+            # across multiple files
+            symbols_with_plans = set()
 
             for c_file in existing_c_files:
                 if not os.path.exists(c_file):
@@ -294,9 +345,25 @@ class LinkerUndefinedSymbolsPlanner(Planner):
 
                     # Check if any undefined symbols are defined in the git version
                     for symbol in symbols:
+                        if symbol in symbols_with_plans:
+                            continue  # Already have a plan for this symbol
+                        
                         # Look for function definitions (not just declarations)
                         # Pattern: return_type symbol(...) { or symbol(...) {
-                        if re.search(rf'\b{re.escape(symbol)}\s*\([^)]*\)\s*\{{', git_contents):
+                        # Also match: type symbol(...) or symbol(...) with looser matching
+                        patterns = [
+                            rf'\b{re.escape(symbol)}\s*\([^)]*\)\s*\{{',  # Function definition with {
+                            rf'^\s*\w+\s+\*?{re.escape(symbol)}\s*\(',  # With return type
+                            rf'^\s*{re.escape(symbol)}\s*\(',  # Function at line start
+                        ]
+                        
+                        found = False
+                        for pattern in patterns:
+                            if re.search(pattern, git_contents, re.MULTILINE):
+                                found = True
+                                break
+                        
+                        if found:
                             print(f"[Planner] Found function definition for '{symbol}' in {c_file} (git version)")
                             # Create a plan to restore this specific function
                             plans.append(RepairPlan(
@@ -312,6 +379,10 @@ class LinkerUndefinedSymbolsPlanner(Planner):
                                 reason=f"Restore function '{symbol}' to {c_file}",
                                 clue_source=clue
                             ))
+                            symbols_with_plans.add(symbol)
+                            # Stop searching after we find the symbol in a file
+                            # (it's unlikely to be defined in multiple files)
+                            break
 
                 except Exception as e:
                     print(f"[Planner] Error checking {c_file}: {e}")

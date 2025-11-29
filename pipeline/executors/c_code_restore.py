@@ -62,27 +62,10 @@ class CCodeRestoreExecutor(Executor):
                     error_message=f"File {file_path} does not exist"
                 )
 
-            # Get current file content to check if element already exists
-            with open(file_path, 'r') as f:
-                current_content = f.read()
-
-            # Check if the element is already properly defined in the current content
-            # Use src_repair's get_labels to see if it's actually there as a code element
-            current_labels = get_labels(current_content, "c")
-
-            # Check if this element already exists as an include or function
-            element_patterns = [
-                f"include:{element_name}",
-                f"function:{element_name}",
-            ]
-
-            if any(pattern in current_labels for pattern in element_patterns):
-                return RepairResult(
-                    success=False,
-                    plans_attempted=[plan],
-                    files_modified=[],
-                    error_message=f"'{element_name}' already exists in {file_path}"
-                )
+            # Note: We don't check if the element already exists here because:
+            # 1. It may exist but not be declared before its first use (forward declaration needed)
+            # 2. src_repair can handle both cases (existing code and new additions)
+            # 3. Checking here would prevent legitimate repairs
 
             # Use src_repair.repair() directly
             # This will restore the file with all existing code elements PLUS the missing element
