@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Analyze which legacy handlers are being used most frequently.
+Analyze an active boil session in the current working directory.
 
 Usage:
-    python3 analyze_legacy_handlers.py
+    python3 analyze_boil_logs.py
 
 This will scan all .boil/iter*.pipeline.json files and show:
 1. Which legacy handlers are used most often

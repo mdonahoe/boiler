@@ -131,8 +131,24 @@ A: This is normal. Each fix attempt is a separate commit.
 **Q: Can I boil non-Python code?**
 A: File-level restoration works on any language. Python code element restoration is Python-specific.
 
+## C Code Support
+
+Boiler can handle C compilation errors:
+
+- **Implicit function declarations**: Detects missing project functions and creates forward declarations
+- **Undeclared identifiers**: Restores missing function definitions from git
+- **Linker undefined symbols**: Restores missing functions to the correct compilation target file
+
+**Limitations**:
+- Missing includes (stdlib headers) are detected but not automatically fixed
+- Some errors (missing headers like `<fcntl.h>`, `<stdarg.h>`) are not (yet) fixed by src_repair
+- File validation ensures repairs actually modify files (prevents infinite loops)
+
+See `notes/c_error_handling_lessons.md` for detailed analysis.
+
 ## Known Issues
 
 1. Named globals aren't supported and always get restored
 2. Enum restoration makes __init__ functions appear
-3. File restoration doesn't verify the fix actually solved the problem (future: add validation)
+3. Missing C headers are not automatically added (requires future planner/executor)
+4. Some stdlib functions may not be in the filtered list and will attempt restoration

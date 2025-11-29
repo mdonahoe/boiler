@@ -15,7 +15,7 @@ The JSON debug output now tracks **which legacy handler was used** when the pipe
 
 ### 2. Created Analysis Tool
 
-- `analyze_legacy_handlers.py` - Analyzes all pipeline JSON files
+- `analyze_boil_logs.py` - Analyzes all pipeline JSON files
 - Shows which legacy handlers are used most frequently
 - Provides migration priority recommendations
 - Displays pipeline success rate
@@ -70,7 +70,7 @@ When running `boil.py`, you'll now see:
 ### Analyze Legacy Handler Usage
 
 ```bash
-python3 analyze_legacy_handlers.py
+python3 analyze_boil_logs.py
 ```
 
 Output shows:
@@ -130,7 +130,7 @@ The pipeline now provides:
 ## Next Steps
 
 1. Run your test suite through `boil.py`
-2. Run `python3 analyze_legacy_handlers.py`
+2. Run `python3 analyze_boil_logs.py`
 3. Migrate the top 3-5 most-used legacy handlers
 4. Re-run analysis to see improvement
 
