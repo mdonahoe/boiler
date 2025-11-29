@@ -3,7 +3,7 @@ import re
 import subprocess
 import typing as T
 
-import py_repair
+import src_repair
 from session import ctx
 
 def run_command(command: T.List[str]) -> T.Tuple[str, str, int]:
@@ -43,7 +43,7 @@ def git_checkout(file_path: str, ref: str = "HEAD") -> bool:
     abs_path = os.path.join(git_toplevel, file_path)
     cwd_relative_path = os.path.relpath(abs_path, cwd)
 
-    # For Python files, create empty file first and let py_repair handle restoration
+    # For Python files, create empty file first and let src_repair handle restoration
     if file_path.endswith(".py"):
         print(f"creating empty Python file: {cwd_relative_path}")
         # Create parent directories if needed
@@ -447,13 +447,13 @@ def handle_orphaned_method(stderr: str) -> bool:
                     print(f"Detected orphaned method on line {error_line_num}: {error_line.strip()}")
                     print(f"Attempting to restore missing class definition in {relative_path}")
 
-                    # Try to restore the file with py_repair without specifying a missing item
+                    # Try to restore the file with src_repair without specifying a missing item
                     # This should restore the class that contains this method
                     # We'll use the method name to help identify what needs restoring
                     method_match = re.match(r'\s+def\s+(\w+)', error_line)
                     if method_match:
                         method_name = method_match.group(1)
-                        # Try restoring with the method name - py_repair should restore
+                        # Try restoring with the method name - src_repair should restore
                         # the entire class context needed for this method
                         print(f"Restoring context for method: {method_name}")
                         return do_repair(relative_path, missing=method_name)
@@ -775,7 +775,7 @@ def do_repair(
 ) -> bool:
     print(f"repair --missing {missing} {file_path}")
     try:
-        py_repair.repair(
+        src_repair.repair(
             filename=file_path,
             commit=ref or ctx().git_ref,
             missing=missing,

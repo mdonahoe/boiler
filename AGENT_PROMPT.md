@@ -52,7 +52,7 @@ Analyze the debugging information in [TARGET_REPO]/.boil/ and improve boiler to 
 ## Tips
 
 - Look for patterns: errors with similar root causes might use the same detector/planner
-- Use py_repair when restoring code elements, not for full file restoration
+- Use src_repair when restoring code elements, not for full file restoration
 - Planners should only create plans for files they can actually fix
 - Executors should validate before attempting fixes
 - **Understanding boil --abort**: This command resets the repository to its pre-boil state (the state when boil was first started), which is often a broken state with deleted files or errors. This is useful for:

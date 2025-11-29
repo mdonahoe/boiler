@@ -87,7 +87,7 @@ Planners create repair strategies for each detected error:
 ### Stage 3: Execution
 Executors perform the repairs:
 - **GitRestoreExecutor**: Restore entire files from git
-- **PythonCodeRestoreExecutor**: Restore specific Python code elements using py_repair
+- **PythonCodeRestoreExecutor**: Restore specific Python code elements using src_repair
 
 ## Examples
 
@@ -96,7 +96,7 @@ Executors perform the repairs:
 ```bash
 # Delete a function from a file
 # Tests fail: "class TestClass not found"
-# Boil.py detects the error, creates a plan, uses py_repair to restore just the class
+# Boil.py detects the error, creates a plan, uses src_repair to restore just the class
 boil python3 test_suite.py
 ```
 

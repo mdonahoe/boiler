@@ -14,7 +14,7 @@ class MissingPythonCodePlanner(Planner):
 
     Strategy:
     - Target only files that are modified or deleted (not fully restored)
-    - Use py_repair to restore the missing code element
+    - Use src_repair to restore the missing code element
     """
 
     @property
@@ -40,7 +40,7 @@ class MissingPythonCodePlanner(Planner):
         # Only plan repairs for files that exist (modified) or are in the repo
         # Skip files that already fully match git
         if os.path.exists(file_path):
-            # File exists - this is good, we can use py_repair to add the missing code
+            # File exists - this is good, we can use src_repair to add the missing code
             print(f"[Planner:MissingPythonCodePlanner] File {file_path} exists, planning repair")
             pass
         else:
@@ -69,7 +69,7 @@ class PythonNameErrorPlanner(Planner):
     Plan fixes for Python NameError exceptions.
 
     Strategy:
-    - Use py_repair to restore the missing import or code element
+    - Use src_repair to restore the missing import or code element
     - Only target existing files (not deleted files)
     """
 
