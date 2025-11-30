@@ -63,6 +63,77 @@ def save_changes(parent: str, message: str, branch_name: T.Optional[str] = None)
     return commit
 
 
+def get_git_file_info(ref: str) -> T.Dict[str, T.Any]:
+    """
+    Get information about modified and deleted files in the current working directory.
+    
+    Returns:
+        {
+            "partial_files": [{"file": "dim.c", "line_ratio": "40/1001", "status": "M"}, ...],
+            "deleted_files": ["file1.c", "file2.h"],
+            "command": "make test"
+        }
+    """
+    git_dir = get_git_dir()
+    index_file = os.path.join(git_dir, "boil.index")
+    env = os.environ.copy()
+    env["GIT_INDEX_FILE"] = index_file
+    
+    partial_files = []
+    deleted_files = []
+    
+    # Get list of modified and deleted files
+    result = subprocess.run(
+        ["git", "diff", "--name-status", ref],
+        capture_output=True,
+        text=True,
+        env=env
+    )
+    
+    for line in result.stdout.strip().split('\n'):
+        if not line:
+            continue
+        parts = line.split(maxsplit=1)
+        if len(parts) < 2:
+            continue
+        
+        status, file_path = parts[0], parts[1]
+        
+        if status == 'D':
+            deleted_files.append(file_path)
+        elif status == 'M':
+            # Count lines in modified file
+            try:
+                # Get current line count
+                with open(file_path, 'r', errors='ignore') as f:
+                    current_lines = len(f.read().splitlines())
+                
+                # Get total line count from git at the ref
+                result = subprocess.run(
+                    ["git", "show", f"{ref}:{file_path}"],
+                    capture_output=True,
+                    text=True,
+                    # env=env
+                )
+                total_lines = len(result.stdout.splitlines())
+                
+                partial_files.append({
+                    "file": file_path,
+                    "line_ratio": f"{current_lines}/{total_lines}",
+                })
+            except Exception as e:
+                print(f"Warning: Could not get line count for {file_path}: {e}")
+                partial_files.append({
+                    "file": file_path,
+                    "line_ratio": "unknown",
+                })
+    
+    return {
+        "partial_files": partial_files,
+        "deleted_files": deleted_files,
+    }
+
+
 def fix(command: T.List[str], num_iterations: int) -> bool:
     """
     Repeatedly run a command, repairing files until it is fixed.
@@ -167,6 +238,15 @@ def fix(command: T.List[str], num_iterations: int) -> bool:
             try:
                 debug_data = pipeline_result.to_dict()
                 debug_data["legacy_handler_used"] = legacy_handler_used
+                
+                # Add command info
+                debug_data["command"] = " ".join(command)
+                
+                # Add git state info
+                git_info = get_git_file_info(ref)
+                debug_data["partial_files"] = git_info["partial_files"]
+                debug_data["deleted_files"] = git_info["deleted_files"]
+                
                 with open(debug_json_path, "w") as f:
                     json.dump(debug_data, f, indent=2)
                 print(f"[Pipeline] Debug info saved to {debug_json_path}")
@@ -274,7 +354,7 @@ def abort_boiling() -> int:
         print("No active boiling session found.")
         return 1
 
-    # Find the boil_start commit
+    # Find the boil_start commit (this should probably ctx.ref not HEAD)
     try:
         boil_start_commit = subprocess.check_output(
             ["git", "log", "--format=%H", "--grep", "boil_start", f"HEAD..{BOILING_BRANCH}"],
