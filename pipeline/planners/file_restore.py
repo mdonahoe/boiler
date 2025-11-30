@@ -81,7 +81,7 @@ class MissingFilePlanner(Planner):
         return "MissingFilePlanner"
 
     def can_handle(self, clue_type: str) -> bool:
-        return clue_type == "missing_file"
+        return clue_type.startswith("missing_file")
 
     def _find_file_in_deleted(self, filename: str, git_state: GitState) -> T.Optional[str]:
         """Try to find a matching file in the deleted files list"""

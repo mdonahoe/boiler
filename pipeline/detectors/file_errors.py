@@ -19,8 +19,8 @@ class FopenNoSuchFileDetector(RegexDetector):
     """
 
     PATTERNS = {
-        "fopen_file": r"fopen:\s+([^\s:]+?):\s*No such file or directory",
-        "fopen_assertion": r"AssertionError:\s*['\"]([^'\"]+\.py)['\"].*fopen: No such file or directory",
+        "missing_file": r"fopen:\s+(?P<file_path>[^\s:]+?):\s*No such file or directory",
+        "missing_file_assertion": r"AssertionError:\s*['\"](?P<file_path>[^'\"]+\.py)['\"].*fopen:\s*No such file or directory",
     }
 
     EXAMPLES = [
@@ -35,8 +35,8 @@ class FopenNoSuchFileDetector(RegexDetector):
         (
             "AssertionError: 'hello.py' not found in 'fopen: No such file or directory'",
             {
-                "clue_type": "missing_file",
-                "confidence": 0.9,
+                "clue_type": "missing_file_assertion",
+                "confidence": 1.0,
                 "context": {"file_path": "hello.py"},
             },
         ),
@@ -53,8 +53,8 @@ class FileNotFoundDetector(RegexDetector):
     """
 
     PATTERNS = {
-        "file_not_found_errno": r"FileNotFoundError:.*?No such file or directory:\s*['\"]([^'\"]+)['\"]",
-        "file_not_found_simple": r"FileNotFoundError:\s*([^\s:]+)",
+        "missing_file": r"FileNotFoundError:.*?No such file or directory:\s*['\"](?P<file_path>[^'\"]+)['\"]",
+        "missing_file_simple": r"FileNotFoundError:\s*(?P<file_path>[^\s:]+)",
     }
 
     EXAMPLES = [
@@ -69,8 +69,8 @@ class FileNotFoundDetector(RegexDetector):
         (
             "FileNotFoundError: ./configure",
             {
-                "clue_type": "missing_file",
-                "confidence": 0.9,
+                "clue_type": "missing_file_simple",
+                "confidence": 1.0,
                 "context": {"file_path": "./configure"},
             },
         ),
@@ -87,7 +87,7 @@ class ShellCannotOpenDetector(RegexDetector):
     """
 
     PATTERNS = {
-        "sh_cannot_open": r"sh:\s*\d+:\s*cannot open\s+([^\s:]+):\s*No such file",
+        "missing_file": r"sh:\s*\d+:\s*cannot open\s+(?P<file_path>[^\s:]+):\s*No such file",
     }
 
     EXAMPLES = [
@@ -113,8 +113,8 @@ class ShellCommandNotFoundDetector(RegexDetector):
     """
 
     PATTERNS = {
-        "shell_line_not_found": r":\s*line\s+\d+:\s*([^\s:]+):\s*No such file or directory",
-        "shell_no_colon_not_found": r":\s*\d+:\s*([^\s:]+):\s*not found",
+        "missing_file": r":\s*line\s+\d+:\s*\.?/?(?P<file_path>[^\s:]+):\s*No such file or directory",
+        "missing_file_not_found": r":\s*\d+:\s*\.?/?(?P<file_path>[^\s:]+):\s*not found",
     }
 
     EXAMPLES = [
@@ -129,8 +129,8 @@ class ShellCommandNotFoundDetector(RegexDetector):
         (
             "./test.sh: 2: ./script.sh: not found",
             {
-                "clue_type": "missing_file",
-                "confidence": 0.9,
+                "clue_type": "missing_file_not_found",
+                "confidence": 1.0,
                 "context": {"file_path": "script.sh"},
             },
         ),
@@ -146,7 +146,7 @@ class CatNoSuchFileDetector(RegexDetector):
     """
 
     PATTERNS = {
-        "cat_no_such_file": r"cat:\s*([^\s:]+):\s*No such file or directory",
+        "missing_file": r"cat:\s*(?P<file_path>[^\s:]+):\s*No such file or directory",
     }
 
     EXAMPLES = [
@@ -170,7 +170,7 @@ class DiffNoSuchFileDetector(RegexDetector):
     """
 
     PATTERNS = {
-        "diff_no_such_file": r"diff:\s*([^\s:]+):\s*No such file or directory",
+        "missing_file": r"diff:\s*(?P<file_path>[^\s:]+):\s*No such file or directory",
     }
 
     EXAMPLES = [
@@ -184,42 +184,19 @@ class DiffNoSuchFileDetector(RegexDetector):
         ),
     ]
 
-    @property
-    def name(self) -> str:
-        return "DiffNoSuchFileDetector"
-
-    def pattern_to_clue(
-        self,
-        pattern_name: str,
-        match: T.Match[str],
-        combined: str,
-    ) -> T.Optional[ErrorClue]:
-        if pattern_name != "diff_no_such_file":
-            return None
-
-        file_path = match.group(1).strip()
-        return ErrorClue(
-            clue_type="missing_file",
-            confidence=1.0,
-            context={"file_path": file_path},
-            source_line=match.group(0),
-        )
-
 
 class CLinkerErrorDetector(RegexDetector):
     """
-    Detect C/C++ linker errors when object files or libraries are missing.
+    Detect C/C++ linker undefined symbol errors and missing files.
 
     Matches patterns like:
-    - /usr/bin/ld: /tmp/cckoAdDP.o: in function `print_node_text':
     - tree_print.c:(.text+0x137): undefined reference to `ts_node_start_byte'
-    - /usr/bin/ld: cannot find -lsomelibrary: No such file or directory
+    - /usr/bin/ld: cannot find exrecover.o: No such file or directory
     """
 
     PATTERNS = {
-        "linker_undefined_symbols": r"undefined reference to [`']([^'`]+)[`']",
-        "linker_missing_object": r"cannot find\s+([^\s:]+\.o):\s+No such file or directory",
-        "linker_missing_library": r"cannot find\s+([^\s:]+):\s+No such file or directory",
+        "linker_undefined_symbols": r"undefined reference to [`'](?P<symbol>[^'`]+)[`']",
+        "missing_file": r"/usr/bin/ld:.*?cannot find\s+(?P<file_path>[^\s:]+):\s+No such file or directory",
     }
 
     EXAMPLES = [
@@ -228,15 +205,15 @@ class CLinkerErrorDetector(RegexDetector):
             {
                 "clue_type": "linker_undefined_symbols",
                 "confidence": 1.0,
-                "context": {"symbols": ["ts_parser_new"]},
+                "context": {"symbol": "ts_parser_new"},
             },
         ),
         (
             "/usr/bin/ld: cannot find exrecover.o: No such file or directory",
             {
-                "clue_type": "missing_object_file",
+                "clue_type": "missing_file",
                 "confidence": 1.0,
-                "context": {"object_file": "exrecover.o"},
+                "context": {"file_path": "exrecover.o"},
             },
         ),
     ]
@@ -253,7 +230,7 @@ class CCompilationErrorDetector(RegexDetector):
     """
 
     PATTERNS = {
-        "c_fatal_error": r"fatal error:\s+([^\s:]+):\s+No such file or directory",
+        "missing_file": r"fatal error:\s+\.?/?(?P<file_path>[^\s:]+):\s+No such file or directory",
     }
 
     EXAMPLES = [
@@ -281,8 +258,7 @@ class CIncompleteTypeDetector(RegexDetector):
     """
 
     PATTERNS = {
-        "c_incomplete_type": r"error:.*has incomplete type",
-        "c_incomplete_storage": r"storage size",
+        "missing_c_include": r"struct\s+(?P<struct_name>termios|winsize|stat|tm|sigaction|dirent).*?error:.*(?:has incomplete type|storage size)",
     }
 
     EXAMPLES = [
@@ -297,77 +273,6 @@ class CIncompleteTypeDetector(RegexDetector):
             },
         ),
     ]
-
-    @property
-    def name(self) -> str:
-        return "CIncompleteTypeDetector"
-
-    def pattern_to_clue(
-        self,
-        pattern_name: str,
-        match: T.Match[str],
-        combined: str,
-    ) -> T.Optional[ErrorClue]:
-        if pattern_name != "c_incomplete_type":
-            return None
-
-        # Map of common struct names to their headers
-        type_to_header = {
-            "termios": "termios.h",
-            "winsize": "sys/ioctl.h",
-            "stat": "sys/stat.h",
-            "tm": "time.h",
-            "sigaction": "signal.h",
-            "dirent": "dirent.h",
-        }
-
-        # Pattern to extract struct name
-        struct_pattern = r"struct\s+([a-zA-Z_][a-zA-Z0-9_]*)"
-
-        # Look for struct names around this match
-        error_context = combined[
-            max(0, match.start() - 200) : match.end() + 100
-        ]
-
-        # Find the most recent struct declaration in context
-        struct_matches = list(re.finditer(struct_pattern, error_context))
-        if not struct_matches:
-            return None
-
-        struct_name = struct_matches[-1].group(1)
-
-        # Check if we know which header this struct needs
-        if struct_name not in type_to_header:
-            return None
-
-        header = type_to_header[struct_name]
-
-        # Try to find the source file
-        file_pattern = r"^([a-zA-Z0-9_./\-]+\.c):(\d+):"
-        file_matches = list(
-            re.finditer(
-                file_pattern, combined[: match.start()], re.MULTILINE
-            )
-        )
-
-        source_file = "unknown"
-        line_number = 0
-        if file_matches:
-            last_match = file_matches[-1]
-            source_file = last_match.group(1).strip()
-            line_number = int(last_match.group(2))
-
-        return ErrorClue(
-            clue_type="missing_c_include",
-            confidence=0.9,
-            context={
-                "file_path": source_file,
-                "line_number": line_number,
-                "struct_name": struct_name,
-                "suggested_include": header,
-            },
-            source_line=match.group(0),
-        )
 
 
 class CImplicitDeclarationDetector(RegexDetector):

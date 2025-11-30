@@ -75,20 +75,22 @@ collect2: error: ld returned 1 exit status"""
         self.assertIn("ts_parser_set_language", symbols)
 
     def test_detect_missing_library(self):
-        """Test detection of missing library errors - now handled by general file detectors"""
+        """Test detection of missing library errors"""
         err = """/usr/bin/ld: cannot find -lsomelibrary: No such file or directory"""
 
         clues = self.detector.detect(err)
-        # This pattern is no longer detected by CLinkerErrorDetector
-        self.assertEqual(len(clues), 0)
+        self.assertEqual(len(clues), 1)
+        self.assertEqual(clues[0].clue_type, "missing_file")
+        self.assertEqual(clues[0].context["file_path"], "-lsomelibrary")
 
     def test_detect_missing_object_file(self):
-        """Test detection of missing object file errors - now handled by general file detectors"""
+        """Test detection of missing object file errors"""
         err = """/usr/bin/ld: cannot find exrecover.o: No such file or directory"""
 
         clues = self.detector.detect(err)
-        # This pattern is no longer detected by CLinkerErrorDetector
-        self.assertEqual(len(clues), 0)
+        self.assertEqual(len(clues), 1)
+        self.assertEqual(clues[0].clue_type, "missing_file")
+        self.assertEqual(clues[0].context["file_path"], "exrecover.o")
 
 
 class TestMissingFilePlanner(unittest.TestCase):
@@ -129,12 +131,13 @@ class TestFopenErrorDetector(unittest.TestCase):
         self.detector = FopenNoSuchFileDetector()
 
     def test_detect_assertion_error_with_fopen(self):
-        """Test detection of AssertionError with fopen error - no longer supported"""
+        """Test detection of AssertionError with fopen error"""
         err = """AssertionError: 'example.py' not found in 'fopen: No such file or directory' : Should show the filename"""
 
         clues = self.detector.detect(err)
-        # Simplified detector no longer handles assertion patterns
-        self.assertEqual(len(clues), 0)
+        self.assertEqual(len(clues), 1)
+        self.assertEqual(clues[0].clue_type, "missing_file_assertion")
+        self.assertEqual(clues[0].context["file_path"], "example.py")
 
     def test_detect_simple_fopen_error(self):
         """Test detection of simple fopen error with filename"""
