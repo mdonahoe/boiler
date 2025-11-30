@@ -20,7 +20,7 @@ class FopenNoSuchFileDetector(RegexDetector):
 
     PATTERNS = {
         "missing_file": r"fopen:\s+(?P<file_path>[^\s:]+?):\s*No such file or directory",
-        "missing_file_assertion": r"AssertionError:\s*['\"](?P<file_path>[^'\"]+\.py)['\"].*fopen:\s*No such file or directory",
+        "missing_file_assertion": r"AssertionError:\s*['\"](?P<file_path>[^'\"]+)['\"].*fopen:\s*No such file or directory",
     }
 
     EXAMPLES = [
