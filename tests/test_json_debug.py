@@ -41,7 +41,7 @@ PermissionError: [Errno 13] Permission denied: './test.py'
         result_dict = result.to_dict()
 
         # Save to JSON
-        json_path = ".boil/test_debug.json"
+        json_path = "/tmp/test_debug.json"
         os.makedirs(".boil", exist_ok=True)
 
         with open(json_path, "w") as f:
