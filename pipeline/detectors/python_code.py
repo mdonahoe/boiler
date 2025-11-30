@@ -4,11 +4,11 @@ Detectors for Python code issues (missing classes, functions, etc.).
 
 import re
 import typing as T
-from pipeline.detectors.base import Detector
+from pipeline.detectors.base import RegexDetector
 from pipeline.models import ErrorClue
 
 
-class MissingPythonCodeDetector(Detector):
+class MissingPythonCodeDetector(RegexDetector):
     """
     Detect when Python files are missing expected code (classes, functions, imports).
 
@@ -18,11 +18,43 @@ class MissingPythonCodeDetector(Detector):
     - Expected to see 'class ClassName' but got something else
     """
 
+    PATTERNS = {
+        "missing_python_code": r"'((?:def|class|import)\s+\w+(?:\s*\(.*\))?)'.*?not found.*?(?:\\n|[\s\n])*?([a-zA-Z0-9_-]+\.py)\s+-\s+\d+\s+lines",
+    }
+
+    EXAMPLES = [
+        (
+            "AssertionError: 'class TestClass' not found in 'example.py - 13 lines'",
+            {
+                "clue_type": "missing_python_code",
+                "confidence": 1.0,
+                "context": {
+                    "file_path": "example.py",
+                    "element_type": "class",
+                    "element_name": "TestClass",
+                },
+            },
+        ),
+        (
+            "AssertionError: 'def hello_world' not found in 'test.py - 5 lines'",
+            {
+                "clue_type": "missing_python_code",
+                "confidence": 1.0,
+                "context": {
+                    "file_path": "test.py",
+                    "element_type": "def",
+                    "element_name": "hello_world",
+                },
+            },
+        ),
+    ]
+
     @property
     def name(self) -> str:
         return "MissingPythonCodeDetector"
 
     def detect(self, stderr: str, stdout: str = "") -> T.List[ErrorClue]:
+        """Override to handle fallback pattern matching"""
         combined = stderr + "\n" + stdout
 
         if "AssertionError:" not in combined:
@@ -30,9 +62,7 @@ class MissingPythonCodeDetector(Detector):
 
         clues = []
 
-        # Look for patterns indicating missing Python constructs
-        # Pattern 1: 'def something' not found in '...filename.py - N lines...'
-        # Note: The filename might be preceded by escaped newlines (\\n) or actual whitespace
+        # Pattern 1: Direct match with file info
         pattern1 = r"'((?:def|class|import)\s+\w+(?:\s*\(.*\))?)'.*?not found.*?(?:\\n|[\s\n])*?([a-zA-Z0-9_-]+\.py)\s+-\s+\d+\s+lines"
         for match in re.finditer(pattern1, combined, re.DOTALL):
             code_element = match.group(1).strip()
@@ -42,53 +72,73 @@ class MissingPythonCodeDetector(Detector):
             name_match = re.search(r"(?:def|class|import)\s+(\w+)", code_element)
             if name_match:
                 element_name = name_match.group(1)
-                clues.append(ErrorClue(
-                    clue_type="missing_python_code",
-                    confidence=1.0,
-                    context={
-                        "file_path": file_path,
-                        "missing_element": code_element,
-                        "element_name": element_name,
-                        "element_type": code_element.split()[0]  # 'def', 'class', or 'import'
-                    },
-                    source_line=match.group(0)[:100]  # Truncate for readability
-                ))
+                clues.append(
+                    ErrorClue(
+                        clue_type="missing_python_code",
+                        confidence=1.0,
+                        context={
+                            "file_path": file_path,
+                            "missing_element": code_element,
+                            "element_name": element_name,
+                            "element_type": code_element.split()[0],
+                        },
+                        source_line=match.group(0)[:100],
+                    )
+                )
 
-        # Pattern 2: 'code element' not found in '...' (more general)
-        # This catches cases where the file info might be formatted differently
+        # Pattern 2: Fallback - more general match
         if not clues:
             pattern2 = r"'((?:def|class|import)\s+\w+(?:\s*\(.*\))?)'.*?not found"
             for match in re.finditer(pattern2, combined):
                 code_element = match.group(1).strip()
 
                 # Try to find the filename nearby
-                # Look for .py files mentioned in the surrounding context
-                context_window = combined[max(0, match.start() - 500):match.end() + 500]
-                file_match = re.search(r'(?:\\n|[\s\n])*?([a-zA-Z0-9_-]+\.py)\s+-\s+\d+\s+lines', context_window)
+                context_window = combined[
+                    max(0, match.start() - 500) : match.end() + 500
+                ]
+                file_match = re.search(
+                    r"(?:\\n|[\s\n])*?([a-zA-Z0-9_-]+\.py)\s+-\s+\d+\s+lines",
+                    context_window,
+                )
 
                 if file_match:
                     file_path = file_match.group(1)
-                    name_match = re.search(r"(?:def|class|import)\s+(\w+)", code_element)
+                    name_match = re.search(
+                        r"(?:def|class|import)\s+(\w+)", code_element
+                    )
                     if name_match:
                         element_name = name_match.group(1)
                         # Avoid duplicates
-                        if not any(c.context.get("element_name") == element_name for c in clues):
-                            clues.append(ErrorClue(
-                                clue_type="missing_python_code",
-                                confidence=0.9,
-                                context={
-                                    "file_path": file_path,
-                                    "missing_element": code_element,
-                                    "element_name": element_name,
-                                    "element_type": code_element.split()[0]
-                                },
-                                source_line=match.group(0)[:100]
-                            ))
+                        if not any(
+                            c.context.get("element_name") == element_name for c in clues
+                        ):
+                            clues.append(
+                                ErrorClue(
+                                    clue_type="missing_python_code",
+                                    confidence=0.9,
+                                    context={
+                                        "file_path": file_path,
+                                        "missing_element": code_element,
+                                        "element_name": element_name,
+                                        "element_type": code_element.split()[0],
+                                    },
+                                    source_line=match.group(0)[:100],
+                                )
+                            )
 
         return clues
 
+    def pattern_to_clue(
+        self,
+        pattern_name: str,
+        match: T.Match[str],
+        combined: str,
+    ) -> T.Optional[ErrorClue]:
+        """Not used - detect() is overridden"""
+        return None
 
-class PythonNameErrorDetector(Detector):
+
+class PythonNameErrorDetector(RegexDetector):
     """
     Detect Python NameError exceptions indicating missing imports or code.
 
@@ -97,11 +147,32 @@ class PythonNameErrorDetector(Detector):
     - NameError: global name 'SomeClass' is not defined
     """
 
+    PATTERNS = {
+        "python_name_error": r"NameError: (?:global )?name '(\w+)' is not defined",
+        "file_reference": r'File "([^"]+\.py)", line (\d+),',
+    }
+
+    EXAMPLES = [
+        (
+            'File "test.py", line 5, in test_func\nNameError: name \'fcntl\' is not defined',
+            {
+                "clue_type": "python_name_error",
+                "confidence": 1.0,
+                "context": {
+                    "file_path": "test.py",
+                    "undefined_name": "fcntl",
+                    "line_number": "5",
+                },
+            },
+        ),
+    ]
+
     @property
     def name(self) -> str:
         return "PythonNameErrorDetector"
 
     def detect(self, stderr: str, stdout: str = "") -> T.List[ErrorClue]:
+        """Override to match NameErrors with their file context"""
         combined = stderr + "\n" + stdout
 
         if "NameError:" not in combined:
@@ -110,12 +181,7 @@ class PythonNameErrorDetector(Detector):
         clues = []
 
         # Parse traceback to find file and undefined name
-        # Pattern: NameError: name 'something' is not defined
-        # or: NameError: global name 'something' is not defined
         name_error_pattern = r"NameError: (?:global )?name '(\w+)' is not defined"
-
-        # Also look for the file path in the traceback
-        # Pattern: File "/path/to/file.py", line 123, in function_name
         file_pattern = r'File "([^"]+\.py)", line (\d+),'
 
         # Find all file references
@@ -135,15 +201,26 @@ class PythonNameErrorDetector(Detector):
                     break
 
             if file_path:
-                clues.append(ErrorClue(
-                    clue_type="python_name_error",
-                    confidence=1.0,
-                    context={
-                        "file_path": file_path,
-                        "undefined_name": undefined_name,
-                        "line_number": line_num,
-                    },
-                    source_line=match.group(0)
-                ))
+                clues.append(
+                    ErrorClue(
+                        clue_type="python_name_error",
+                        confidence=1.0,
+                        context={
+                            "file_path": file_path,
+                            "undefined_name": undefined_name,
+                            "line_number": line_num,
+                        },
+                        source_line=match.group(0),
+                    )
+                )
 
         return clues
+
+    def pattern_to_clue(
+        self,
+        pattern_name: str,
+        match: T.Match[str],
+        combined: str,
+    ) -> T.Optional[ErrorClue]:
+        """Not used - detect() is overridden"""
+        return None
