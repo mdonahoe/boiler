@@ -21,7 +21,15 @@
       "params": {
         "ref": "HEAD"
       },
-      "reason": "File ./test.py is missing (permission error implies it should exist)"
+      "reason": "File ./test.py is missing (permission error implies it should exist)",
+      "clue_source": {
+        "clue_type": "permission_denied",
+        "confidence": 1.0,
+        "context": {
+          "file_path": "./test.py"
+        },
+        "source_line": "Permission denied: './test.py'"
+      }
     }
   ],
   "plans_attempted": []

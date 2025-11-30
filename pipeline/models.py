@@ -86,7 +86,13 @@ class RepairResult:
                     "target_file": p.target_file,
                     "action": p.action,
                     "params": p.params,
-                    "reason": p.reason
+                    "reason": p.reason,
+                    "clue_source": {
+                        "clue_type": p.clue_source.clue_type,
+                        "confidence": p.clue_source.confidence,
+                        "context": p.clue_source.context,
+                        "source_line": p.clue_source.source_line
+                    } if p.clue_source else None
                 }
                 for p in (self.plans_generated or [])
             ],
@@ -96,7 +102,13 @@ class RepairResult:
                     "priority": p.priority,
                     "target_file": p.target_file,
                     "action": p.action,
-                    "reason": p.reason
+                    "reason": p.reason,
+                    "clue_source": {
+                        "clue_type": p.clue_source.clue_type,
+                        "confidence": p.clue_source.confidence,
+                        "context": p.clue_source.context,
+                        "source_line": p.clue_source.source_line
+                    } if p.clue_source else None
                 }
                 for p in self.plans_attempted
             ]

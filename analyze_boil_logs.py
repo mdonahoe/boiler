@@ -355,11 +355,26 @@ def analyze_legacy_usage():
                 target_file = plan.get("target_file", "unknown")
                 action = plan.get("action", "unknown")
                 reason = plan.get("reason", "")
+                clue_source = plan.get("clue_source")
 
                 print(f"  - [{plan_type}] {target_file}")
                 print(f"    Action: {action}")
                 if reason:
                     print(f"    Reason: {reason}")
+
+                # Show clue source details if available
+                if clue_source:
+                    source_line = clue_source.get("source_line", "")
+                    clue_type = clue_source.get("clue_type", "")
+                    confidence = clue_source.get("confidence", 0)
+
+                    if source_line:
+                        # Truncate very long source lines
+                        if len(source_line) > 100:
+                            source_line = source_line[:97] + "..."
+                        print(f"    Error detected: {source_line}")
+                    if clue_type:
+                        print(f"    Clue type: {clue_type} (confidence: {confidence:.2f})")
             print()
     else:
         print("  (no plans were attempted)")
