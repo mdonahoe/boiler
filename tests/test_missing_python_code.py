@@ -38,7 +38,7 @@ class MissingPythonCodeTest(unittest.TestCase):
         self.assertIsNotNone(result.clues_detected, "Should detect clues")
         self.assertGreater(len(result.clues_detected), 0, "Should have at least one clue")
         self.assertEqual(result.clues_detected[0].clue_type, "missing_python_code")
-        self.assertEqual(result.clues_detected[0].context.get("element_name"), "TestClass")
+        self.assertIn("TestClass", result.clues_detected[0].context.get("missing_element", ""))
 
     def test_missing_function_detection(self):
         """Test that missing function definitions are detected"""
@@ -56,7 +56,7 @@ class MissingPythonCodeTest(unittest.TestCase):
         self.assertIsNotNone(result.clues_detected)
         self.assertGreater(len(result.clues_detected), 0)
         self.assertEqual(result.clues_detected[0].clue_type, "missing_python_code")
-        self.assertEqual(result.clues_detected[0].context.get("element_name"), "hello_world")
+        self.assertIn("hello_world", result.clues_detected[0].context.get("missing_element", ""))
 
     def test_missing_python_code_skips_nonexistent_files(self):
         """Test that planner skips files that don't exist"""
@@ -93,7 +93,7 @@ class MissingPythonCodeTest(unittest.TestCase):
         self.assertIsNotNone(result.clues_detected, "Should detect clues")
         self.assertGreater(len(result.clues_detected), 0, "Should have at least one clue")
         self.assertEqual(result.clues_detected[0].clue_type, "missing_python_code")
-        self.assertEqual(result.clues_detected[0].context.get("element_name"), "TestClass")
+        self.assertIn("TestClass", result.clues_detected[0].context.get("missing_element", ""))
         self.assertEqual(result.clues_detected[0].context.get("file_path"), "example.py",
                         "Should extract correct filename, not 'nexample.py'")
 

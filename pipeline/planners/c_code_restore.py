@@ -34,7 +34,13 @@ class MissingCFunctionPlanner(Planner):
 
     def _plan_for_clue(self, clue: ErrorClue, git_state: GitState) -> T.List[RepairPlan]:
         file_path = clue.context.get("file_path")
+
+        # Handle both old format (symbols list) and new format (single identifier)
         symbols = clue.context.get("symbols", [])
+        if not symbols and "identifier" in clue.context:
+            symbols = [clue.context["identifier"]]
+        elif not symbols and "function_name" in clue.context:
+            symbols = [clue.context["function_name"]]
 
         if not file_path or not symbols:
             print(f"[Planner:MissingCFunctionPlanner] Missing file_path or symbols")

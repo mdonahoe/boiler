@@ -28,7 +28,7 @@ class FopenNoSuchFileDetector(RegexDetector):
             "fopen: example.py: No such file or directory",
             {
                 "clue_type": "missing_file",
-                "confidence": 0.95,
+                "confidence": 1.0,
                 "context": {"file_path": "example.py"},
             },
         ),
@@ -41,82 +41,6 @@ class FopenNoSuchFileDetector(RegexDetector):
             },
         ),
     ]
-
-    @property
-    def name(self) -> str:
-        return "FopenNoSuchFileDetector"
-
-    def detect(self, stderr: str, stdout: str = "") -> T.List[ErrorClue]:
-        """Override to handle fallback pattern matching"""
-        combined = stderr + "\n" + stdout
-
-        if "fopen:" not in combined and "fopen: No such file or directory" not in combined:
-            return []
-
-        clues = []
-        seen_files = set()
-
-        # Pattern 1: fopen: filename: No such file or directory
-        pattern1 = r"fopen:\s+([^\s:]+?):\s*No such file or directory"
-        for match in re.finditer(pattern1, combined):
-            file_path = match.group(1).strip()
-            if file_path not in seen_files:
-                seen_files.add(file_path)
-                clues.append(
-                    ErrorClue(
-                        clue_type="missing_file",
-                        confidence=0.95,
-                        context={"file_path": file_path},
-                        source_line=match.group(0),
-                    )
-                )
-
-        # Pattern 2: AssertionError mentioning a file that fopen can't open
-        if "fopen: No such file or directory" in combined:
-            assertion_pattern = r"AssertionError:\s*['\"]([^'\"]+\.py)['\"].*fopen: No such file or directory"
-            for match in re.finditer(assertion_pattern, combined):
-                file_path = match.group(1).strip()
-                if file_path not in seen_files:
-                    seen_files.add(file_path)
-                    clues.append(
-                        ErrorClue(
-                            clue_type="missing_file",
-                            confidence=0.9,
-                            context={"file_path": file_path},
-                            source_line=f"fopen: No such file or directory (file: {file_path})",
-                        )
-                    )
-
-        # Pattern 3: Fallback - look for any file with extension mentioned in context
-        if not clues and "fopen: No such file or directory" in combined:
-            file_pattern = (
-                r"\b([a-zA-Z0-9_-]+\.(?:txt|md|py|c|h|cpp|cc|java|js|html|css))\b"
-            )
-            matches = list(re.finditer(file_pattern, combined))
-
-            for match in matches:
-                file_path = match.group(1).strip()
-                if file_path not in seen_files:
-                    seen_files.add(file_path)
-                    clues.append(
-                        ErrorClue(
-                            clue_type="missing_file",
-                            confidence=0.6,
-                            context={"file_path": file_path},
-                            source_line="fopen: No such file or directory (inferred from context)",
-                        )
-                    )
-
-        return clues
-
-    def pattern_to_clue(
-        self,
-        pattern_name: str,
-        match: T.Match[str],
-        combined: str,
-    ) -> T.Optional[ErrorClue]:
-        """Not used - detect() is overridden"""
-        return None
 
 
 class FileNotFoundDetector(RegexDetector):
@@ -152,34 +76,6 @@ class FileNotFoundDetector(RegexDetector):
         ),
     ]
 
-    @property
-    def name(self) -> str:
-        return "FileNotFoundDetector"
-
-    def pattern_to_clue(
-        self,
-        pattern_name: str,
-        match: T.Match[str],
-        combined: str,
-    ) -> T.Optional[ErrorClue]:
-        if pattern_name == "file_not_found_errno":
-            file_path = match.group(1).strip()
-            return ErrorClue(
-                clue_type="missing_file",
-                confidence=1.0,
-                context={"file_path": file_path},
-                source_line=match.group(0),
-            )
-        elif pattern_name == "file_not_found_simple":
-            file_path = match.group(1).strip()
-            return ErrorClue(
-                clue_type="missing_file",
-                confidence=0.9,
-                context={"file_path": file_path},
-                source_line=match.group(0),
-            )
-        return None
-
 
 class ShellCannotOpenDetector(RegexDetector):
     """
@@ -204,27 +100,6 @@ class ShellCannotOpenDetector(RegexDetector):
             },
         ),
     ]
-
-    @property
-    def name(self) -> str:
-        return "ShellCannotOpenDetector"
-
-    def pattern_to_clue(
-        self,
-        pattern_name: str,
-        match: T.Match[str],
-        combined: str,
-    ) -> T.Optional[ErrorClue]:
-        if pattern_name != "sh_cannot_open":
-            return None
-
-        file_path = match.group(1).strip()
-        return ErrorClue(
-            clue_type="missing_file",
-            confidence=1.0,
-            context={"file_path": file_path},
-            source_line=match.group(0),
-        )
 
 
 class ShellCommandNotFoundDetector(RegexDetector):
@@ -261,38 +136,6 @@ class ShellCommandNotFoundDetector(RegexDetector):
         ),
     ]
 
-    @property
-    def name(self) -> str:
-        return "ShellCommandNotFoundDetector"
-
-    def pattern_to_clue(
-        self,
-        pattern_name: str,
-        match: T.Match[str],
-        combined: str,
-    ) -> T.Optional[ErrorClue]:
-        if pattern_name == "shell_line_not_found":
-            file_path = match.group(1).strip()
-            if file_path.startswith("./"):
-                file_path = file_path[2:]
-            return ErrorClue(
-                clue_type="missing_file",
-                confidence=1.0,
-                context={"file_path": file_path},
-                source_line=match.group(0),
-            )
-        elif pattern_name == "shell_no_colon_not_found":
-            file_path = match.group(1).strip()
-            if file_path.startswith("./"):
-                file_path = file_path[2:]
-            return ErrorClue(
-                clue_type="missing_file",
-                confidence=0.9,
-                context={"file_path": file_path},
-                source_line=match.group(0),
-            )
-        return None
-
 
 class CatNoSuchFileDetector(RegexDetector):
     """
@@ -316,27 +159,6 @@ class CatNoSuchFileDetector(RegexDetector):
             },
         ),
     ]
-
-    @property
-    def name(self) -> str:
-        return "CatNoSuchFileDetector"
-
-    def pattern_to_clue(
-        self,
-        pattern_name: str,
-        match: T.Match[str],
-        combined: str,
-    ) -> T.Optional[ErrorClue]:
-        if pattern_name != "cat_no_such_file":
-            return None
-
-        file_path = match.group(1).strip()
-        return ErrorClue(
-            clue_type="missing_file",
-            confidence=1.0,
-            context={"file_path": file_path},
-            source_line=match.group(0),
-        )
 
 
 class DiffNoSuchFileDetector(RegexDetector):
@@ -419,56 +241,6 @@ class CLinkerErrorDetector(RegexDetector):
         ),
     ]
 
-    @property
-    def name(self) -> str:
-        return "CLinkerErrorDetector"
-
-    def pattern_to_clue(
-        self,
-        pattern_name: str,
-        match: T.Match[str],
-        combined: str,
-    ) -> T.Optional[ErrorClue]:
-        if pattern_name == "linker_undefined_symbols":
-            # Only process on the first match to avoid duplicates
-            # Check if this is the first undefined reference in combined
-            first_undefined_pos = combined.find("undefined reference to")
-            if match.start() == first_undefined_pos:
-                # Collect all undefined symbols in one clue
-                undefined_symbols = set()
-                pattern = r"undefined reference to [`']([^'`]+)[`']"
-                for m in re.finditer(pattern, combined):
-                    undefined_symbols.add(m.group(1))
-
-                if undefined_symbols:
-                    return ErrorClue(
-                        clue_type="linker_undefined_symbols",
-                        confidence=1.0,
-                        context={"symbols": list(undefined_symbols)},
-                        source_line=f"Found {len(undefined_symbols)} undefined references",
-                    )
-            return None
-        elif pattern_name == "linker_missing_object":
-            obj_file = match.group(1).strip()
-            return ErrorClue(
-                clue_type="missing_object_file",
-                confidence=1.0,
-                context={"object_file": obj_file},
-                source_line=match.group(0),
-            )
-        elif pattern_name == "linker_missing_library":
-            library = match.group(1).strip()
-            # Skip if this is an object file (they're handled by linker_missing_object)
-            if not library.endswith(".o"):
-                return ErrorClue(
-                    clue_type="missing_library",
-                    confidence=1.0,
-                    context={"library": library},
-                    source_line=match.group(0),
-                )
-            return None
-        return None
-
 
 class CCompilationErrorDetector(RegexDetector):
     """
@@ -492,55 +264,10 @@ class CCompilationErrorDetector(RegexDetector):
                 "confidence": 1.0,
                 "context": {
                     "file_path": "ex.h",
-                    "is_header": True,
                 },
             },
         ),
     ]
-
-    @property
-    def name(self) -> str:
-        return "CCompilationErrorDetector"
-
-    def pattern_to_clue(
-        self,
-        pattern_name: str,
-        match: T.Match[str],
-        combined: str,
-    ) -> T.Optional[ErrorClue]:
-        if pattern_name != "c_fatal_error":
-            return None
-
-        file_path = match.group(1).strip()
-        # Remove ./ prefix if present
-        if file_path.startswith("./"):
-            file_path = file_path[2:]
-
-        context = {
-            "file_path": file_path,
-            "is_header": file_path.endswith(".h"),
-        }
-
-        # Try to find the source file being compiled for better context
-        source_file_pattern = (
-            r"(?:cc|gcc|clang|g\+\+|c\+\+)\s+[^:]*?\s+([^\s]+\.c+)\s+"
-        )
-        source_match = re.search(source_file_pattern, combined)
-        if source_match:
-            source_file = source_match.group(1).strip()
-            context["source_file"] = source_file
-            # Extract the directory of the source file
-            import os
-            source_dir = os.path.dirname(source_file)
-            if source_dir:
-                context["source_dir"] = source_dir
-
-        return ErrorClue(
-            clue_type="missing_file",
-            confidence=1.0,
-            context=context,
-            source_line=match.group(0),
-        )
 
 
 class CIncompleteTypeDetector(RegexDetector):
@@ -563,12 +290,9 @@ class CIncompleteTypeDetector(RegexDetector):
             "struct termios raw;\ntest.c:10: error: field 'orig_termios' has incomplete type",
             {
                 "clue_type": "missing_c_include",
-                "confidence": 0.9,
+                "confidence": 1.0,
                 "context": {
-                    "file_path": "test.c",
-                    "line_number": 10,
                     "struct_name": "termios",
-                    "suggested_include": "termios.h",
                 },
             },
         ),
@@ -656,8 +380,8 @@ class CImplicitDeclarationDetector(RegexDetector):
     """
 
     PATTERNS = {
-        "c_implicit_declaration": r"implicit declaration of function",
-        "c_implicit_include_suggestion": r"note:\s+include\s+['\u2018]<([^>]+)>['\u2019]",
+        "missing_c_include": r"implicit declaration of function\s+['\u2018](?P<function_name>[^'\u2019]+)['\u2019].*?note:\s+include\s+['\u2018]<(?P<suggested_include>[^>]+)>['\u2019]",
+        "missing_c_function": r"(?P<file_path>[a-zA-Z0-9_./\-]+\.c):(?P<line_number>\d+):\d+:\s+(?:error|warning):\s+implicit declaration of function\s+['\u2018](?P<function_name>[^'\u2019]+)['\u2019]",
     }
 
     EXAMPLES = [
@@ -667,134 +391,12 @@ class CImplicitDeclarationDetector(RegexDetector):
                 "clue_type": "missing_c_include",
                 "confidence": 1.0,
                 "context": {
-                    "file_path": "test.c",
-                    "line_number": 5,
                     "function_name": "printf",
                     "suggested_include": "stdio.h",
                 },
             },
         ),
     ]
-
-    @property
-    def name(self) -> str:
-        return "CImplicitDeclarationDetector"
-
-    def pattern_to_clue(
-        self,
-        pattern_name: str,
-        match: T.Match[str],
-        combined: str,
-    ) -> T.Optional[ErrorClue]:
-        if pattern_name != "c_implicit_declaration":
-            return None
-
-        # Map stdlib functions to their headers
-        stdlib_to_header = {
-            "printf": "stdio.h", "fprintf": "stdio.h", "sprintf": "stdio.h",
-            "scanf": "stdio.h", "fscanf": "stdio.h", "fopen": "stdio.h",
-            "fclose": "stdio.h", "fread": "stdio.h", "fwrite": "stdio.h",
-            "fgets": "stdio.h", "fputs": "stdio.h", "getchar": "stdio.h",
-            "putchar": "stdio.h", "puts": "stdio.h", "gets": "stdio.h",
-            "sscanf": "stdio.h", "snprintf": "stdio.h", "perror": "stdio.h",
-            "malloc": "stdlib.h", "calloc": "stdlib.h", "realloc": "stdlib.h",
-            "free": "stdlib.h", "atoi": "stdlib.h", "atol": "stdlib.h",
-            "strtol": "stdlib.h", "rand": "stdlib.h", "srand": "stdlib.h",
-            "exit": "stdlib.h", "abort": "stdlib.h", "atexit": "stdlib.h",
-            "strlen": "string.h", "strcpy": "string.h", "strncpy": "string.h",
-            "strcat": "string.h", "strncat": "string.h", "strcmp": "string.h",
-            "strncmp": "string.h", "strchr": "string.h", "strstr": "string.h",
-            "memcpy": "string.h", "memmove": "string.h", "memset": "string.h",
-            "memcmp": "string.h", "read": "unistd.h", "write": "unistd.h",
-            "open": "unistd.h", "close": "unistd.h", "lseek": "unistd.h",
-            "fork": "unistd.h", "sleep": "unistd.h", "usleep": "unistd.h",
-            "fcntl": "fcntl.h", "dup": "fcntl.h", "dup2": "fcntl.h",
-            "signal": "signal.h", "kill": "signal.h", "raise": "signal.h",
-            "pause": "signal.h", "stat": "sys/stat.h", "fstat": "sys/stat.h",
-            "lstat": "sys/stat.h", "chmod": "sys/stat.h", "mkdir": "sys/stat.h",
-            "time": "time.h", "localtime": "time.h", "gmtime": "time.h",
-            "strftime": "time.h", "clock": "time.h", "va_start": "stdarg.h",
-            "va_end": "stdarg.h", "va_arg": "stdarg.h", "va_copy": "stdarg.h",
-            "sin": "math.h", "cos": "math.h", "tan": "math.h", "sqrt": "math.h",
-            "pow": "math.h", "abs": "math.h", "fabs": "math.h",
-            "isalpha": "ctype.h", "isdigit": "ctype.h", "isspace": "ctype.h",
-            "tolower": "ctype.h", "toupper": "ctype.h",
-            "tcgetattr": "termios.h", "tcsetattr": "termios.h",
-            "ioctl": "sys/ioctl.h",
-        }
-
-        # Find the start of the line containing this match
-        line_start = combined.rfind('\n', 0, match.start()) + 1
-        line_end = combined.find('\n', match.start())
-        if line_end == -1:
-            line_end = len(combined)
-        
-        error_line = combined[line_start:line_end]
-
-        # Extract the implicit declaration information from this line
-        implicit_pattern = r"^([a-zA-Z0-9_./\-]+\.c):(\d+):\d+:\s+(?:error|warning):\s+implicit declaration of function ['\u2018]([^'\u2019]+)['\u2019]"
-        implicit_match = re.match(implicit_pattern, error_line)
-        
-        if not implicit_match:
-            return None
-
-        source_file = implicit_match.group(1).strip()
-        line_number = int(implicit_match.group(2))
-        function_name = implicit_match.group(3).strip()
-
-        # Try to find the corresponding include suggestion near this match
-        include_pattern1 = r"note:\s+include\s+['\u2018]<([^>]+)>['\u2019]\s+or provide a declaration"
-        include_pattern2 = r"note:\s+['\u2018]([^'\u2019]+)['\u2019]\s+is defined in header\s+['\u2018]<([^>]+)>['\u2019]"
-
-        include_name = None
-        match_end = match.start() + 200
-        
-        for inc_match in re.finditer(include_pattern1, combined[match.start(): match_end]):
-            include_name = inc_match.group(1).strip()
-            break
-
-        if not include_name:
-            for inc_match in re.finditer(include_pattern2, combined[match.start(): match_end]):
-                if inc_match.group(1) == function_name:
-                    include_name = inc_match.group(2).strip()
-                    break
-
-        context = {
-            "file_path": source_file,
-            "line_number": line_number,
-            "function_name": function_name,
-        }
-
-        # If there's a suggested include, it's a missing include problem
-        if include_name:
-            context["suggested_include"] = include_name
-            return ErrorClue(
-                clue_type="missing_c_include",
-                confidence=1.0,
-                context=context,
-                source_line=error_line,
-            )
-        # Check if it's a known stdlib function
-        elif function_name in stdlib_to_header:
-            context["suggested_include"] = stdlib_to_header[function_name]
-            return ErrorClue(
-                clue_type="missing_c_include",
-                confidence=0.95,
-                context=context,
-                source_line=error_line,
-            )
-        else:
-            # No include suggestion and not a stdlib function
-            return ErrorClue(
-                clue_type="missing_c_function",
-                confidence=0.8,
-                context={
-                    "file_path": source_file,
-                    "line_number": line_number,
-                    "symbols": [function_name],
-                },
-                source_line=error_line,
-            )
 
 
 class CUndeclaredIdentifierDetector(RegexDetector):
@@ -810,8 +412,8 @@ class CUndeclaredIdentifierDetector(RegexDetector):
     """
 
     PATTERNS = {
-        "c_undeclared": r"undeclared",
-        "c_unknown_type": r"unknown type name",
+        "missing_c_include": r"undeclared.*?note:.*is defined in header\s+['\u2018]<(?P<suggested_include>[^>]+)>['\u2019]",
+        "missing_c_function": r"(?P<file_path>[a-zA-Z0-9_./\-]+\.c):(?P<line_number>\d+):\d+:\s+error:\s+['\u2018](?P<identifier>[^'\u2019]+)['\u2019]\s+undeclared\s+\(first use",
     }
 
     EXAMPLES = [
@@ -821,118 +423,8 @@ class CUndeclaredIdentifierDetector(RegexDetector):
                 "clue_type": "missing_c_include",
                 "confidence": 1.0,
                 "context": {
-                    "file_path": "test.c",
-                    "line_number": 5,
                     "suggested_include": "stddef.h",
                 },
             },
         ),
     ]
-
-    @property
-    def name(self) -> str:
-        return "CUndeclaredIdentifierDetector"
-
-    def pattern_to_clue(
-        self,
-        pattern_name: str,
-        match: T.Match[str],
-        combined: str,
-    ) -> T.Optional[ErrorClue]:
-        if pattern_name not in ("c_undeclared", "c_unknown_type"):
-            return None
-
-        # Map stdlib constants/macros to their headers
-        stdlib_to_header = {
-            "O_RDWR": "fcntl.h", "O_RDONLY": "fcntl.h", "O_WRONLY": "fcntl.h",
-            "O_CREAT": "fcntl.h", "O_APPEND": "fcntl.h", "O_EXCL": "fcntl.h",
-            "O_TRUNC": "fcntl.h", "O_NONBLOCK": "fcntl.h", "O_NOCTTY": "fcntl.h",
-            "O_SYNC": "fcntl.h", "SIGTERM": "signal.h", "SIGKILL": "signal.h",
-            "SIGUSR1": "signal.h", "SIGUSR2": "signal.h", "SIGINT": "signal.h",
-            "SIGSTOP": "signal.h", "EACCES": "errno.h", "ENOENT": "errno.h",
-            "EINVAL": "errno.h", "EAGAIN": "errno.h", "ENOMEM": "errno.h",
-            "WIFEXITED": "sys/wait.h", "WEXITSTATUS": "sys/wait.h",
-            "WIFSIGNALED": "sys/wait.h", "WTERMSIG": "sys/wait.h",
-            "STDOUT_FILENO": "unistd.h", "STDIN_FILENO": "unistd.h",
-            "STDERR_FILENO": "unistd.h", "TCSAFLUSH": "termios.h",
-            "TCSANOW": "termios.h", "TCSADRAIN": "termios.h", "BRKINT": "termios.h",
-            "ICRNL": "termios.h", "INPCK": "termios.h", "ISTRIP": "termios.h",
-            "IXON": "termios.h", "ECHO": "termios.h", "ICANON": "termios.h",
-            "IEXTEN": "termios.h", "ISIG": "termios.h", "OPOST": "termios.h",
-            "CS8": "termios.h", "VMIN": "termios.h", "VTIME": "termios.h",
-            "TIOCGWINSZ": "sys/ioctl.h", "TIOCSWINSZ": "sys/ioctl.h",
-        }
-
-        # Look for include suggestions first
-        include_pattern = r"note:.*is defined in header\s+['\u2018]<([^>]+)>['\u2019]"
-        for inc_match in re.finditer(include_pattern, combined[match.start(): match.start() + 500]):
-            include_name = inc_match.group(1).strip()
-
-            # Try to find the associated error line
-            error_context = combined[: match.start()]
-
-            # Find the most recent filename:line reference
-            file_pattern = r"^([a-zA-Z0-9_./\-]+\.c):(\d+):"
-            file_matches = list(re.finditer(file_pattern, error_context, re.MULTILINE))
-
-            if file_matches:
-                last_match = file_matches[-1]
-                source_file = last_match.group(1).strip()
-                line_number = int(last_match.group(2))
-
-                return ErrorClue(
-                    clue_type="missing_c_include",
-                    confidence=1.0,
-                    context={
-                        "file_path": source_file,
-                        "line_number": line_number,
-                        "suggested_include": include_name,
-                    },
-                    source_line=f"Suggested include: {include_name}",
-                )
-
-        # Look for undeclared identifiers without include suggestions
-        if pattern_name == "c_undeclared":
-            # Find the line containing this match
-            line_start = combined.rfind('\n', 0, match.start()) + 1
-            line_end = combined.find('\n', match.start())
-            if line_end == -1:
-                line_end = len(combined)
-            
-            error_line = combined[line_start:line_end]
-            
-            undeclared_pattern = r"^([a-zA-Z0-9_./\-]+\.c):(\d+):\d+:\s+error:\s+['\u2018]([^'\u2019]+)['\u2019]\s+undeclared\s+\(first use"
-            
-            und_match = re.match(undeclared_pattern, error_line)
-            if und_match:
-                source_file = und_match.group(1).strip()
-                line_number = int(und_match.group(2))
-                identifier = und_match.group(3).strip()
-
-                # Check if this is a known stdlib constant/macro
-                if identifier in stdlib_to_header:
-                    header = stdlib_to_header[identifier]
-                    return ErrorClue(
-                        clue_type="missing_c_include",
-                        confidence=0.95,
-                        context={
-                            "file_path": source_file,
-                            "line_number": line_number,
-                            "suggested_include": header,
-                        },
-                        source_line=error_line,
-                    )
-                else:
-                    # Not a stdlib constant - likely a missing function definition
-                    return ErrorClue(
-                        clue_type="missing_c_function",
-                        confidence=0.8,
-                        context={
-                            "file_path": source_file,
-                            "line_number": line_number,
-                            "symbols": [identifier],
-                        },
-                        source_line=error_line,
-                    )
-
-        return None
