@@ -19,8 +19,7 @@ class PermissionDeniedDetector(RegexDetector):
     """
 
     PATTERNS = {
-        "permission_denied_colon": r"Permission denied:\s*['\"]?([^'\"]+)['\"]?",
-        "permission_denied_sh": r":\s*([^\s:]+):\s*Permission denied",
+        "permission_denied": r"Permission denied:\s*['\"]?(?P<file_path>[^'\"]+)['\"]?",
     }
 
     EXAMPLES = [
@@ -41,31 +40,3 @@ class PermissionDeniedDetector(RegexDetector):
             },
         ),
     ]
-
-    @property
-    def name(self) -> str:
-        return "PermissionDeniedDetector"
-
-    def pattern_to_clue(
-        self,
-        pattern_name: str,
-        match: T.Match[str],
-        combined: str,
-    ) -> T.Optional[ErrorClue]:
-        if pattern_name == "permission_denied_colon":
-            file_path = match.group(1).strip()
-            return ErrorClue(
-                clue_type="permission_denied",
-                confidence=1.0,
-                context={"file_path": file_path},
-                source_line=match.group(0),
-            )
-        elif pattern_name == "permission_denied_sh":
-            file_path = match.group(1).strip()
-            return ErrorClue(
-                clue_type="permission_denied",
-                confidence=0.9,
-                context={"file_path": file_path},
-                source_line=match.group(0),
-            )
-        return None

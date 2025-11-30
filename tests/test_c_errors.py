@@ -120,7 +120,7 @@ class TestMissingFilePlanner(unittest.TestCase):
             git_toplevel="/repo"
         )
         
-        plans = self.planner.plan(clue, git_state)
+        plans = self.planner.plan([clue], git_state)
         self.assertEqual(len(plans), 1)
         # Should use the actual path found in deleted files
         self.assertEqual(plans[0].target_file, "lib/src/point.h")
@@ -180,7 +180,7 @@ class TestLinkerUndefinedSymbolsPlanner(unittest.TestCase):
             git_toplevel="/repo"
         )
         
-        plans = self.planner.plan(clue, git_state)
+        plans = self.planner.plan([clue], git_state)
         self.assertEqual(len(plans), 1)
         self.assertEqual(plans[0].target_file, "lib/src/lib.c")
         self.assertIn("lib.c", plans[0].reason)

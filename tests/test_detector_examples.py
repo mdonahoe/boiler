@@ -15,6 +15,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from pipeline.detectors.make_errors import (
+    MakeEnteringDirectoryDetector,
     MakeMissingTargetDetector,
     MakeNoRuleDetector,
 )
@@ -44,6 +45,7 @@ class DetectorExamplesTest(unittest.TestCase):
     def setUp(self):
         """Register detectors before each test"""
         self.detectors = [
+            MakeEnteringDirectoryDetector(),
             MakeMissingTargetDetector(),
             MakeNoRuleDetector(),
             PermissionDeniedDetector(),
@@ -168,6 +170,7 @@ class DetectorExamplesTest(unittest.TestCase):
     def test_examples_have_correct_context(self):
         """Verify example errors produce clues with expected context"""
         for detector in self.detectors:
+            # TODO(claude): use a unittest context manager here so that if a detector fails, the error message makes it clear which
             for i, example in enumerate(detector.EXAMPLES):
                 error_text, expected_clue = example
                 clues = detector.detect(error_text)

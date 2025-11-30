@@ -23,7 +23,10 @@ class PlannerRegistry:
 
     def plan_all(self, clues: T.List[ErrorClue], git_state: GitState) -> T.List[RepairPlan]:
         """
-        Run all applicable planners and return all RepairPlan objects.
+        Run all planners and return all RepairPlan objects.
+
+        Each planner receives ALL clues and filters to the ones it cares about.
+        This allows planners to combine context from multiple clue types.
 
         Args:
             clues: List of ErrorClue objects from detectors
@@ -34,20 +37,24 @@ class PlannerRegistry:
         """
         all_plans: T.List[RepairPlan] = []
 
-        for clue in clues:
-            # Find planners that can handle this clue type
-            for planner in self._planners:
-                if not planner.can_handle(clue.clue_type):
-                    continue
+        # Get unique clue types to determine which planners to call
+        clue_types = set(clue.clue_type for clue in clues)
 
-                try:
-                    plans = planner.plan(clue, git_state)
-                    if plans:
-                        print(f"[Planner:{planner.name}] Generated {len(plans)} plan(s) for {clue.clue_type}")
-                        all_plans.extend(plans)
-                except Exception as e:
-                    print(f"[Planner:{planner.name}] Error planning for {clue.clue_type}: {e}")
-                    # Continue with other planners
+        for planner in self._planners:
+            # Check if this planner handles any of the clue types we have
+            if not any(planner.can_handle(ct) for ct in clue_types):
+                continue
+
+            try:
+                plans = planner.plan(clues, git_state)
+                if plans:
+                    print(f"[Planner:{planner.name}] Generated {len(plans)} plan(s)")
+                    all_plans.extend(plans)
+            except Exception as e:
+                print(f"[Planner:{planner.name}] Error planning: {e}")
+                import traceback
+                traceback.print_exc()
+                # Continue with other planners
 
         # Sort plans by priority (lower = higher priority)
         all_plans.sort(key=lambda p: p.priority)

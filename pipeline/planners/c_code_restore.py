@@ -24,7 +24,15 @@ class MissingCFunctionPlanner(Planner):
     def can_handle(self, clue_type: str) -> bool:
         return clue_type == "missing_c_function"
 
-    def plan(self, clue: ErrorClue, git_state: GitState) -> T.List[RepairPlan]:
+    def plan(self, clues: T.List[ErrorClue], git_state: GitState) -> T.List[RepairPlan]:
+        plans = []
+        for clue in clues:
+            if clue.clue_type != "missing_c_function":
+                continue
+            plans.extend(self._plan_for_clue(clue, git_state))
+        return plans
+
+    def _plan_for_clue(self, clue: ErrorClue, git_state: GitState) -> T.List[RepairPlan]:
         file_path = clue.context.get("file_path")
         symbols = clue.context.get("symbols", [])
 
@@ -79,7 +87,15 @@ class MissingCIncludePlanner(Planner):
     def can_handle(self, clue_type: str) -> bool:
         return clue_type == "missing_c_include"
 
-    def plan(self, clue: ErrorClue, git_state: GitState) -> T.List[RepairPlan]:
+    def plan(self, clues: T.List[ErrorClue], git_state: GitState) -> T.List[RepairPlan]:
+        plans = []
+        for clue in clues:
+            if clue.clue_type != "missing_c_include":
+                continue
+            plans.extend(self._plan_for_clue(clue, git_state))
+        return plans
+
+    def _plan_for_clue(self, clue: ErrorClue, git_state: GitState) -> T.List[RepairPlan]:
         file_path = clue.context.get("file_path")
         suggested_include = clue.context.get("suggested_include")
         function_name = clue.context.get("function_name")
@@ -116,17 +132,19 @@ class MissingCIncludePlanner(Planner):
 
         print(f"[Planner:MissingCIncludePlanner] Planning to restore '#include <{suggested_include}>' to {file_path}")
 
-        return [RepairPlan(
-            plan_type="restore_c_code",
-            priority=0,  # High priority - compilation failure
-            target_file=file_path,
-            action="restore_c_element",
-            params={
-                "ref": git_state.ref,
-                "element_name": suggested_include,
-                "element_type": "include",
-                "function_name": function_name,
-            },
-            reason=f"Missing #include <{suggested_include}> for function '{function_name}' in {file_path}",
-            clue_source=clue
-        )]
+        return [
+            RepairPlan(
+                plan_type="restore_c_code",
+                priority=0,  # High priority - compilation failure
+                target_file=file_path,
+                action="restore_c_element",
+                params={
+                    "ref": git_state.ref,
+                    "element_name": suggested_include,
+                    "element_type": "include",
+                    "function_name": function_name,
+                },
+                reason=f"Missing #include <{suggested_include}> for function '{function_name}' in {file_path}",
+                clue_source=clue
+            )
+        ]

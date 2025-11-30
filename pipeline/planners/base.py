@@ -19,12 +19,15 @@ class Planner(ABC):
     """
 
     @abstractmethod
-    def plan(self, clue: ErrorClue, git_state: GitState) -> T.List[RepairPlan]:
+    def plan(self, clues: T.List[ErrorClue], git_state: GitState) -> T.List[RepairPlan]:
         """
-        Convert an ErrorClue into one or more RepairPlan objects.
+        Convert ErrorClues into one or more RepairPlan objects.
+
+        Planners receive ALL clues and should filter to the ones they care about.
+        This allows planners to combine context from multiple clue types.
 
         Args:
-            clue: The error clue to plan a fix for
+            clues: All error clues detected (planner should filter by clue_type)
             git_state: Current git repository state
 
         Returns:

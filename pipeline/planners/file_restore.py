@@ -26,40 +26,43 @@ class PermissionFixPlanner(Planner):
     def can_handle(self, clue_type: str) -> bool:
         return clue_type == "permission_denied"
 
-    def plan(self, clue: ErrorClue, git_state: GitState) -> T.List[RepairPlan]:
-        file_path = clue.context.get("file_path")
-        if not file_path:
-            return []
-
-        # Make path relative if it's absolute
-        if os.path.isabs(file_path):
-            file_path = os.path.relpath(file_path)
-
+    def plan(self, clues: T.List[ErrorClue], git_state: GitState) -> T.List[RepairPlan]:
         plans = []
+        for clue in clues:
+            if clue.clue_type != "permission_denied":
+                continue
 
-        # Check if file exists
-        if not os.path.exists(file_path):
-            # File is missing - restore it (high priority)
-            plans.append(RepairPlan(
-                plan_type="restore_file",
-                priority=0,  # High priority - file missing
-                target_file=file_path,
-                action="restore_full",
-                params={"ref": git_state.ref},
-                reason=f"File {file_path} is missing (permission error implies it should exist)",
-                clue_source=clue
-            ))
-        else:
-            # File exists but has wrong permissions - restore from git
-            plans.append(RepairPlan(
-                plan_type="restore_permissions",
-                priority=1,  # Medium priority - file exists
-                target_file=file_path,
-                action="restore_full",
-                params={"ref": git_state.ref},
-                reason=f"File {file_path} has wrong permissions, restoring from git",
-                clue_source=clue
-            ))
+            file_path = clue.context.get("file_path")
+            if not file_path:
+                continue
+
+            # Make path relative if it's absolute
+            if os.path.isabs(file_path):
+                file_path = os.path.relpath(file_path)
+
+            # Check if file exists
+            if not os.path.exists(file_path):
+                # File is missing - restore it (high priority)
+                plans.append(RepairPlan(
+                    plan_type="restore_file",
+                    priority=0,  # High priority - file missing
+                    target_file=file_path,
+                    action="restore_full",
+                    params={"ref": git_state.ref},
+                    reason=f"File {file_path} is missing (permission error implies it should exist)",
+                    clue_source=clue
+                ))
+            else:
+                # File exists but has wrong permissions - restore from git
+                plans.append(RepairPlan(
+                    plan_type="restore_permissions",
+                    priority=1,  # Medium priority - file exists
+                    target_file=file_path,
+                    action="restore_full",
+                    params={"ref": git_state.ref},
+                    reason=f"File {file_path} has wrong permissions, restoring from git",
+                    clue_source=clue
+                ))
 
         return plans
 
@@ -83,25 +86,25 @@ class MissingFilePlanner(Planner):
     def _find_file_in_deleted(self, filename: str, git_state: GitState) -> T.Optional[str]:
         """Try to find a matching file in the deleted files list"""
         deleted_files = git_state.deleted_files
-        
+
         # Exact match first
         if filename in deleted_files:
             return filename
-        
+
         # Try with various directory prefixes
         for deleted_file in deleted_files:
             if deleted_file.endswith("/" + filename):
                 return deleted_file
             if deleted_file.endswith(filename) and os.path.basename(deleted_file) == filename:
                 return deleted_file
-        
+
         # If source directory is provided, search there
         source_dir = self._find_source_dir()
         if source_dir:
             candidate = os.path.join(source_dir, filename)
             if candidate in deleted_files:
                 return candidate
-        
+
         return None
 
     def _find_source_dir(self) -> T.Optional[str]:
@@ -109,7 +112,15 @@ class MissingFilePlanner(Planner):
         # This will be populated from the clue context if available
         return None
 
-    def plan(self, clue: ErrorClue, git_state: GitState) -> T.List[RepairPlan]:
+    def plan(self, clues: T.List[ErrorClue], git_state: GitState) -> T.List[RepairPlan]:
+        plans = []
+        for clue in clues:
+            if clue.clue_type != "missing_file":
+                continue
+            plans.extend(self._plan_for_clue(clue, git_state))
+        return plans
+
+    def _plan_for_clue(self, clue: ErrorClue, git_state: GitState) -> T.List[RepairPlan]:
         file_path = clue.context.get("file_path")
         if not file_path:
             return []
@@ -190,7 +201,15 @@ class LinkerUndefinedSymbolsPlanner(Planner):
     def can_handle(self, clue_type: str) -> bool:
         return clue_type == "linker_undefined_symbols"
 
-    def plan(self, clue: ErrorClue, git_state: GitState) -> T.List[RepairPlan]:
+    def plan(self, clues: T.List[ErrorClue], git_state: GitState) -> T.List[RepairPlan]:
+        plans = []
+        for clue in clues:
+            if clue.clue_type != "linker_undefined_symbols":
+                continue
+            plans.extend(self._plan_for_clue(clue, git_state))
+        return plans
+
+    def _plan_for_clue(self, clue: ErrorClue, git_state: GitState) -> T.List[RepairPlan]:
         symbols = clue.context.get("symbols", [])
         if not symbols:
             return []
