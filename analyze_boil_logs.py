@@ -3,15 +3,19 @@
 Analyze an active boil session in the current working directory.
 
 Usage:
-    python3 analyze_boil_logs.py
+    python3 analyze_boil_logs.py [--debug-iterations START-END]
 
 This will scan all .boil/iter*.pipeline.json files and show:
 1. Overall boil session status (succeeded, stuck, or in progress)
 2. Which legacy handlers are used most often
 3. Which errors the pipeline successfully handles
 4. Migration priority recommendations
+
+Optional arguments:
+    --debug-iterations START-END : Show detailed plan info for iterations (e.g., 3-9)
 """
 
+import argparse
 import json
 import os
 import sys
@@ -383,5 +387,75 @@ def analyze_legacy_usage():
     return 0
 
 
+def debug_iterations(start_iter, end_iter):
+    """Show detailed plan information for a range of iterations"""
+    boil_dir = ".boil"
+
+    print("=" * 80)
+    print(f"DEBUG: ITERATIONS {start_iter}-{end_iter}")
+    print("=" * 80)
+
+    for iter_num in range(start_iter, end_iter + 1):
+        json_file = f"iter{iter_num}.pipeline.json"
+        path = os.path.join(boil_dir, json_file)
+
+        if not os.path.exists(path):
+            print(f"\nIteration {iter_num}: File not found")
+            continue
+
+        try:
+            with open(path, "r") as f:
+                data = json.load(f)
+        except Exception as e:
+            print(f"\nIteration {iter_num}: Error reading file: {e}")
+            continue
+
+        print(f"\n{'=' * 80}")
+        print(f"Iteration {iter_num}")
+        print('=' * 80)
+
+        # Show plans attempted
+        plans = data.get("plans_attempted", [])
+        if not plans:
+            print("  No plans attempted")
+            continue
+
+        for i, plan in enumerate(plans, 1):
+            print(f"\nPlan {i}:")
+            print(f"  Reason: {plan.get('reason', 'N/A')}")
+
+            clue = plan.get("clue_source", {})
+            if clue:
+                context = clue.get("context", {})
+                print(f"  Suggested include: {context.get('suggested_include', 'N/A')}")
+                print(f"  Function name: {context.get('function_name', 'N/A')}")
+                print(f"  Error line: {clue.get('source_line', 'N/A')[:100]}")
+                print(f"  Confidence: {clue.get('confidence', 0):.2f}")
+
+        # Show files modified
+        files_modified = data.get("files_modified", [])
+        print(f"\nFiles modified: {', '.join(files_modified) if files_modified else 'None'}")
+        print(f"Success: {data.get('success', False)}")
+
+
 if __name__ == "__main__":
-    sys.exit(analyze_legacy_usage())
+    parser = argparse.ArgumentParser(description="Analyze boil session logs")
+    parser.add_argument(
+        "--debug-iterations",
+        type=str,
+        help="Debug specific iterations (e.g., 3-9)",
+        metavar="START-END"
+    )
+
+    args = parser.parse_args()
+
+    if args.debug_iterations:
+        # Parse range
+        try:
+            start, end = map(int, args.debug_iterations.split('-'))
+            debug_iterations(start, end)
+        except ValueError:
+            print("Error: --debug-iterations must be in format START-END (e.g., 3-9)")
+            sys.exit(1)
+    else:
+        sys.exit(analyze_legacy_usage())

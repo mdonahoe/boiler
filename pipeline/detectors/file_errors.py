@@ -542,14 +542,15 @@ class CImplicitDeclarationDetector(Detector):
         # Map stdlib functions to their headers
         stdlib_to_header = {
             # stdio.h
-            'printf': 'stdio.h', 'fprintf': 'stdio.h', 'sprintf': 'stdio.h', 'scanf': 'stdio.h', 
-            'fscanf': 'stdio.h', 'fopen': 'stdio.h', 'fclose': 'stdio.h', 'fread': 'stdio.h', 
-            'fwrite': 'stdio.h', 'fgets': 'stdio.h', 'fputs': 'stdio.h', 'getchar': 'stdio.h', 
-            'putchar': 'stdio.h', 'puts': 'stdio.h', 'gets': 'stdio.h',
+            'printf': 'stdio.h', 'fprintf': 'stdio.h', 'sprintf': 'stdio.h', 'scanf': 'stdio.h',
+            'fscanf': 'stdio.h', 'fopen': 'stdio.h', 'fclose': 'stdio.h', 'fread': 'stdio.h',
+            'fwrite': 'stdio.h', 'fgets': 'stdio.h', 'fputs': 'stdio.h', 'getchar': 'stdio.h',
+            'putchar': 'stdio.h', 'puts': 'stdio.h', 'gets': 'stdio.h', 'sscanf': 'stdio.h',
+            'snprintf': 'stdio.h', 'perror': 'stdio.h',
             # stdlib.h
-            'malloc': 'stdlib.h', 'calloc': 'stdlib.h', 'realloc': 'stdlib.h', 'free': 'stdlib.h', 
-            'atoi': 'stdlib.h', 'atol': 'stdlib.h', 'strtol': 'stdlib.h', 'rand': 'stdlib.h', 
-            'srand': 'stdlib.h',
+            'malloc': 'stdlib.h', 'calloc': 'stdlib.h', 'realloc': 'stdlib.h', 'free': 'stdlib.h',
+            'atoi': 'stdlib.h', 'atol': 'stdlib.h', 'strtol': 'stdlib.h', 'rand': 'stdlib.h',
+            'srand': 'stdlib.h', 'exit': 'stdlib.h', 'abort': 'stdlib.h', 'atexit': 'stdlib.h',
             # string.h
             'strlen': 'string.h', 'strcpy': 'string.h', 'strncpy': 'string.h', 'strcat': 'string.h', 
             'strncat': 'string.h', 'strcmp': 'string.h', 'strncmp': 'string.h', 'strchr': 'string.h', 
@@ -591,17 +592,22 @@ class CImplicitDeclarationDetector(Detector):
 
         # Pattern for include suggestion - format 1
         # note: include '<stdio.h>' or provide a declaration of 'printf'
-        include_pattern1 = r"note:\s+include\s+['\u2018]<([^>]+)>['\u2019]\s+or provide a declaration"
+        # Capture both the header and the symbol it's for
+        include_pattern1 = r"note:\s+include\s+['\u2018]<([^>]+)>['\u2019]\s+or provide a declaration of ['\u2018]([^'\u2019]+)['\u2019]"
 
         # Pattern for include suggestion - format 2
         # note: 'NULL' is defined in header '<stddef.h>'; did you forget to '#include <stddef.h>'?
-        include_pattern2 = r"note:.*is defined in header\s+['\u2018]<([^>]+)>['\u2019]"
+        # Capture both the symbol and the header
+        include_pattern2 = r"note:\s+['\u2018]([^'\u2019]+)['\u2019]\s+is defined in header\s+['\u2018]<([^>]+)>['\u2019]"
 
         # Find all implicit declarations
         implicit_matches = list(re.finditer(implicit_pattern, combined, re.MULTILINE))
+        # Note: For pattern1, group(1)=header, group(2)=symbol
+        # For pattern2, group(1)=symbol, group(2)=header
         include_matches1 = list(re.finditer(include_pattern1, combined))
         include_matches2 = list(re.finditer(include_pattern2, combined))
-        include_matches = include_matches1 + include_matches2
+        include_matches = [(m, m.group(1), m.group(2)) for m in include_matches1]  # (match, header, symbol)
+        include_matches += [(m, m.group(2), m.group(1)) for m in include_matches2]  # (match, header, symbol)
 
         # Match them up - the include suggestion usually comes after the error
         for i, implicit_match in enumerate(implicit_matches):
@@ -609,10 +615,18 @@ class CImplicitDeclarationDetector(Detector):
             line_number = int(implicit_match.group(2))
             function_name = implicit_match.group(3).strip()
 
-            # Try to find the corresponding include suggestion
+            # Try to find the corresponding include suggestion that appears AFTER this error
+            # AND is for the SAME symbol
             include_name = None
-            if i < len(include_matches):
-                include_name = include_matches[i].group(1).strip()
+            implicit_end_pos = implicit_match.end()
+            for match_tuple in include_matches:
+                inc_match, header, symbol = match_tuple
+                if inc_match.start() > implicit_end_pos:
+                    # Found an include suggestion after this error
+                    # Check if it's close enough (within ~500 chars) and for the same symbol
+                    if inc_match.start() - implicit_end_pos < 500 and symbol == function_name:
+                        include_name = header.strip()
+                        break
 
             context = {
                 "file_path": source_file,
