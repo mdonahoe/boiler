@@ -126,6 +126,82 @@ class ExampleReposTest(unittest.TestCase):
             self.assertEqual(final_result.returncode, 0,
                            f"Test should pass after restoration for {repo_name}. Output:\n{final_result.stdout}\n{final_result.stderr}")
 
+            # Verify that boiled content matches the after/ folder
+            example_after_dir = os.path.join(boiler_dir, "example_repos", repo_name, "after")
+            if os.path.exists(example_after_dir):
+                self._verify_after_is_subset_of_boiled(repo_name, example_after_dir, tmpdir)
+
+    def _verify_after_is_subset_of_boiled(self, repo_name, after_dir, boiled_dir):
+        """Verify that after/ is a subset of the boiled directory"""
+        after_files = self._get_all_non_hidden_files(after_dir)
+        boiled_files_rel = set(
+            os.path.relpath(f, boiled_dir) 
+            for f in self._get_all_non_hidden_files(boiled_dir)
+        )
+
+        # Check all files in after/ exist in boiled
+        for after_file in after_files:
+            relative_path = os.path.relpath(after_file, after_dir)
+            if relative_path not in boiled_files_rel:
+                msg = f"\n{'='*70}\n"
+                msg += f"[{repo_name}] FILE IN after/ NOT FOUND IN BOILED RESULT\n"
+                msg += f"{'='*70}\n"
+                msg += f"File: {relative_path}\n\n"
+                msg += f"Files in after/:\n"
+                after_files_rel = sorted(os.path.relpath(f, after_dir) for f in after_files)
+                for f in after_files_rel:
+                    msg += f"  - {f}\n"
+                msg += f"\nFiles in boiled result:\n"
+                for f in sorted(boiled_files_rel):
+                    msg += f"  - {f}\n"
+                msg += f"{'='*70}\n"
+                self.fail(msg)
+
+            # Check file content line-by-line
+            boiled_file = os.path.join(boiled_dir, relative_path)
+            with open(after_file, 'r', errors='ignore') as f:
+                after_lines = f.readlines()
+            with open(boiled_file, 'r', errors='ignore') as f:
+                boiled_lines = f.readlines()
+
+            # All lines in after/ should exist in boiled/ in the same order
+            boiled_idx = 0
+            for after_idx, after_line in enumerate(after_lines):
+                found = False
+                for idx in range(boiled_idx, len(boiled_lines)):
+                    if boiled_lines[idx] == after_line:
+                        boiled_idx = idx + 1
+                        found = True
+                        break
+
+                if not found:
+                    msg = f"\n{'='*70}\n"
+                    msg += f"[{repo_name}] LINE IN after/ NOT FOUND IN BOILED RESULT\n"
+                    msg += f"{'='*70}\n"
+                    msg += f"File: {relative_path}\n"
+                    msg += f"Problem at line {after_idx + 1} in after/:\n"
+                    msg += f"  {after_line.rstrip()}\n\n"
+                    msg += f"after/{relative_path}:\n"
+                    for i, line in enumerate(after_lines, 1):
+                        mark = " <-- MISSING FROM BOILED" if i == after_idx + 1 else ""
+                        msg += f"  {i:3d}: {line.rstrip()}{mark}\n"
+                    msg += f"\nBoiled {relative_path} (relevant section):\n"
+                    for i, line in enumerate(boiled_lines, 1):
+                        msg += f"  {i:3d}: {line.rstrip()}\n"
+                    msg += f"{'='*70}\n"
+                    self.fail(msg)
+
+    def _get_all_non_hidden_files(self, directory):
+        """Recursively get all non-hidden files in directory"""
+        files = []
+        for root, dirs, filenames in os.walk(directory):
+            # Skip hidden directories
+            dirs[:] = [d for d in dirs if not d.startswith('.')]
+            for filename in filenames:
+                if not filename.startswith('.'):
+                    files.append(os.path.join(root, filename))
+        return files
+
 
 if __name__ == "__main__":
     unittest.main()
