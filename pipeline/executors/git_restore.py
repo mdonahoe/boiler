@@ -24,6 +24,33 @@ class GitRestoreExecutor(Executor):
     def can_handle(self, action: str) -> bool:
         return action == "restore_full"
 
+    def _resolve_git_path(self, file_path: str) -> str:
+        """
+        Resolve a file path to be relative to git root.
+
+        The file_path may be:
+        - Already relative to git root (from git diff output)
+        - Relative to current working directory
+        - Absolute path
+
+        Returns: path relative to git root
+        """
+        git_toplevel = self._get_git_toplevel()
+
+        # If path is absolute, make it relative to git root
+        if os.path.isabs(file_path):
+            return os.path.relpath(file_path, git_toplevel)
+
+        # Check if the path exists when interpreted as git-root-relative
+        git_root_path = os.path.join(git_toplevel, file_path)
+        if os.path.exists(git_root_path) or file_path.count('/') > 0:
+            # Likely already git-root-relative (or it's a path with slashes that should be)
+            return file_path
+
+        # Otherwise, treat as cwd-relative
+        abs_path = os.path.abspath(file_path)
+        return os.path.relpath(abs_path, git_toplevel)
+
     def validate_plan(self, plan: RepairPlan) -> T.Tuple[bool, T.Optional[str]]:
         """Validate that the file exists in git at the specified ref"""
         ref = plan.params.get("ref", "HEAD")
@@ -32,9 +59,7 @@ class GitRestoreExecutor(Executor):
         # Check if file exists in git at ref
         try:
             git_toplevel = self._get_git_toplevel()
-            cwd = os.getcwd()
-            abs_path = os.path.abspath(file_path)
-            git_relative_path = os.path.relpath(abs_path, git_toplevel)
+            git_relative_path = self._resolve_git_path(file_path)
 
             # Try to show the file from git
             result = subprocess.run(
@@ -58,9 +83,7 @@ class GitRestoreExecutor(Executor):
 
         try:
             git_toplevel = self._get_git_toplevel()
-            cwd = os.getcwd()
-            abs_path = os.path.abspath(file_path)
-            git_relative_path = os.path.relpath(abs_path, git_toplevel)
+            git_relative_path = self._resolve_git_path(file_path)
 
             # Check if there are actually changes to restore
             # If the file already exists and matches git, there's nothing to do
