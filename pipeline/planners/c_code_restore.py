@@ -62,6 +62,13 @@ class MissingCFunctionPlanner(Planner):
         "strerror": "string.h",
         # errno.h
         "errno": "errno.h", "EAGAIN": "errno.h", "EINTR": "errno.h",
+        # ctype.h - Character classification
+        "isdigit": "ctype.h", "isalpha": "ctype.h", "isalnum": "ctype.h", "isspace": "ctype.h",
+        "islower": "ctype.h", "isupper": "ctype.h", "tolower": "ctype.h", "toupper": "ctype.h",
+        # stdarg.h - Variable argument macros
+        "va_start": "stdarg.h", "va_end": "stdarg.h", "va_list": "stdarg.h", "va_arg": "stdarg.h",
+        # time.h
+        "time": "time.h", "time_t": "time.h",
     }
 
     @property
