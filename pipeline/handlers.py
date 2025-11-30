@@ -10,7 +10,11 @@ from pipeline.executors.registry import register_executor
 
 # Import concrete implementations
 from pipeline.detectors.permissions import PermissionDeniedDetector
-from pipeline.detectors.make_errors import MakeMissingTargetDetector, MakeNoRuleDetector
+from pipeline.detectors.make_errors import (
+    MakeEnteringDirectoryDetector,
+    MakeMissingTargetDetector,
+    MakeNoRuleDetector,
+)
 from pipeline.detectors.file_errors import (
     FopenNoSuchFileDetector,
     FileNotFoundDetector,
@@ -52,6 +56,7 @@ def register_all_handlers():
 
     # Register detectors
     register_detector(PermissionDeniedDetector())
+    register_detector(MakeEnteringDirectoryDetector())
     register_detector(MakeMissingTargetDetector())
     register_detector(MakeNoRuleDetector())
     register_detector(MissingPythonCodeDetector())

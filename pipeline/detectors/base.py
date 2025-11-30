@@ -52,20 +52,25 @@ class RegexDetector(Detector):
     """
     Base class for detectors that work via regex pattern matching.
     
-    Subclasses should define:
+    Subclasses should ONLY define:
     - EXAMPLES: List of (error_text, expected_context) tuples for testing
     - PATTERNS: Dict mapping pattern names to regex patterns
-    - pattern_to_clue(): Method that converts a regex match to an ErrorClue
     
     The detect() method automatically:
     1. Combines stderr and stdout
     2. Searches for all PATTERNS
     3. Converts matches to ErrorClue objects
+
+    Regexes must use named capture groups!
     """
 
     # Subclasses must define this
     PATTERNS: T.Dict[str, str] = {}
     EXAMPLES: T.List[T.Tuple[str, T.Dict[str, T.Any]]] = []
+
+    @property
+    def name(self):
+        return self.__class__.__name__
 
     def detect(self, stderr: str, stdout: str = "") -> T.List[ErrorClue]:
         """
@@ -90,24 +95,30 @@ class RegexDetector(Detector):
         return clues
 
     def pattern_to_clue(
-        self, 
-        pattern_name: str, 
-        match: T.Match[str], 
-        combined: str
+        self,
+        pattern_name: str,
+        match: T.Match[str],
+        combined: str,
     ) -> T.Optional[ErrorClue]:
         """
         Convert a regex match to an ErrorClue object.
-        
-        Override this in subclasses to customize how matches are converted to clues.
-        
+
+        Default implementation uses named groups from the regex.
+        Override this ONLY if you need to combine multiple patterns or do complex processing.
+
         Args:
             pattern_name: Name of the pattern that matched
             match: The regex match object
-            combined: The full stderr+stdout combined string (for context)
-            
+            combined: The full combined stderr+stdout text (for context searching)
+
         Returns:
-            ErrorClue object, or None to skip this match
+            ErrorClue object
         """
-        raise NotImplementedError(
-            f"{self.__class__.__name__} must implement pattern_to_clue()"
+        if not match:
+            return None
+        return ErrorClue(
+            clue_type=pattern_name,
+            confidence=1.0,
+            context=match.groupdict(),
+            source_line=match.group(0),
         )

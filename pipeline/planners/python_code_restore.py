@@ -24,7 +24,15 @@ class MissingPythonCodePlanner(Planner):
     def can_handle(self, clue_type: str) -> bool:
         return clue_type == "missing_python_code"
 
-    def plan(self, clue: ErrorClue, git_state: GitState) -> T.List[RepairPlan]:
+    def plan(self, clues: T.List[ErrorClue], git_state: GitState) -> T.List[RepairPlan]:
+        plans = []
+        for clue in clues:
+            if clue.clue_type != "missing_python_code":
+                continue
+            plans.extend(self._plan_for_clue(clue, git_state))
+        return plans
+
+    def _plan_for_clue(self, clue: ErrorClue, git_state: GitState) -> T.List[RepairPlan]:
         file_path = clue.context.get("file_path")
         element_name = clue.context.get("element_name")
         missing_element = clue.context.get("missing_element")
@@ -48,20 +56,22 @@ class MissingPythonCodePlanner(Planner):
             print(f"[Planner:MissingPythonCodePlanner] File {file_path} does not exist, skipping")
             return []
 
-        return [RepairPlan(
-            plan_type="restore_python_code",
-            priority=0,  # High priority - missing code in test file
-            target_file=file_path,
-            action="restore_python_element",
-            params={
-                "ref": git_state.ref,
-                "element_name": element_name,
-                "element_type": clue.context.get("element_type", "def"),
-                "missing_element": missing_element
-            },
-            reason=f"Missing {clue.context.get('element_type', 'code')} '{element_name}' in {file_path}",
-            clue_source=clue
-        )]
+        return [
+            RepairPlan(
+                plan_type="restore_python_code",
+                priority=0,  # High priority - missing code in test file
+                target_file=file_path,
+                action="restore_python_element",
+                params={
+                    "ref": git_state.ref,
+                    "element_name": element_name,
+                    "element_type": clue.context.get("element_type", "def"),
+                    "missing_element": missing_element
+                },
+                reason=f"Missing {clue.context.get('element_type', 'code')} '{element_name}' in {file_path}",
+                clue_source=clue
+            )
+        ]
 
 
 class PythonNameErrorPlanner(Planner):
@@ -80,7 +90,15 @@ class PythonNameErrorPlanner(Planner):
     def can_handle(self, clue_type: str) -> bool:
         return clue_type == "python_name_error"
 
-    def plan(self, clue: ErrorClue, git_state: GitState) -> T.List[RepairPlan]:
+    def plan(self, clues: T.List[ErrorClue], git_state: GitState) -> T.List[RepairPlan]:
+        plans = []
+        for clue in clues:
+            if clue.clue_type != "python_name_error":
+                continue
+            plans.extend(self._plan_for_clue(clue, git_state))
+        return plans
+
+    def _plan_for_clue(self, clue: ErrorClue, git_state: GitState) -> T.List[RepairPlan]:
         file_path = clue.context.get("file_path")
         undefined_name = clue.context.get("undefined_name")
         line_number = clue.context.get("line_number")
@@ -101,16 +119,18 @@ class PythonNameErrorPlanner(Planner):
             print(f"[Planner:PythonNameErrorPlanner] File {file_path} does not exist, skipping")
             return []
 
-        return [RepairPlan(
-            plan_type="restore_python_code",
-            priority=0,  # High priority - NameError blocks execution
-            target_file=file_path,
-            action="restore_python_element",
-            params={
-                "ref": git_state.ref,
-                "element_name": undefined_name,
-                "line_number": line_number,
-            },
-            reason=f"NameError: name '{undefined_name}' is not defined in {file_path}",
-            clue_source=clue
-        )]
+        return [
+            RepairPlan(
+                plan_type="restore_python_code",
+                priority=0,  # High priority - NameError blocks execution
+                target_file=file_path,
+                action="restore_python_element",
+                params={
+                    "ref": git_state.ref,
+                    "element_name": undefined_name,
+                    "line_number": line_number,
+                },
+                reason=f"NameError: name '{undefined_name}' is not defined in {file_path}",
+                clue_source=clue
+            )
+        ]
