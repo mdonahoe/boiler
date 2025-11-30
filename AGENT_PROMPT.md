@@ -43,6 +43,7 @@ Analyze the debugging information in [TARGET_REPO]/.boil/ and improve boiler to 
      - Proper handling of edge cases
 
 4. **Validate**
+   - Run `make check` in boiler - this is fast but not comprehensive.
    - Run `make test` in boiler - all tests must pass
    - Test on [TARGET_REPO]:
      - Reset to pre-boil state: `boil --abort` (restores working directory and removes .boil)

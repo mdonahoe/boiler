@@ -42,6 +42,7 @@ class CCodeRestoreExecutor(Executor):
         """Execute src_repair to restore the missing code element"""
         file_path = plan.target_file
         element_name = plan.params.get("element_name")
+        element_type = plan.params.get("element_type", "function")
         ref = plan.params.get("ref", "HEAD")
 
         try:
@@ -78,8 +79,16 @@ class CCodeRestoreExecutor(Executor):
             git_toplevel = self._get_git_toplevel()
             git_relative_path = os.path.relpath(abs_path, git_toplevel)
 
+            # Format the missing element pattern for src_repair
+            # For includes, src_repair expects "include:stdio.h" format
+            # For functions, it expects just the function name
+            if element_type == "include":
+                missing_pattern = f"include:{element_name}"
+            else:
+                missing_pattern = element_name
+
             # Call src_repair.repair() with the missing element
-            repair(file_path, ref, missing=element_name, verbose=False)
+            repair(file_path, ref, missing=missing_pattern, verbose=False)
 
             # Verify the file actually changed
             with open(file_path, 'r') as f:
@@ -87,15 +96,15 @@ class CCodeRestoreExecutor(Executor):
             after_hash = hash(after_content)
 
             if before_hash == after_hash:
-                print(f"[Executor:CCodeRestoreExecutor] WARNING: File unchanged after repair attempt for '{element_name}'")
+                print(f"[Executor:CCodeRestoreExecutor] WARNING: File unchanged after repair attempt for '{missing_pattern}'")
                 return RepairResult(
                     success=False,
                     plans_attempted=[plan],
                     files_modified=[],
-                    error_message=f"Repair did not modify {file_path} ('{element_name}' may not exist in git history)"
+                    error_message=f"Repair did not modify {file_path} ('{missing_pattern}' may not exist in git history)"
                 )
 
-            print(f"[Executor:CCodeRestoreExecutor] Successfully restored '{element_name}' to {file_path}")
+            print(f"[Executor:CCodeRestoreExecutor] Successfully restored '{missing_pattern}' to {file_path}")
             return RepairResult(
                 success=True,
                 plans_attempted=[plan],

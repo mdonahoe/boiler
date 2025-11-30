@@ -258,16 +258,17 @@ class CIncompleteTypeDetector(RegexDetector):
     """
 
     PATTERNS = {
-        "missing_c_include": r"struct\s+(?P<struct_name>termios|winsize|stat|tm|sigaction|dirent).*?error:.*(?:has incomplete type|storage size)",
+        "missing_c_include": r"(?P<file_path>[a-zA-Z0-9_./\-]+\.c):\d+:\d+:.*?error:.*?(?:has incomplete type|storage size).*?struct\s+(?P<struct_name>termios|winsize|stat|tm|sigaction|dirent)",
     }
 
     EXAMPLES = [
         (
-            "struct termios raw;\ntest.c:10: error: field 'orig_termios' has incomplete type",
+            "dim.c:81:18: error: field 'orig_termios' has incomplete type\n   81 |   struct termios orig_termios;",
             {
                 "clue_type": "missing_c_include",
                 "confidence": 1.0,
                 "context": {
+                    "file_path": "dim.c",
                     "struct_name": "termios",
                 },
             },
@@ -285,7 +286,7 @@ class CImplicitDeclarationDetector(RegexDetector):
     """
 
     PATTERNS = {
-        "missing_c_include": r"implicit declaration of function\s+['\u2018](?P<function_name>[^'\u2019]+)['\u2019].*?note:\s+include\s+['\u2018]<(?P<suggested_include>[^>]+)>['\u2019]",
+        "missing_c_include": r"(?P<file_path>[a-zA-Z0-9_./\-]+\.c):\d+:\d+:\s+(?:error|warning):\s+implicit declaration of function\s+['\u2018](?P<function_name>[^'\u2019]+)['\u2019].*?note:\s+include\s+['\u2018]<(?P<suggested_include>[^>]+)>['\u2019]",
         "missing_c_function": r"(?P<file_path>[a-zA-Z0-9_./\-]+\.c):(?P<line_number>\d+):\d+:\s+(?:error|warning):\s+implicit declaration of function\s+['\u2018](?P<function_name>[^'\u2019]+)['\u2019]",
     }
 
@@ -296,6 +297,7 @@ class CImplicitDeclarationDetector(RegexDetector):
                 "clue_type": "missing_c_include",
                 "confidence": 1.0,
                 "context": {
+                    "file_path": "test.c",
                     "function_name": "printf",
                     "suggested_include": "stdio.h",
                 },
@@ -317,17 +319,18 @@ class CUndeclaredIdentifierDetector(RegexDetector):
     """
 
     PATTERNS = {
-        "missing_c_include": r"undeclared.*?note:.*is defined in header\s+['\u2018]<(?P<suggested_include>[^>]+)>['\u2019]",
+        "missing_c_include": r"(?P<file_path>[a-zA-Z0-9_./\-]+\.c):\d+:\d+:.*?undeclared.*?note:.*is defined in header\s+['\u2018]<(?P<suggested_include>[^>]+)>['\u2019]",
         "missing_c_function": r"(?P<file_path>[a-zA-Z0-9_./\-]+\.c):(?P<line_number>\d+):\d+:\s+error:\s+['\u2018](?P<identifier>[^'\u2019]+)['\u2019]\s+undeclared\s+\(first use",
     }
 
     EXAMPLES = [
         (
-            "test.c:5: error: 'NULL' undeclared\nnote: 'NULL' is defined in header '<stddef.h>'",
+            "test.c:5:10: error: 'NULL' undeclared\nnote: 'NULL' is defined in header '<stddef.h>'",
             {
                 "clue_type": "missing_c_include",
                 "confidence": 1.0,
                 "context": {
+                    "file_path": "test.c",
                     "suggested_include": "stddef.h",
                 },
             },
