@@ -439,6 +439,85 @@ class CCompilationErrorDetector(Detector):
         return clues
 
 
+class CIncompleteTypeDetector(Detector):
+    """
+    Detect C compilation errors for incomplete struct/type errors.
+
+    Matches patterns like:
+    - error: field 'orig_termios' has incomplete type
+    - error: storage size of 'raw' isn't known
+    - These usually indicate missing header files for struct definitions
+    """
+
+    @property
+    def name(self) -> str:
+        return "CIncompleteTypeDetector"
+
+    def detect(self, stderr: str, stdout: str = "") -> T.List[ErrorClue]:
+        combined = stderr + "\n" + stdout
+
+        if "incomplete type" not in combined and "storage size" not in combined:
+            return []
+
+        clues = []
+
+        # Map incomplete types to likely headers
+        type_to_header = {
+            'termios': 'termios.h',
+            'winsize': 'sys/ioctl.h',
+            'stat': 'sys/stat.h',
+            'tm': 'time.h',
+            'sigaction': 'signal.h',
+            'dirent': 'dirent.h',
+        }
+
+        # Pattern for incomplete type errors
+        # error: field 'name' has incomplete type
+        incomplete_pattern = r"error:.*has incomplete type"
+        
+        # Pattern to extract struct name - look for struct keyword
+        # struct termios orig_termios;
+        struct_pattern = r"struct\s+([a-zA-Z_][a-zA-Z0-9_]*)"
+
+        # Find all incomplete type errors and look for struct names nearby
+        for match in re.finditer(incomplete_pattern, combined):
+            error_context = combined[max(0, match.start() - 200):match.end() + 100]
+            
+            # Find the most recent struct declaration in context
+            struct_matches = list(re.finditer(struct_pattern, error_context))
+            if struct_matches:
+                struct_name = struct_matches[-1].group(1)
+                
+                # Check if we know which header this struct needs
+                if struct_name in type_to_header:
+                    header = type_to_header[struct_name]
+                    
+                    # Try to find the source file
+                    file_pattern = r"^([a-zA-Z0-9_./\-]+\.c):(\d+):"
+                    file_matches = list(re.finditer(file_pattern, combined[:match.start()], re.MULTILINE))
+                    
+                    source_file = "unknown"
+                    line_number = 0
+                    if file_matches:
+                        last_match = file_matches[-1]
+                        source_file = last_match.group(1).strip()
+                        line_number = int(last_match.group(2))
+                    
+                    clues.append(ErrorClue(
+                        clue_type="missing_c_include",
+                        confidence=0.9,
+                        context={
+                            "file_path": source_file,
+                            "line_number": line_number,
+                            "struct_name": struct_name,
+                            "suggested_include": header,
+                        },
+                        source_line=match.group(0)
+                    ))
+
+        return clues
+
+
 class CImplicitDeclarationDetector(Detector):
     """
     Detect C implicit function declaration errors that suggest missing includes.
@@ -460,33 +539,48 @@ class CImplicitDeclarationDetector(Detector):
 
         clues = []
 
-        # Common standard library functions that require specific headers
-        # If we see these, it's almost certainly a missing include, not a missing function
-        stdlib_functions = {
+        # Map stdlib functions to their headers
+        stdlib_to_header = {
             # stdio.h
-            'printf', 'fprintf', 'sprintf', 'scanf', 'fscanf', 'fopen', 'fclose', 'fread', 'fwrite',
-            'fgets', 'fputs', 'getchar', 'putchar', 'puts', 'gets',
+            'printf': 'stdio.h', 'fprintf': 'stdio.h', 'sprintf': 'stdio.h', 'scanf': 'stdio.h', 
+            'fscanf': 'stdio.h', 'fopen': 'stdio.h', 'fclose': 'stdio.h', 'fread': 'stdio.h', 
+            'fwrite': 'stdio.h', 'fgets': 'stdio.h', 'fputs': 'stdio.h', 'getchar': 'stdio.h', 
+            'putchar': 'stdio.h', 'puts': 'stdio.h', 'gets': 'stdio.h',
             # stdlib.h
-            'malloc', 'calloc', 'realloc', 'free', 'atoi', 'atol', 'strtol', 'rand', 'srand',
+            'malloc': 'stdlib.h', 'calloc': 'stdlib.h', 'realloc': 'stdlib.h', 'free': 'stdlib.h', 
+            'atoi': 'stdlib.h', 'atol': 'stdlib.h', 'strtol': 'stdlib.h', 'rand': 'stdlib.h', 
+            'srand': 'stdlib.h',
             # string.h
-            'strlen', 'strcpy', 'strncpy', 'strcat', 'strncat', 'strcmp', 'strncmp', 'strchr', 'strstr',
-            'memcpy', 'memmove', 'memset', 'memcmp',
+            'strlen': 'string.h', 'strcpy': 'string.h', 'strncpy': 'string.h', 'strcat': 'string.h', 
+            'strncat': 'string.h', 'strcmp': 'string.h', 'strncmp': 'string.h', 'strchr': 'string.h', 
+            'strstr': 'string.h', 'memcpy': 'string.h', 'memmove': 'string.h', 'memset': 'string.h', 
+            'memcmp': 'string.h',
             # unistd.h
-            'read', 'write', 'open', 'close', 'lseek', 'fork', 'exec', 'exit', 'sleep', 'usleep',
+            'read': 'unistd.h', 'write': 'unistd.h', 'open': 'unistd.h', 'close': 'unistd.h', 
+            'lseek': 'unistd.h', 'fork': 'unistd.h', 'exit': 'unistd.h', 'sleep': 'unistd.h', 
+            'usleep': 'unistd.h',
             # fcntl.h
-            'open', 'fcntl', 'dup', 'dup2',
+            'fcntl': 'fcntl.h', 'dup': 'fcntl.h', 'dup2': 'fcntl.h',
             # signal.h
-            'signal', 'kill', 'raise', 'pause',
+            'signal': 'signal.h', 'kill': 'signal.h', 'raise': 'signal.h', 'pause': 'signal.h',
             # sys/stat.h
-            'stat', 'fstat', 'lstat', 'chmod', 'mkdir',
+            'stat': 'sys/stat.h', 'fstat': 'sys/stat.h', 'lstat': 'sys/stat.h', 
+            'chmod': 'sys/stat.h', 'mkdir': 'sys/stat.h',
             # time.h
-            'time', 'localtime', 'gmtime', 'strftime', 'clock',
+            'time': 'time.h', 'localtime': 'time.h', 'gmtime': 'time.h', 'strftime': 'time.h', 
+            'clock': 'time.h',
             # stdarg.h
-            'va_start', 'va_end', 'va_arg', 'va_copy',
+            'va_start': 'stdarg.h', 'va_end': 'stdarg.h', 'va_arg': 'stdarg.h', 'va_copy': 'stdarg.h',
             # math.h
-            'sin', 'cos', 'tan', 'sqrt', 'pow', 'abs', 'fabs',
+            'sin': 'math.h', 'cos': 'math.h', 'tan': 'math.h', 'sqrt': 'math.h', 'pow': 'math.h', 
+            'abs': 'math.h', 'fabs': 'math.h',
             # ctype.h
-            'isalpha', 'isdigit', 'isspace', 'tolower', 'toupper',
+            'isalpha': 'ctype.h', 'isdigit': 'ctype.h', 'isspace': 'ctype.h', 
+            'tolower': 'ctype.h', 'toupper': 'ctype.h',
+            # termios.h
+            'tcgetattr': 'termios.h', 'tcsetattr': 'termios.h',
+            # sys/ioctl.h
+            'ioctl': 'sys/ioctl.h',
         }
 
         # Pattern for implicit declaration error
@@ -535,13 +629,15 @@ class CImplicitDeclarationDetector(Detector):
                     context=context,
                     source_line=implicit_match.group(0)
                 ))
-            # Check if it's a known stdlib function - if so, it's likely missing include
-            elif function_name.lower() in stdlib_functions:
-                # Guess the header based on common patterns
-                # For a real solution, we could maintain a full mapping
-                print(f"[Detector] Note: '{function_name}' is likely from a stdlib header, not a project function")
-                # Skip this - don't create a clue since we can't determine the header without compiler hints
-                continue
+            # Check if it's a known stdlib function - if so, look it up in the mapping
+            elif function_name in stdlib_to_header:
+                context["suggested_include"] = stdlib_to_header[function_name]
+                clues.append(ErrorClue(
+                    clue_type="missing_c_include",
+                    confidence=0.95,
+                    context=context,
+                    source_line=implicit_match.group(0)
+                ))
             else:
                 # No include suggestion and not a stdlib function - likely a missing function definition
                 clues.append(ErrorClue(
@@ -618,16 +714,31 @@ class CUndeclaredIdentifierDetector(Detector):
         # Pattern: filename.c:line:col: error: 'identifier' undeclared (first use in this function)
         # Note: GCC may output fancy Unicode quotes (') so we need to match both ASCII and Unicode quotes
         
-        # Common stdlib constants/macros (uppercase names, usually from headers)
-        stdlib_constants = {
+        # Map stdlib constants/macros to their headers
+        stdlib_to_header = {
             # fcntl.h
-            'O_RDWR', 'O_RDONLY', 'O_WRONLY', 'O_CREAT', 'O_APPEND', 'O_EXCL', 'O_TRUNC',
+            'O_RDWR': 'fcntl.h', 'O_RDONLY': 'fcntl.h', 'O_WRONLY': 'fcntl.h', 
+            'O_CREAT': 'fcntl.h', 'O_APPEND': 'fcntl.h', 'O_EXCL': 'fcntl.h', 'O_TRUNC': 'fcntl.h',
+            'O_NONBLOCK': 'fcntl.h', 'O_NOCTTY': 'fcntl.h', 'O_SYNC': 'fcntl.h',
             # signal.h
-            'SIGTERM', 'SIGKILL', 'SIGUSR1', 'SIGUSR2', 'SIGINT', 'SIGSTOP',
+            'SIGTERM': 'signal.h', 'SIGKILL': 'signal.h', 'SIGUSR1': 'signal.h', 
+            'SIGUSR2': 'signal.h', 'SIGINT': 'signal.h', 'SIGSTOP': 'signal.h',
             # errno.h
-            'EACCES', 'ENOENT', 'EINVAL', 'EAGAIN', 'ENOMEM',
+            'EACCES': 'errno.h', 'ENOENT': 'errno.h', 'EINVAL': 'errno.h', 
+            'EAGAIN': 'errno.h', 'ENOMEM': 'errno.h',
             # sys/wait.h
-            'WIFEXITED', 'WEXITSTATUS', 'WIFSIGNALED', 'WTERMSIG',
+            'WIFEXITED': 'sys/wait.h', 'WEXITSTATUS': 'sys/wait.h', 
+            'WIFSIGNALED': 'sys/wait.h', 'WTERMSIG': 'sys/wait.h',
+            # unistd.h
+            'STDOUT_FILENO': 'unistd.h', 'STDIN_FILENO': 'unistd.h', 'STDERR_FILENO': 'unistd.h',
+            # termios.h
+            'TCSAFLUSH': 'termios.h', 'TCSANOW': 'termios.h', 'TCSADRAIN': 'termios.h',
+            'BRKINT': 'termios.h', 'ICRNL': 'termios.h', 'INPCK': 'termios.h', 
+            'ISTRIP': 'termios.h', 'IXON': 'termios.h',
+            'ECHO': 'termios.h', 'ICANON': 'termios.h', 'IEXTEN': 'termios.h', 'ISIG': 'termios.h',
+            'OPOST': 'termios.h', 'CS8': 'termios.h', 'VMIN': 'termios.h', 'VTIME': 'termios.h',
+            # sys/ioctl.h
+            'TIOCGWINSZ': 'sys/ioctl.h', 'TIOCSWINSZ': 'sys/ioctl.h',
         }
         
         undeclared_no_include_pattern = r"^([a-zA-Z0-9_./\-]+\.c):(\d+):\d+:\s+error:\s+['\u2018]([^'\u2019]+)['\u2019]\s+undeclared\s+\(first use"
@@ -647,12 +758,21 @@ class CUndeclaredIdentifierDetector(Detector):
                 for c in clues
             )
             
-            # Skip stdlib constants - these need headers, not function definitions
-            if identifier in stdlib_constants:
-                print(f"[Detector] Note: '{identifier}' is likely from a stdlib header, not a project function")
-                continue
-            
-            if not already_has_include:
+            # Check if this is a known stdlib constant/macro with a known header
+            if identifier in stdlib_to_header and not already_has_include:
+                header = stdlib_to_header[identifier]
+                clues.append(ErrorClue(
+                    clue_type="missing_c_include",
+                    confidence=0.95,
+                    context={
+                        "file_path": source_file,
+                        "line_number": line_number,
+                        "suggested_include": header,
+                    },
+                    source_line=match.group(0)
+                ))
+            elif not already_has_include and not identifier in stdlib_to_header:
+                # Not a stdlib constant - likely a missing function definition
                 clues.append(ErrorClue(
                     clue_type="missing_c_function",
                     confidence=0.8,
