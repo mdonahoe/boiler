@@ -1,7 +1,7 @@
 {
   "success": false,
   "files_modified": [],
-  "error_message": "All repair plans failed",
+  "error_message": "Could not fix all clues",
   "clues_detected": [
     {
       "clue_type": "permission_denied",
@@ -29,7 +29,8 @@
           "file_path": "./test.py"
         },
         "source_line": "Permission denied: './test.py'"
-      }
+      },
+      "clues_fixed_count": 1
     }
   ],
   "plans_attempted": []

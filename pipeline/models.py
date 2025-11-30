@@ -39,7 +39,8 @@ class RepairPlan:
     action: str  # "restore_full", "restore_symbol", "restore_permissions"
     params: T.Dict[str, T.Any]  # action-specific parameters
     reason: str  # human-readable explanation
-    clue_source: ErrorClue  # the clue that generated this plan
+    clue_source: ErrorClue  # the primary clue that generated this plan
+    clues_fixed: T.List[ErrorClue] = dataclasses.field(default_factory=list)  # all clues this plan might fix
 
     def __repr__(self) -> str:
         return f"RepairPlan(type={self.plan_type}, priority={self.priority}, action={self.action}, target={self.target_file})"
@@ -92,7 +93,8 @@ class RepairResult:
                         "confidence": p.clue_source.confidence,
                         "context": p.clue_source.context,
                         "source_line": p.clue_source.source_line
-                    } if p.clue_source else None
+                    } if p.clue_source else None,
+                    "clues_fixed_count": len(p.clues_fixed)
                 }
                 for p in (self.plans_generated or [])
             ],
@@ -108,7 +110,8 @@ class RepairResult:
                         "confidence": p.clue_source.confidence,
                         "context": p.clue_source.context,
                         "source_line": p.clue_source.source_line
-                    } if p.clue_source else None
+                    } if p.clue_source else None,
+                    "clues_fixed_count": len(p.clues_fixed)
                 }
                 for p in self.plans_attempted
             ]
