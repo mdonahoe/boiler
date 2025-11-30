@@ -19,14 +19,15 @@ class PermissionDeniedDetector(RegexDetector):
     """
 
     PATTERNS = {
-        "permission_denied": r"Permission denied:\s*['\"]?(?P<file_path>[^'\"]+)['\"]?",
+        "py_permission_denied": r"Permission denied:\s*['\"]?(?P<file_path>[^'\"]+)['\"]?",
+        "sh_permission_denied": r":\s*(?P<file_path>[^:]+):\s*Permission denied",
     }
 
     EXAMPLES = [
         (
             "PermissionError: [Errno 13] Permission denied: './test.py'",
             {
-                "clue_type": "permission_denied",
+                "clue_type": "py_permission_denied",
                 "confidence": 1.0,
                 "context": {"file_path": "./test.py"},
             },
@@ -34,8 +35,8 @@ class PermissionDeniedDetector(RegexDetector):
         (
             "/bin/sh: 1: ./testty.py: Permission denied",
             {
-                "clue_type": "permission_denied",
-                "confidence": 0.9,
+                "clue_type": "sh_permission_denied",
+                "confidence": 1.0,
                 "context": {"file_path": "./testty.py"},
             },
         ),

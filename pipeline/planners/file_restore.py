@@ -24,12 +24,12 @@ class PermissionFixPlanner(Planner):
         return "PermissionFixPlanner"
 
     def can_handle(self, clue_type: str) -> bool:
-        return clue_type == "permission_denied"
+        return clue_type.endswith("permission_denied")
 
     def plan(self, clues: T.List[ErrorClue], git_state: GitState) -> T.List[RepairPlan]:
         plans = []
         for clue in clues:
-            if clue.clue_type != "permission_denied":
+            if clue.clue_type.endswith("permission_denied"):
                 continue
 
             file_path = clue.context.get("file_path")

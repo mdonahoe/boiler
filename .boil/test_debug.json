@@ -4,7 +4,7 @@
   "error_message": "Could not fix all clues",
   "clues_detected": [
     {
-      "clue_type": "permission_denied",
+      "clue_type": "py_permission_denied",
       "confidence": 1.0,
       "context": {
         "file_path": "./test.py"
