@@ -122,17 +122,20 @@ class MakeNoRulePlanner(Planner):
         # Check for common Makefile names in deleted files
         makefile_names = ['Makefile', 'makefile', 'GNUmakefile']
 
-        for makefile in makefile_names:
-            if makefile in git_state.deleted_files:
-                print(f"[Planner:MakeNoRulePlanner] Found deleted {makefile}")
-                plans.append(RepairPlan(
-                    plan_type="restore_file",
-                    priority=0,  # High priority - Makefile needed for build
-                    target_file=makefile,
-                    action="restore_full",
-                    params={"ref": git_state.ref},
-                    reason=f"Restore {makefile} (no rule to make target '{clue.context.get('target')}')",
-                    clue_source=clue
-                ))
+        for makefile_name in makefile_names:
+            # Check both exact match and basename match
+            for deleted_file in git_state.deleted_files:
+                if deleted_file == makefile_name or os.path.basename(deleted_file) == makefile_name:
+                    print(f"[Planner:MakeNoRulePlanner] Found deleted {deleted_file}")
+                    plans.append(RepairPlan(
+                        plan_type="restore_file",
+                        priority=0,  # High priority - Makefile needed for build
+                        target_file=deleted_file,
+                        action="restore_full",
+                        params={"ref": git_state.ref},
+                        reason=f"Restore {deleted_file} (no rule to make target '{clue.context.get('target')}')",
+                        clue_source=clue
+                    ))
+                    break  # Only add one plan per makefile name
 
         return plans
