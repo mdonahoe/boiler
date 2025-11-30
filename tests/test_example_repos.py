@@ -29,12 +29,20 @@ class ExampleReposTest(unittest.TestCase):
 
     def test_simple_repo_boiling(self):
         """Test that the simple example repo can be boiled successfully"""
+        self._test_repo_boiling("simple")
+
+    def test_dim_repo_boiling(self):
+        """Test that the dim example repo can be boiled successfully"""
+        self._test_repo_boiling("dim")
+
+    def _test_repo_boiling(self, repo_name):
+        """Helper function to test boiling of a repo"""
         # Get the path to the boil script and example repo
         boiler_dir = os.path.dirname(os.path.dirname(__file__))
         boil_script = os.path.join(boiler_dir, "boil")
         # Use before/ folder - it contains the files that should be committed to git
         # After deletion, boiling should restore them
-        example_before_dir = os.path.join(boiler_dir, "example_repos", "simple", "before")
+        example_before_dir = os.path.join(boiler_dir, "example_repos", repo_name, "before")
 
         # Verify the example directory exists
         self.assertTrue(os.path.exists(example_before_dir),
@@ -62,18 +70,15 @@ class ExampleReposTest(unittest.TestCase):
                     shutil.copytree(src, dst)
 
             # Make scripts executable if needed
-            for item in ["simple", "simple.py"]:
-                item_path = os.path.join(tmpdir, item)
-                if os.path.exists(item_path):
-                    os.chmod(item_path, 0o755)
+            for item in os.listdir(example_before_dir):
+                if not item.startswith('.'):
+                    item_path = os.path.join(tmpdir, item)
+                    if os.path.isfile(item_path) and os.access(os.path.join(example_before_dir, item), os.X_OK):
+                        os.chmod(item_path, 0o755)
 
-            # Verify files were copied
+            # Verify Makefile was copied
             self.assertTrue(os.path.exists(os.path.join(tmpdir, "Makefile")),
-                          "Makefile should be copied")
-            self.assertTrue(os.path.exists(os.path.join(tmpdir, "simple.c")),
-                          "simple.c should be copied")
-            self.assertTrue(os.path.exists(os.path.join(tmpdir, "simple.py")),
-                          "simple.py should be copied")
+                          f"Makefile should be copied for {repo_name}")
 
             # Commit all files
             subprocess.run(["git", "add", "."], cwd=tmpdir, check=True, capture_output=True)
@@ -83,7 +88,7 @@ class ExampleReposTest(unittest.TestCase):
             # Verify the test works before deletion
             result = subprocess.run(["make", "test"], cwd=tmpdir, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0,
-                           f"Test should pass before deletion. Output:\n{result.stdout}\n{result.stderr}")
+                           f"Test should pass before deletion for {repo_name}. Output:\n{result.stdout}\n{result.stderr}")
 
             # Delete all files (but keep .git)
             for item in os.listdir(tmpdir):
@@ -95,13 +100,9 @@ class ExampleReposTest(unittest.TestCase):
                 elif os.path.isdir(item_path):
                     shutil.rmtree(item_path)
 
-            # Verify files are deleted
+            # Verify Makefile is deleted
             self.assertFalse(os.path.exists(os.path.join(tmpdir, "Makefile")),
-                           "Makefile should be deleted")
-            self.assertFalse(os.path.exists(os.path.join(tmpdir, "simple.c")),
-                           "simple.c should be deleted")
-            self.assertFalse(os.path.exists(os.path.join(tmpdir, "simple.py")),
-                           "simple.py should be deleted")
+                           f"Makefile should be deleted for {repo_name}")
 
             # Run boil to restore files
             boil_result = subprocess.run(
@@ -114,20 +115,16 @@ class ExampleReposTest(unittest.TestCase):
 
             # Check that boil succeeded
             self.assertEqual(boil_result.returncode, 0,
-                           f"Boil should succeed. Output:\n{boil_result.stdout}\n{boil_result.stderr}")
+                           f"Boil should succeed for {repo_name}. Output:\n{boil_result.stdout}\n{boil_result.stderr}")
 
-            # Verify files were restored
+            # Verify Makefile was restored
             self.assertTrue(os.path.exists(os.path.join(tmpdir, "Makefile")),
-                          "Makefile should be restored")
-            self.assertTrue(os.path.exists(os.path.join(tmpdir, "simple.c")),
-                          "simple.c should be restored")
-            self.assertTrue(os.path.exists(os.path.join(tmpdir, "simple.py")),
-                          "simple.py should be restored")
+                          f"Makefile should be restored for {repo_name}")
 
             # Verify the test passes after restoration
             final_result = subprocess.run(["make", "test"], cwd=tmpdir, capture_output=True, text=True)
             self.assertEqual(final_result.returncode, 0,
-                           f"Test should pass after restoration. Output:\n{final_result.stdout}\n{final_result.stderr}")
+                           f"Test should pass after restoration for {repo_name}. Output:\n{final_result.stdout}\n{final_result.stderr}")
 
 
 if __name__ == "__main__":
