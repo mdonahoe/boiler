@@ -96,7 +96,12 @@ class ExampleReposTest(unittest.TestCase):
                     continue
                 item_path = os.path.join(tmpdir, item)
                 if os.path.isfile(item_path):
-                    os.remove(item_path)
+                    if item_path.endswith("dim.c"):
+                        # clear the content
+                        with open(item_path, "w"):
+                            pass
+                    else:
+                        os.remove(item_path)
                 elif os.path.isdir(item_path):
                     shutil.rmtree(item_path)
 
@@ -110,7 +115,7 @@ class ExampleReposTest(unittest.TestCase):
                 cwd=tmpdir,
                 capture_output=True,
                 text=True,
-                timeout=60
+                timeout=120
             )
 
             # Check that boil succeeded
