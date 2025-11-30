@@ -34,12 +34,20 @@ class MissingPythonCodePlanner(Planner):
 
     def _plan_for_clue(self, clue: ErrorClue, git_state: GitState) -> T.List[RepairPlan]:
         file_path = clue.context.get("file_path")
-        element_name = clue.context.get("element_name")
         missing_element = clue.context.get("missing_element")
 
-        if not file_path or not element_name:
-            print(f"[Planner:MissingPythonCodePlanner] Missing file_path or element_name")
+        if not file_path or not missing_element:
+            print(f"[Planner:MissingPythonCodePlanner] Missing file_path or missing_element")
             return []
+
+        # Extract element_name and element_type from missing_element
+        # missing_element is like "def foo", "class Bar", "import baz"
+        parts = missing_element.split(None, 1)
+        if len(parts) < 2:
+            return []
+        element_type = parts[0]  # "def", "class", or "import"
+        # Extract just the name (handle "def foo()" -> "foo")
+        element_name = parts[1].split('(')[0].strip()
 
         # Make path relative if it's absolute
         if os.path.isabs(file_path):
@@ -65,10 +73,10 @@ class MissingPythonCodePlanner(Planner):
                 params={
                     "ref": git_state.ref,
                     "element_name": element_name,
-                    "element_type": clue.context.get("element_type", "def"),
+                    "element_type": element_type,
                     "missing_element": missing_element
                 },
-                reason=f"Missing {clue.context.get('element_type', 'code')} '{element_name}' in {file_path}",
+                reason=f"Missing {element_type} '{element_name}' in {file_path}",
                 clue_source=clue
             )
         ]

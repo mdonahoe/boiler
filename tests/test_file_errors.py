@@ -94,7 +94,6 @@ compilation terminated."""
         self.assertGreater(len(result.clues_detected), 0, "Should have at least one clue")
         self.assertEqual(result.clues_detected[0].clue_type, "missing_file")
         self.assertEqual(result.clues_detected[0].context["file_path"], "ex.h")
-        self.assertEqual(result.clues_detected[0].context.get("is_header"), True)
 
 
 if __name__ == "__main__":

@@ -30,7 +30,6 @@ compilation terminated."""
         self.assertEqual(len(clues), 1)
         self.assertEqual(clues[0].clue_type, "missing_file")
         self.assertEqual(clues[0].context["file_path"], "point.h")
-        self.assertTrue(clues[0].context["is_header"])
 
     def test_detect_with_source_context(self):
         """Test that detector extracts source file context"""
@@ -39,13 +38,11 @@ lib/src/node.c:2:10: fatal error: ./point.h: No such file or directory
     2 | #include "./point.h"
       |          ^~~~~~~~~~~
 compilation terminated."""
-        
+
         clues = self.detector.detect(err)
         self.assertEqual(len(clues), 1)
-        self.assertIn("source_file", clues[0].context)
-        self.assertEqual(clues[0].context["source_file"], "lib/src/node.c")
-        self.assertIn("source_dir", clues[0].context)
-        self.assertEqual(clues[0].context["source_dir"], "lib/src")
+        # Simplified detector now only extracts file_path
+        self.assertEqual(clues[0].context["file_path"], "point.h")
 
     def test_detect_with_relative_path(self):
         """Test detection with ./ prefix"""
@@ -68,30 +65,30 @@ class TestCLinkerErrorDetector(unittest.TestCase):
 tree_print.c:(.text+0x28a): undefined reference to `ts_parser_new'
 /usr/bin/ld: tree_print.c:(.text+0x2f1): undefined reference to `ts_parser_set_language'
 collect2: error: ld returned 1 exit status"""
-        
+
         clues = self.detector.detect(err)
-        self.assertEqual(len(clues), 1)
+        self.assertEqual(len(clues), 2)  # Now emits one clue per symbol
         self.assertEqual(clues[0].clue_type, "linker_undefined_symbols")
-        self.assertIn("ts_parser_new", clues[0].context["symbols"])
-        self.assertIn("ts_parser_set_language", clues[0].context["symbols"])
+        self.assertEqual(clues[1].clue_type, "linker_undefined_symbols")
+        symbols = [clues[0].context["symbol"], clues[1].context["symbol"]]
+        self.assertIn("ts_parser_new", symbols)
+        self.assertIn("ts_parser_set_language", symbols)
 
     def test_detect_missing_library(self):
-        """Test detection of missing library errors"""
+        """Test detection of missing library errors - now handled by general file detectors"""
         err = """/usr/bin/ld: cannot find -lsomelibrary: No such file or directory"""
-        
+
         clues = self.detector.detect(err)
-        self.assertEqual(len(clues), 1)
-        self.assertEqual(clues[0].clue_type, "missing_library")
-        self.assertEqual(clues[0].context["library"], "-lsomelibrary")
+        # This pattern is no longer detected by CLinkerErrorDetector
+        self.assertEqual(len(clues), 0)
 
     def test_detect_missing_object_file(self):
-        """Test detection of missing object file errors"""
+        """Test detection of missing object file errors - now handled by general file detectors"""
         err = """/usr/bin/ld: cannot find exrecover.o: No such file or directory"""
-        
+
         clues = self.detector.detect(err)
-        self.assertEqual(len(clues), 1)
-        self.assertEqual(clues[0].clue_type, "missing_object_file")
-        self.assertEqual(clues[0].context["object_file"], "exrecover.o")
+        # This pattern is no longer detected by CLinkerErrorDetector
+        self.assertEqual(len(clues), 0)
 
 
 class TestMissingFilePlanner(unittest.TestCase):
@@ -132,14 +129,12 @@ class TestFopenErrorDetector(unittest.TestCase):
         self.detector = FopenNoSuchFileDetector()
 
     def test_detect_assertion_error_with_fopen(self):
-        """Test detection of AssertionError with fopen error"""
+        """Test detection of AssertionError with fopen error - no longer supported"""
         err = """AssertionError: 'example.py' not found in 'fopen: No such file or directory' : Should show the filename"""
-        
+
         clues = self.detector.detect(err)
-        self.assertEqual(len(clues), 1)
-        self.assertEqual(clues[0].clue_type, "missing_file")
-        self.assertEqual(clues[0].context["file_path"], "example.py")
-        self.assertGreaterEqual(clues[0].confidence, 0.9)
+        # Simplified detector no longer handles assertion patterns
+        self.assertEqual(len(clues), 0)
 
     def test_detect_simple_fopen_error(self):
         """Test detection of simple fopen error with filename"""
@@ -150,14 +145,13 @@ class TestFopenErrorDetector(unittest.TestCase):
         self.assertEqual(clues[0].context["file_path"], "config.txt")
 
     def test_detect_fallback_py_file(self):
-        """Test fallback detection when filename not explicit"""
+        """Test fallback detection when filename not explicit - no longer supported"""
         err = """Test failure: Expected 'def test_function' in 'test.py'
 fopen: No such file or directory"""
-        
+
         clues = self.detector.detect(err)
-        # Should find test.py file from quoted context
-        self.assertGreater(len(clues), 0)
-        self.assertEqual(clues[0].context["file_path"], "test.py")
+        # Simplified detector no longer handles fallback/inference
+        self.assertEqual(len(clues), 0)
 
 
 class TestLinkerUndefinedSymbolsPlanner(unittest.TestCase):

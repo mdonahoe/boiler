@@ -29,7 +29,7 @@ class PermissionFixPlanner(Planner):
     def plan(self, clues: T.List[ErrorClue], git_state: GitState) -> T.List[RepairPlan]:
         plans = []
         for clue in clues:
-            if clue.clue_type.endswith("permission_denied"):
+            if not clue.clue_type.endswith("permission_denied"):
                 continue
 
             file_path = clue.context.get("file_path")
@@ -202,15 +202,25 @@ class LinkerUndefinedSymbolsPlanner(Planner):
         return clue_type == "linker_undefined_symbols"
 
     def plan(self, clues: T.List[ErrorClue], git_state: GitState) -> T.List[RepairPlan]:
-        plans = []
+        # Collect all symbols from all clues (detectors now emit one clue per symbol)
+        symbols = []
+        linker_clue = None
         for clue in clues:
             if clue.clue_type != "linker_undefined_symbols":
                 continue
-            plans.extend(self._plan_for_clue(clue, git_state))
-        return plans
+            linker_clue = clue
+            # Handle both old format (symbols list) and new format (single symbol)
+            if "symbols" in clue.context:
+                symbols.extend(clue.context["symbols"])
+            elif "symbol" in clue.context:
+                symbols.append(clue.context["symbol"])
 
-    def _plan_for_clue(self, clue: ErrorClue, git_state: GitState) -> T.List[RepairPlan]:
-        symbols = clue.context.get("symbols", [])
+        if not symbols or not linker_clue:
+            return []
+
+        return self._plan_for_clue(symbols, linker_clue, git_state)
+
+    def _plan_for_clue(self, symbols: T.List[str], clue: ErrorClue, git_state: GitState) -> T.List[RepairPlan]:
         if not symbols:
             return []
 
