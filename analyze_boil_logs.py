@@ -144,6 +144,12 @@ def analyze_legacy_usage():
     error_types_not_detected = defaultdict(list)
     failure_reasons = Counter()
 
+    # New trackers for enhanced output
+    all_plans_attempted = []
+    files_repaired_by_iteration = {}
+    file_line_ratios = {}  # Track line_ratio per file per iteration
+    test_command = None
+
     # Analyze each file
     for json_file in sorted(json_files):
         path = os.path.join(boil_dir, json_file)
@@ -154,6 +160,37 @@ def analyze_legacy_usage():
         except Exception as e:
             print(f"Warning: Could not read {json_file}: {e}")
             continue
+
+        # Extract iteration number
+        iter_match = re.match(r"iter(\d+)\.pipeline\.json", json_file)
+        iter_num = int(iter_match.group(1)) if iter_match else None
+
+        # Capture test command (should be same across all iterations)
+        if data.get("command") and not test_command:
+            test_command = data.get("command")
+
+        # Track files repaired in this iteration
+        files_modified = data.get("files_modified", [])
+        if files_modified and iter_num is not None:
+            files_repaired_by_iteration[iter_num] = files_modified
+
+        # Track line_ratio for partial files
+        partial_files = data.get("partial_files", [])
+        for pf in partial_files:
+            file_name = pf.get("file")
+            line_ratio = pf.get("line_ratio")
+            if file_name and line_ratio and iter_num is not None:
+                if file_name not in file_line_ratios:
+                    file_line_ratios[file_name] = {}
+                file_line_ratios[file_name][iter_num] = line_ratio
+
+        # Track plans attempted in this iteration
+        plans_attempted = data.get("plans_attempted", [])
+        for plan in plans_attempted:
+            all_plans_attempted.append({
+                "iteration": iter_num,
+                "plan": plan
+            })
 
         # Count pipeline success/failure
         if data.get("success"):
@@ -234,6 +271,98 @@ def analyze_legacy_usage():
             print()
     else:
         print("No legacy handlers needed - pipeline is handling everything!")
+    print()
+
+    # Print test command
+    if test_command:
+        print("=" * 80)
+        print("TEST COMMAND")
+        print("=" * 80)
+        print(f"  {test_command}")
+        print()
+
+    # Print files repaired over the course of boiling
+    print("=" * 80)
+    print("FILES REPAIRED BY ITERATION")
+    print("=" * 80)
+    if files_repaired_by_iteration:
+        # Collect all unique files
+        all_files_repaired = set()
+        for iter_num in sorted(files_repaired_by_iteration.keys()):
+            files = files_repaired_by_iteration[iter_num]
+            for f in files:
+                all_files_repaired.add(f)
+
+        # Print iteration-by-iteration with line ratios
+        for iter_num in sorted(files_repaired_by_iteration.keys()):
+            files = files_repaired_by_iteration[iter_num]
+
+            # For each file, show line ratio if available
+            file_info_parts = []
+            for f in files:
+                if f in file_line_ratios and iter_num in file_line_ratios[f]:
+                    line_ratio = file_line_ratios[f][iter_num]
+
+                    # Parse line_ratio to calculate lines added
+                    match = re.match(r"(\d+)/(\d+)", line_ratio)
+                    if match:
+                        current_lines = int(match.group(1))
+                        total_lines = int(match.group(2))
+
+                        # Calculate lines added from previous iteration
+                        prev_lines = None
+                        for prev_iter in range(iter_num - 1, 0, -1):
+                            if f in file_line_ratios and prev_iter in file_line_ratios[f]:
+                                prev_ratio = file_line_ratios[f][prev_iter]
+                                prev_match = re.match(r"(\d+)/(\d+)", prev_ratio)
+                                if prev_match:
+                                    prev_lines = int(prev_match.group(1))
+                                    break
+
+                        if prev_lines is not None:
+                            lines_added = current_lines - prev_lines
+                            file_info_parts.append(f"{f} ({line_ratio}, +{lines_added} lines)")
+                        else:
+                            file_info_parts.append(f"{f} ({line_ratio})")
+                    else:
+                        file_info_parts.append(f"{f} ({line_ratio})")
+                else:
+                    file_info_parts.append(f)
+
+            print(f"  Iteration {iter_num:2}: {', '.join(file_info_parts)}")
+
+        print()
+        print(f"Total unique files repaired: {len(all_files_repaired)}")
+        print(f"Files: {', '.join(sorted(all_files_repaired))}")
+    else:
+        print("  (no files were modified)")
+    print()
+
+    # Print all plans attempted
+    print("=" * 80)
+    print("ALL PLANS ATTEMPTED")
+    print("=" * 80)
+    if all_plans_attempted:
+        print(f"Total plans attempted: {len(all_plans_attempted)}\n")
+
+        # Group by iteration
+        for iter_num in sorted(set(p["iteration"] for p in all_plans_attempted if p["iteration"] is not None)):
+            iter_plans = [p for p in all_plans_attempted if p["iteration"] == iter_num]
+            print(f"Iteration {iter_num}:")
+            for p in iter_plans:
+                plan = p["plan"]
+                plan_type = plan.get("plan_type", "unknown")
+                target_file = plan.get("target_file", "unknown")
+                action = plan.get("action", "unknown")
+                reason = plan.get("reason", "")
+
+                print(f"  - [{plan_type}] {target_file}")
+                print(f"    Action: {action}")
+                if reason:
+                    print(f"    Reason: {reason}")
+            print()
+    else:
+        print("  (no plans were attempted)")
     print()
 
     return 0
