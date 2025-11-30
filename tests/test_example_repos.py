@@ -31,6 +31,7 @@ class ExampleReposTest(unittest.TestCase):
         """Test that the simple example repo can be boiled successfully"""
         self._test_repo_boiling("simple")
 
+    @unittest.skipIf(os.environ.get('SKIP_SLOW_TESTS') == '1', "Slow test skipped")
     def test_dim_repo_boiling(self):
         """Test that the dim example repo can be boiled successfully"""
         self._test_repo_boiling("dim")
