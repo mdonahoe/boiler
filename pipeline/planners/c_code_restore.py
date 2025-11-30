@@ -102,6 +102,18 @@ class MissingCIncludePlanner(Planner):
             print(f"[Planner:MissingCIncludePlanner] No suggested include for {function_name}, skipping")
             return []
 
+        # Check if the include is already present in the file
+        try:
+            with open(file_path, 'r') as f:
+                content = f.read()
+                # Check for both <header.h> and "header.h" styles
+                if f'#include <{suggested_include}>' in content or f'#include "{suggested_include}"' in content:
+                    print(f"[Planner:MissingCIncludePlanner] Include <{suggested_include}> already present in {file_path}, skipping")
+                    return []
+        except Exception as e:
+            print(f"[Planner:MissingCIncludePlanner] Error reading {file_path}: {e}")
+            return []
+
         print(f"[Planner:MissingCIncludePlanner] Planning to restore '#include <{suggested_include}>' to {file_path}")
 
         return [RepairPlan(
