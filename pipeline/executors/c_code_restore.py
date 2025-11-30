@@ -73,13 +73,12 @@ class CCodeRestoreExecutor(Executor):
             # 3. Checking here would prevent legitimate repairs
 
             # Use src_repair.repair() directly
-            # This will restore the file with all existing code elements PLUS the missing element
+            # For C includes, src_repair now preserves all existing includes while adding the missing one
             abs_path = os.path.abspath(file_path)
             git_toplevel = self._get_git_toplevel()
             git_relative_path = os.path.relpath(abs_path, git_toplevel)
 
             # Call src_repair.repair() with the missing element
-            # This preserves the current file's structure and only adds the missing code
             repair(file_path, ref, missing=element_name, verbose=False)
 
             # Verify the file actually changed

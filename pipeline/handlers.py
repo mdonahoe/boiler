@@ -20,6 +20,7 @@ from pipeline.detectors.file_errors import (
     DiffNoSuchFileDetector,
     CCompilationErrorDetector,
     CLinkerErrorDetector,
+    CIncompleteTypeDetector,
     CImplicitDeclarationDetector,
     CUndeclaredIdentifierDetector,
 )
@@ -63,6 +64,7 @@ def register_all_handlers():
     register_detector(DiffNoSuchFileDetector())
     register_detector(CLinkerErrorDetector())
     register_detector(CCompilationErrorDetector())
+    register_detector(CIncompleteTypeDetector())
     register_detector(CImplicitDeclarationDetector())
     register_detector(CUndeclaredIdentifierDetector())
 

@@ -6,15 +6,105 @@ Usage:
     python3 analyze_boil_logs.py
 
 This will scan all .boil/iter*.pipeline.json files and show:
-1. Which legacy handlers are used most often
-2. Which errors the pipeline successfully handles
-3. Migration priority recommendations
+1. Overall boil session status (succeeded, stuck, or in progress)
+2. Which legacy handlers are used most often
+3. Which errors the pipeline successfully handles
+4. Migration priority recommendations
 """
 
 import json
 import os
 import sys
+import re
 from collections import Counter, defaultdict
+from datetime import datetime
+
+
+def get_session_status():
+    """Determine if the boil session succeeded, is stuck, or still in progress"""
+    boil_dir = ".boil"
+    
+    # Check for completion marker
+    completed_file = os.path.join(boil_dir, "completed")
+    if os.path.exists(completed_file):
+        try:
+            with open(completed_file, "r") as f:
+                result = f.read().strip()
+                return f"✓ SUCCEEDED", result
+        except:
+            return "✓ SUCCEEDED", "Unknown"
+    
+    # Get all iteration numbers to detect infinite loops
+    json_files = sorted([
+        f for f in os.listdir(boil_dir)
+        if re.match(r"iter\d+\.pipeline\.json", f)
+    ])
+    
+    if not json_files:
+        return "? UNKNOWN", "No pipeline files found"
+    
+    # Extract iteration numbers
+    iterations = []
+    for f in json_files:
+        match = re.match(r"iter(\d+)\.pipeline\.json", f)
+        if match:
+            iterations.append(int(match.group(1)))
+    
+    if not iterations:
+        return "? UNKNOWN", "Could not parse iteration numbers"
+    
+    iterations.sort()
+    max_iter = iterations[-1]
+    
+    # Check if any recent iteration succeeded (could indicate success, then retried and failed)
+    # Check backwards from max_iter to handle cases where boil succeeded then continued
+    for i in range(max_iter, max(0, max_iter - 10), -1):
+        last_json = os.path.join(boil_dir, f"iter{i}.pipeline.json")
+        if os.path.exists(last_json):
+            try:
+                with open(last_json, "r") as f:
+                    data = json.load(f)
+                    if data.get("success"):
+                        if i == max_iter:
+                            return "✓ SUCCEEDED", f"Completed successfully at iteration {i}"
+                        else:
+                            return "✓ SUCCEEDED", f"Completed successfully at iteration {i} (retried but failed at {max_iter})"
+            except:
+                pass
+    
+    # Check if stuck in a loop (many iterations with similar failures)
+    if max_iter > 20:
+        # Likely stuck - check if recent iterations are failing the same way
+        recent_failures = []
+        for i in range(max(1, max_iter - 5), max_iter + 1):
+            path = os.path.join(boil_dir, f"iter{i}.pipeline.json")
+            if os.path.exists(path):
+                try:
+                    with open(path, "r") as f:
+                        data = json.load(f)
+                        if not data.get("success"):
+                            error_msg = data.get("error_message", "unknown")
+                            recent_failures.append(error_msg)
+                except:
+                    pass
+        
+        if recent_failures and len(set(recent_failures)) <= 2:
+            return "⚠ STUCK", f"Max {max_iter} iterations reached with repeating failures"
+        else:
+            return "⚠ STUCK", f"Max {max_iter} iterations (likely infinite loop)"
+    
+    # If we haven't found a success, check the last iteration for detailed status
+    last_json = os.path.join(boil_dir, f"iter{max_iter}.pipeline.json")
+    if os.path.exists(last_json):
+        try:
+            with open(last_json, "r") as f:
+                data = json.load(f)
+                error = data.get("error_message", "unknown")
+                return "⏳ IN PROGRESS", f"Iteration {max_iter}: {error}"
+        except:
+            return "? UNKNOWN", f"Could not read iter{max_iter}.pipeline.json"
+    
+    return "⏳ IN PROGRESS", f"Iterations {min(iterations)}-{max_iter} completed"
 
 
 def analyze_legacy_usage():
@@ -26,6 +116,15 @@ def analyze_legacy_usage():
         print(f"No {boil_dir} directory found. Run boil.py first.")
         return 1
 
+    # Print session status first
+    print("=" * 80)
+    print("BOIL SESSION STATUS")
+    print("=" * 80)
+    status, details = get_session_status()
+    print(f"{status}")
+    print(f"Details: {details}")
+    print()
+
     json_files = [
         f for f in os.listdir(boil_dir)
         if f.endswith(".pipeline.json")
@@ -35,7 +134,7 @@ def analyze_legacy_usage():
         print(f"No pipeline JSON files found in {boil_dir}")
         return 1
 
-    print(f"Found {len(json_files)} pipeline JSON files\n")
+    print(f"Found {len(json_files)} pipeline iterations\n")
 
     # Counters
     legacy_handler_usage = Counter()
@@ -43,6 +142,7 @@ def analyze_legacy_usage():
     pipeline_failures = 0
     error_types_detected = Counter()
     error_types_not_detected = defaultdict(list)
+    failure_reasons = Counter()
 
     # Analyze each file
     for json_file in sorted(json_files):
@@ -60,6 +160,9 @@ def analyze_legacy_usage():
             pipeline_successes += 1
         else:
             pipeline_failures += 1
+            # Track failure reasons
+            error_msg = data.get("error_message", "unknown error")
+            failure_reasons[error_msg] += 1
 
         # Count clue types detected
         for clue in data.get("clues_detected", []):
@@ -86,6 +189,14 @@ def analyze_legacy_usage():
         success_rate = pipeline_successes / (pipeline_successes + pipeline_failures) * 100
         print(f"Success rate:       {success_rate:.1f}%")
     print()
+
+    if failure_reasons:
+        print("=" * 80)
+        print("FAILURE REASONS (Most Common)")
+        print("=" * 80)
+        for reason, count in failure_reasons.most_common(5):
+            print(f"  [{count}x] {reason}")
+        print()
 
     print("=" * 80)
     print("ERROR TYPES DETECTED BY PIPELINE")
