@@ -58,13 +58,15 @@ Boil.py creates a branch called `boiling` to track its progress:
 - Each fix attempt is a separate commit
 - Inspect history: `git log boiling`
 - Use `--abort` to clean up and restore original state
-- If boiling succeeds, use `--clear` to just delete the .boil directory and `boiling` branch, leaving the working directory as-is.
+- If boiling succeeds, use `--finish` to delete the .boil directory and `boiling` branch, leaving the working directory as-is.
 
 ## Command Line Options
 
 - `-n <number>`: Maximum number of iterations (default: unlimited)
 - `--ref <commit>`: Git reference to restore code from (default: HEAD)
 - `--abort`: Abort current boiling session and restore working directory
+- `--check`: Analyze current boil session and show status/statistics
+- `--check --debug-iterations START-END`: Show detailed plan info for specific iterations
 
 ## The Pipeline System
 
@@ -118,7 +120,8 @@ boil python3 -m pytest
 2. **Start small**: Use `-n 5` when testing to avoid long loops
 3. **Check the boiling branch**: `git log boiling` shows what was restored
 4. **Use --abort liberally**: Don't be afraid to abort and try again
-5. **Check .boil/ directory**: Contains debug output from each iteration
+5. **Check session status**: Use `boil --check` to see what was fixed and what failed
+6. **Check .boil/ directory**: Contains debug output from each iteration
 
 ## Troubleshooting
 

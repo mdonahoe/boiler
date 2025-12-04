@@ -63,7 +63,7 @@ Error message formats differ between shells:
 - bash: `./script.sh: line 2: ./cmd: No such file or directory`
 
 ### 5. Robustness of --clear
-Fixed `boil --clear` to not crash when the boiling branch doesn't exist. Used `subprocess.run()` with `capture_output=True` instead of `check_call()`.
+Fixed `boil --finish` to not crash when the boiling branch doesn't exist. Used `subprocess.run()` with `capture_output=True` instead of `check_call()`.
 
 ## Test Command
 

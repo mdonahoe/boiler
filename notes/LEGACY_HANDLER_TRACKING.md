@@ -40,10 +40,10 @@ When a legacy handler is used, you'll see:
 
 ## Analysis Tool
 
-Use `analyze_boil_logs.py` to see which handlers are used most frequently:
+Use `boil --check` to see which handlers are used most frequently:
 
 ```bash
-python3 analyze_boil_logs.py
+boil --check
 ```
 
 ### Example Output
@@ -106,7 +106,7 @@ Based on the analysis, migrate handlers in this order:
 ## Example Workflow
 
 1. Run your test suite through `boil.py`
-2. Analyze the results: `python3 analyze_boil_logs.py`
+2. Analyze the results: `boil --check`
 3. Migrate the top 3 legacy handlers
 4. Run the test suite again
 5. See improved success rate!
@@ -144,7 +144,7 @@ debug_data["legacy_handler_used"] = legacy_handler_used  # <-- Add to JSON
 
 After running your test suite through `boil.py`:
 
-1. Run `python3 analyze_boil_logs.py`
+1. Run `boil --check`
 2. Identify the top 5 most-used legacy handlers
 3. Check which ones are similar (e.g., all Python errors)
 4. Migrate them together as a group

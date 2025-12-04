@@ -15,6 +15,7 @@ from session import ctx, new_session
 from pipeline import run_pipeline, GitState, has_pipeline_handlers
 from pipeline.handlers import register_all_handlers
 
+from analyze_boil_logs import analyze_legacy_usage, debug_iterations
 """
 git branch "boiling"
 cp .git/index .git/boil.index
@@ -319,7 +320,7 @@ def has_changes(verbose:bool=False) -> bool:
 
     return changed
 
-def clear_boiling() -> int:
+def finish_boiling() -> int:
     """
     Delete the boiling branch and the .boil folder
     Does not otherwise change the working directory
@@ -409,7 +410,7 @@ def main() -> int:
         help="abort current boiling session and restore working directory",
     )
     parser.add_argument(
-        "--clear",
+        "--finish",
         action="store_true",
         help="remove the boiling branch and folder but not the working directory state",
     )
@@ -418,6 +419,18 @@ def main() -> int:
         type=str,
         default=None,
         help="path to pre-existing command output for error analysis",
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="analyze the current boil session and show status/statistics",
+    )
+    parser.add_argument(
+        "--debug-iterations",
+        type=str,
+        default=None,
+        help="debug specific iterations when using --check (e.g., 3-9)",
+        metavar="START-END"
     )
     parser.add_argument(
         "--test-detectors",
@@ -433,8 +446,20 @@ def main() -> int:
     if args.abort:
         return abort_boiling()
 
-    if args.clear:
-        return clear_boiling()
+    if args.finish:
+        return finish_boiling()
+
+    # Handle check command (analyze boil session)
+    if args.check:
+        if args.debug_iterations:
+            try:
+                start, end = map(int, args.debug_iterations.split('-'))
+                debug_iterations(start, end)
+            except ValueError:
+                print("Error: --debug-iterations must be in format START-END (e.g., 3-9)")
+                return 1
+        else:
+            return analyze_legacy_usage()
 
     # Handle test-detectors command
     if args.test_detectors:

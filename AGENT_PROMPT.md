@@ -13,7 +13,7 @@ Analyze the debugging information in [TARGET_REPO]/.boil/ and improve boiler to 
 
 1. **Analyze the errors**
    - The user has likely run into an issue and is asking for your help to improve boiler until it can repair the target repo.
-   - Run `~/boiler/analyze_boil_logs.py` from within the target repo to check the status of the current boiling session. This will give you a summary.
+   - Run `boil --check` from within the target repo to check the status of the current boiling session. This will give you a summary.
    - For full details, read all JSON files in [TARGET_REPO]/.boil/ (especially iter*.pipeline.json)
    - Look for errors where boiler was unable to handle a particular error, and see if you can write a new detector or planner to handle it.
    - For each error type, understand:
