@@ -3,6 +3,8 @@
 Analyze an active boil session in the current working directory.
 
 Usage:
+    boil --check [--debug-iterations START-END]
+    # OR
     python3 analyze_boil_logs.py [--debug-iterations START-END]
 
 This will scan all .boil/iter*.pipeline.json files and show:

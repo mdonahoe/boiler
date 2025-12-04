@@ -170,5 +170,5 @@ To reach 100% coverage in the heirloom-ex-vi test, analyze the remaining 2 itera
 Run analysis again:
 ```bash
 cd /root/dim/heirloom-ex-vi
-python3 /root/boiler/analyze_boil_logs.py
+boil --check
 ```

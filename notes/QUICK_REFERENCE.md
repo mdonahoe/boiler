@@ -11,7 +11,7 @@ pipeline/                           # New 3-stage system
 ├── planners/                       # Stage 2
 └── executors/                      # Stage 3
 
-analyze_boil_logs.py          # Analysis tool
+boil --check                  # Analyze boil session status
 test_pipeline.py                    # Tests
 test_legacy_tracking.py             # Tests
 ```
@@ -61,10 +61,10 @@ test_legacy_tracking.py             # Tests
 
 ```bash
 # Run boil with new pipeline
-python3 boil.py -n 10 ./my_test_command
+boil -n 10 ./my_test_command
 
 # Analyze legacy handler usage
-python3 analyze_boil_logs.py
+boil --check
 
 # View debug JSON (requires jq)
 cat .boil/iter1.pipeline.json | jq .
@@ -114,7 +114,7 @@ grep -o '"success": [^,]*' .boil/iter*.pipeline.json | cut -d' ' -f2 | sort | un
 After running your test suite:
 
 ```bash
-$ python3 analyze_boil_logs.py
+$ boil --check
 ```
 
 Output shows:
@@ -126,8 +126,8 @@ Output shows:
 
 ## Next Steps
 
-1. **Run test suite**: `python3 boil.py -n 50 ./my_tests`
-2. **Analyze results**: `python3 analyze_boil_logs.py`
+1. **Run test suite**: `boil -n 50 ./my_tests`
+2. **Analyze results**: `boil --check`
 3. **Migrate top handlers**: Use MIGRATION_GUIDE.md
 4. **Re-run**: See improvement in success rate
 
