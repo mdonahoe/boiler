@@ -34,10 +34,11 @@ from pipeline.planners.file_restore import PermissionFixPlanner, MissingFilePlan
 from pipeline.planners.make_restore import MakeMissingTargetPlanner, MakeNoRulePlanner
 from pipeline.planners.python_code_restore import MissingPythonCodePlanner, PythonNameErrorPlanner
 from pipeline.planners.c_code_restore import MissingCIncludePlanner, MissingCFunctionPlanner
-from pipeline.planners.test_failures import TestFailurePlanner
+from pipeline.planners.test_failures import TestFailurePlanner, UnwantedContentPlanner
 from pipeline.executors.git_restore import GitRestoreExecutor
 from pipeline.executors.python_code_restore import PythonCodeRestoreExecutor
 from pipeline.executors.c_code_restore import CCodeRestoreExecutor
+from pipeline.executors.file_edit import RemoveMatchingLinesExecutor
 
 
 # Track if handlers have been registered
@@ -87,11 +88,13 @@ def register_all_handlers():
     register_planner(MissingCIncludePlanner())
     register_planner(MissingCFunctionPlanner())
     register_planner(TestFailurePlanner())
+    register_planner(UnwantedContentPlanner())
 
     # Register executors
     register_executor(PythonCodeRestoreExecutor())
     register_executor(CCodeRestoreExecutor())
     register_executor(GitRestoreExecutor())
+    register_executor(RemoveMatchingLinesExecutor())
 
     _handlers_registered = True
 

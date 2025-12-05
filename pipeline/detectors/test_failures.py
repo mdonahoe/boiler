@@ -11,16 +11,19 @@ from pipeline.models import ErrorClue
 class TestFailureDetector(RegexDetector):
     """
     Detect test failures and extract test file paths and suspected filenames.
-    
+
     Matches patterns like:
     - unittest tracebacks with file paths and line numbers
     - AssertionError messages that mention filenames
     - Test failure output that indicates missing files
+    - git grep test failures showing unwanted content in files
     """
 
     PATTERNS = {
         "test_failure": r"File\s+['\"](?P<test_file>[^'\"]+\.py)['\"],\s+line\s+(?P<line_number>\d+),\s+in\s+(?P<test_name>\w+)",
         "test_assertion_with_filename": r"AssertionError:\s*['\"](?P<suspected_file>[^'\"]+\.(?:py|txt|md|c|h|cpp|hpp|json|yaml|yml|sh))['\"].*?not found",
+        # Capture the git grep failure including the output lines that follow
+        "git_grep_test_failure": r"Testing:\s+(?P<test_name>[^.]+)\.\.\.\s+FAIL\s+\((?P<keyword>\w+)\s+found\s+in\s+(?P<search_path>[^)]+)\)(?P<output_section>(?:\s*Found [^:]+:)?(?:\s*[^\n]+:\s*[^\n]+)*)",
     }
 
     EXAMPLES = [
@@ -40,62 +43,23 @@ class TestFailureDetector(RegexDetector):
             "AssertionError: 'hello_world.txt' not found in 'fopen: No such file or directory'",
             {
                 "clue_type": "test_assertion_with_filename",
-                "confidence": 0.9,
+                "confidence": 1.0,
                 "context": {
                     "suspected_file": "hello_world.txt",
                 },
             },
         ),
-    ]
-
-    def detect(self, stderr: str, stdout: str = "") -> T.List[ErrorClue]:
-        """
-        Detect test failures and extract test file information.
-        """
-        combined = stderr + "\n" + stdout
-        clues = []
-        
-        # First, find all test failures with file paths
-        test_failures = {}
-        for match in re.finditer(self.PATTERNS["test_failure"], combined, re.MULTILINE):
-            test_file = match.group("test_file")
-            line_number = match.group("line_number")
-            test_name = match.group("test_name")
-            
-            # Make path relative if absolute
-            if "/" in test_file:
-                test_file = test_file.split("/")[-1]  # Just filename for now
-            
-            key = (test_file, line_number)
-            if key not in test_failures:
-                test_failures[key] = {
-                    "test_file": test_file,
-                    "line_number": int(line_number),
-                    "test_name": test_name,
-                    "suspected_files": [],
-                }
-        
-        # Extract suspected filenames from assertions
-        for match in re.finditer(self.PATTERNS["test_assertion_with_filename"], combined, re.MULTILINE):
-            suspected_file = match.group("suspected_file")
-            # Try to associate with nearest test failure
-            # For now, add to all test failures (planner will dedupe)
-            for key in test_failures:
-                if suspected_file not in test_failures[key]["suspected_files"]:
-                    test_failures[key]["suspected_files"].append(suspected_file)
-        
-        # Create clues for each test failure
-        for (test_file, line_number), info in test_failures.items():
-            clues.append(ErrorClue(
-                clue_type="test_failure",
-                confidence=1.0,
-                context={
-                    "test_file": info["test_file"],
-                    "line_number": info["line_number"],
-                    "test_name": info["test_name"],
-                    "suspected_files": info["suspected_files"],
+        (
+            "Testing: No wasm references in lib/include... FAIL (wasm found in lib/include/)\n  Found wasm in:\nlib/include/tree_sitter/api.h:typedef struct wasm_engine_t TSWasmEngine;",
+            {
+                "clue_type": "git_grep_test_failure",
+                "confidence": 1.0,
+                "context": {
+                    "test_name": "No wasm references in lib/include",
+                    "keyword": "wasm",
+                    "search_path": "lib/include/",
+                    "output_section": "\n  Found wasm in:\nlib/include/tree_sitter/api.h:typedef struct wasm_engine_t TSWasmEngine;",
                 },
-                source_line=f"Test {info['test_name']} failed at {test_file}:{line_number}"
-            ))
-        
-        return clues
+            },
+        ),
+    ]
