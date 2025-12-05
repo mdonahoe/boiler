@@ -155,117 +155,16 @@ class TestFailurePlanner(Planner):
     def _find_file_in_deleted(self, filename: str, git_state: GitState) -> T.Optional[str]:
         """Try to find a matching file in the deleted files list"""
         deleted_files = git_state.deleted_files
-
+        
         # Exact match first
         if filename in deleted_files:
             return filename
-
+        
         # Try with various directory prefixes
         for deleted_file in deleted_files:
             if deleted_file.endswith("/" + filename):
                 return deleted_file
             if deleted_file.endswith(filename) and os.path.basename(deleted_file) == filename:
                 return deleted_file
-
+        
         return None
-
-
-class UnwantedContentPlanner(Planner):
-    """
-    Plan fixes for test failures caused by unwanted content in files.
-
-    Strategy:
-    1. Identify files that contain unwanted keywords (e.g., "wasm")
-    2. Create a plan to remove lines containing those keywords
-    """
-
-    @property
-    def name(self) -> str:
-        return "UnwantedContentPlanner"
-
-    def can_handle(self, clue_type: str) -> bool:
-        return clue_type in ("git_grep_test_failure", "unwanted_content_in_files")
-
-    def plan(self, clues: T.List[ErrorClue], git_state: GitState) -> T.List[RepairPlan]:
-        plans = []
-        seen_targets = set()  # Deduplicate plans for the same file
-
-        for clue in clues:
-            if clue.clue_type == "git_grep_test_failure":
-                # Parse the output chunk to extract file info
-                clue = self._parse_git_grep_clue(clue)
-
-            if clue.clue_type not in ("unwanted_content_in_files", "git_grep_test_failure"):
-                continue
-
-            clue_plans = self._plan_for_clue(clue, git_state)
-            for plan in clue_plans:
-                target_key = (plan.target_file, plan.params.get("keyword"))
-                if target_key not in seen_targets:
-                    plans.append(plan)
-                    seen_targets.add(target_key)
-
-        return plans
-
-    def _parse_git_grep_clue(self, clue: ErrorClue) -> ErrorClue:
-        """Parse git grep output to extract file paths."""
-        keyword = clue.context.get("keyword")
-        search_path = clue.context.get("search_path")
-        output_section = clue.context.get("output_section", "")
-
-        # Pattern: file_path:line_content
-        file_pattern = rf"({re.escape(search_path)}[^\s:]+):.*?{re.escape(keyword)}"
-        found_files = {}
-        for file_match in re.finditer(file_pattern, output_section, re.IGNORECASE):
-            file_path = file_match.group(1)
-            if file_path not in found_files:
-                found_files[file_path] = []
-            line_start = file_match.start()
-            line_end = output_section.find('\n', line_start)
-            if line_end == -1:
-                line_end = len(output_section)
-            full_line = output_section[line_start:line_end].strip()
-            found_files[file_path].append(full_line)
-
-        # Return a new clue with parsed data
-        return ErrorClue(
-            clue_type="unwanted_content_in_files",
-            confidence=clue.confidence,
-            context={
-                "test_name": clue.context.get("test_name"),
-                "keyword": keyword,
-                "search_path": search_path,
-                "found_files": found_files,
-            },
-            source_line=clue.source_line
-        )
-
-    def _plan_for_clue(self, clue: ErrorClue, git_state: GitState) -> T.List[RepairPlan]:
-        keyword = clue.context.get("keyword")
-        found_files = clue.context.get("found_files", {})
-        test_name = clue.context.get("test_name", "unknown test")
-
-        plans = []
-        for file_path in found_files.keys():
-            # Only create plans for header files (.h) to avoid breaking C source syntax
-            # Removing arbitrary lines from .c files can create syntax errors
-            if not file_path.endswith('.h'):
-                print(f"[Planner:UnwantedContentPlanner] Skipping {file_path} - only header files supported")
-                continue
-
-            # Create plan to remove lines containing the keyword
-            # The executor will validate that the file exists
-            plans.append(RepairPlan(
-                plan_type="remove_lines_matching",
-                priority=1,  # Medium priority
-                target_file=file_path,
-                action="remove_matching_lines",
-                params={
-                    "keyword": keyword,
-                    "case_insensitive": True,
-                },
-                reason=f"Remove lines containing '{keyword}' from {file_path} to fix test '{test_name}'",
-                clue_source=clue
-            ))
-
-        return plans
