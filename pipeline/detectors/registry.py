@@ -3,7 +3,7 @@ Registry for managing all error detectors.
 """
 
 import typing as T
-from pipeline.detectors.base import Detector
+from pipeline.detectors.base import RegexDetector as Detector
 from pipeline.models import ErrorClue
 
 

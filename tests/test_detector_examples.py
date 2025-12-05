@@ -37,6 +37,8 @@ from pipeline.detectors.file_errors import (
     CImplicitDeclarationDetector,
     CUndeclaredIdentifierDetector,
 )
+from pipeline.detectors.test_failures import TestFailureDetector
+from pipeline.detectors.base import RegexDetector
 
 
 class DetectorExamplesTest(unittest.TestCase):
@@ -62,6 +64,7 @@ class DetectorExamplesTest(unittest.TestCase):
             CIncompleteTypeDetector(),
             CImplicitDeclarationDetector(),
             CUndeclaredIdentifierDetector(),
+            TestFailureDetector(),
         ]
 
     def test_all_detectors_have_examples(self):
@@ -235,8 +238,7 @@ class DetectorExamplesTest(unittest.TestCase):
             )
 
     def test_detectors_do_not_override_base_methods(self):
-        """Verify detector subclasses don't override detect() or pattern_to_clue()"""
-        from pipeline.detectors.base import RegexDetector
+        """Verify RegexDetector subclasses don't override detect() or pattern_to_clue()"""
 
         for detector in self.detectors:
             class_name = detector.__class__.__name__
@@ -258,6 +260,50 @@ class DetectorExamplesTest(unittest.TestCase):
                 base_pattern_to_clue_method,
                 f"{class_name} should not override pattern_to_clue() method",
             )
+
+    def test_all_patterns_have_examples(self):
+        """Verify every PATTERN has at least one corresponding EXAMPLE"""
+        for detector in self.detectors:
+            class_name = detector.__class__.__name__
+            patterns = getattr(detector, 'PATTERNS', {})
+            examples = getattr(detector, 'EXAMPLES', [])
+
+            # Get all clue_types from examples
+            example_clue_types = set()
+            for example in examples:
+                _, expected_clue = example
+                clue_type = expected_clue.get("clue_type")
+                if clue_type:
+                    example_clue_types.add(clue_type)
+
+            # Check that each pattern has an example
+            for pattern_name in patterns.keys():
+                self.assertIn(
+                    pattern_name,
+                    example_clue_types,
+                    f"{class_name}: Pattern '{pattern_name}' has no corresponding EXAMPLE\n"
+                    f"Available examples: {example_clue_types}\n"
+                    f"Add an EXAMPLE with clue_type='{pattern_name}'",
+                )
+
+    def test_all_examples_match_patterns(self):
+        """Verify every EXAMPLE corresponds to an actual PATTERN"""
+        for detector in self.detectors:
+            class_name = detector.__class__.__name__
+            patterns = getattr(detector, 'PATTERNS', {})
+            examples = getattr(detector, 'EXAMPLES', [])
+
+            for i, example in enumerate(examples):
+                _, expected_clue = example
+                clue_type = expected_clue.get("clue_type")
+
+                self.assertIn(
+                    clue_type,
+                    patterns.keys(),
+                    f"{class_name}: Example {i} has clue_type='{clue_type}' "
+                    f"but no matching PATTERN\n"
+                    f"Available patterns: {list(patterns.keys())}",
+                )
 
 
 if __name__ == "__main__":
