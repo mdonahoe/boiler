@@ -43,6 +43,10 @@ import subprocess
 import sys
 import typing as T
 
+# Add pipeline to path for imports
+sys.path.insert(0, os.path.dirname(__file__))
+from pipeline.utils import is_verbose
+
 
 # T0DO(matt): annotate global constatnts
 class LineAnnotator(ast.NodeVisitor):
@@ -106,12 +110,13 @@ class LineAnnotator(ast.NodeVisitor):
             # ast.Call
             return self.get_decorator_name(n.func)
         else:
-            print("Unsupported decorator node")
-            print(
-                ", ".join(
-                    f"n.{k} = {getattr(n, k)}" for k in dir(n) if not k.startswith("_")
+            if is_verbose():
+                print("Unsupported decorator node")
+                print(
+                    ", ".join(
+                        f"n.{k} = {getattr(n, k)}" for k in dir(n) if not k.startswith("_")
+                    )
                 )
-            )
             # import pdb; pdb.set_trace()
             raise ValueError(n)
 
@@ -173,7 +178,8 @@ def get_codes(filename: str, commit: str) -> T.Tuple[str, str]:
         with open(filename) as sourcefile:
             index_code = sourcefile.read()
     else:
-        print(f"No file: {filename}")
+        if is_verbose():
+            print(f"No file: {filename}")
         # restore with git so folders and permissions are correct
         r = subprocess.run(["git", "checkout", repo_path])
         if r.returncode != 0:
@@ -189,8 +195,9 @@ def get_codes(filename: str, commit: str) -> T.Tuple[str, str]:
     if r.returncode == 0:
         git_code = r.stdout.decode("utf-8")
     else:
-        print("err:", r.stderr)
-        print(r)
+        if is_verbose():
+            print("err:", r.stderr)
+            print(r)
         raise ValueError("failed to get repo code for {filename}")
     return index_code, git_code
 
@@ -217,7 +224,8 @@ def get_c_code_annotations(code_str) -> T.List[T.List[str]]:
         )
 
         if result.returncode != 0:
-            print(f"tree_print failed: {result.stderr}")
+            if is_verbose():
+                print(f"tree_print failed: {result.stderr}")
             return annotations
 
         # Parse JSON output
@@ -338,7 +346,8 @@ def repair(
     filename: str, commit: str, missing: T.Optional[str] = None, verbose: bool = False
 ) -> None:
     """Restore deleted lines to a file that match the `missing` pattern."""
-    print(f"repairing {filename} from {commit} missing {missing}")
+    if is_verbose():
+        print(f"repairing {filename} from {commit} missing {missing}")
     lang = _infer_language(filename)
     index_code, git_code = get_codes(filename, commit)
     raw_labels = get_labels(index_code, lang)

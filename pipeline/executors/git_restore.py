@@ -7,6 +7,7 @@ import subprocess
 import typing as T
 from pipeline.executors.base import Executor
 from pipeline.models import RepairPlan, RepairResult
+from pipeline.utils import is_verbose
 
 
 class GitRestoreExecutor(Executor):
@@ -151,7 +152,8 @@ class GitRestoreExecutor(Executor):
                     error_message=f"Restoring {file_path} did not create any changes (already in boiling branch)"
                 )
 
-            print(f"Successfully restored {git_relative_path} from {ref}")
+            if is_verbose():
+                print(f"Successfully restored {git_relative_path} from {ref}")
             return RepairResult(
                 success=True,
                 plans_attempted=[plan],

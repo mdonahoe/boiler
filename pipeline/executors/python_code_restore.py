@@ -7,6 +7,7 @@ import subprocess
 import typing as T
 from pipeline.executors.base import Executor
 from pipeline.models import RepairPlan, RepairResult
+from pipeline.utils import is_verbose
 
 
 class PythonCodeRestoreExecutor(Executor):
@@ -97,7 +98,8 @@ class PythonCodeRestoreExecutor(Executor):
             # This preserves the current file's structure and only adds the missing code
             repair(file_path, ref, missing=element_name, verbose=False)
 
-            print(f"[Executor:PythonCodeRestoreExecutor] Successfully restored '{element_name}' to {file_path}")
+            if is_verbose():
+                print(f"[Executor:PythonCodeRestoreExecutor] Successfully restored '{element_name}' to {file_path}")
             return RepairResult(
                 success=True,
                 plans_attempted=[plan],

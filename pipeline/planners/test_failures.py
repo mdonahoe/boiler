@@ -8,6 +8,7 @@ import subprocess
 import typing as T
 from pipeline.planners.base import Planner
 from pipeline.models import ErrorClue, RepairPlan, GitState
+from pipeline.utils import is_verbose
 
 
 class TestFailurePlanner(Planner):
@@ -87,10 +88,12 @@ class TestFailurePlanner(Planner):
                         if result.stdout.strip():
                             test_file = result.stdout.strip().split('\n')[0]
                         else:
-                            print(f"[Planner:TestFailurePlanner] Test file {test_file} not found, skipping")
+                            if is_verbose():
+                                print(f"[Planner:TestFailurePlanner] Test file {test_file} not found, skipping")
                             return []
                     except Exception:
-                        print(f"[Planner:TestFailurePlanner] Test file {test_file} not found, skipping")
+                        if is_verbose():
+                            print(f"[Planner:TestFailurePlanner] Test file {test_file} not found, skipping")
                         return []
         
         # Update test_file_path if we found it in git
@@ -148,7 +151,8 @@ class TestFailurePlanner(Planner):
                 referenced_files.add(match.group(1))
             
         except Exception as e:
-            print(f"[Planner:TestFailurePlanner] Error reading {test_file}: {e}")
+            if is_verbose():
+                print(f"[Planner:TestFailurePlanner] Error reading {test_file}: {e}")
         
         return list(referenced_files)
 

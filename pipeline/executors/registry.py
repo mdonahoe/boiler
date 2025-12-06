@@ -2,6 +2,7 @@
 Registry for managing all repair executors.
 """
 
+import os
 import typing as T
 from pipeline.executors.base import Executor
 from pipeline.models import RepairPlan, RepairResult
@@ -41,23 +42,29 @@ class ExecutorRegistry:
 
         all_attempted = []
         all_modified = []
+        
+        # Suppress output during tests unless BOIL_VERBOSE is set
+        verbose = os.environ.get("BOIL_VERBOSE", "").lower() in ("1", "true", "yes")
 
         for plan in plans:
             # Find executor that can handle this action
             executor = self._find_executor(plan.action)
             if not executor:
-                print(f"[Executor] No executor found for action: {plan.action}")
+                if verbose:
+                    print(f"[Executor] No executor found for action: {plan.action}")
                 continue
 
             # Validate plan
             is_valid, error_msg = executor.validate_plan(plan)
             if not is_valid:
-                print(f"[Executor:{executor.name}] Plan validation failed: {error_msg}")
+                if verbose:
+                    print(f"[Executor:{executor.name}] Plan validation failed: {error_msg}")
                 continue
 
             # Execute plan
             try:
-                print(f"[Executor:{executor.name}] Executing: {plan.action} on {plan.target_file}")
+                if verbose:
+                    print(f"[Executor:{executor.name}] Executing: {plan.action} on {plan.target_file}")
                 result = executor.execute(plan)
                 all_attempted.append(plan)
                 all_modified.extend(result.files_modified)
@@ -71,9 +78,11 @@ class ExecutorRegistry:
                         error_message=None
                     )
                 else:
-                    print(f"[Executor:{executor.name}] Failed: {result.error_message}")
+                    if verbose:
+                        print(f"[Executor:{executor.name}] Failed: {result.error_message}")
             except Exception as e:
-                print(f"[Executor:{executor.name}] Exception: {e}")
+                if verbose:
+                    print(f"[Executor:{executor.name}] Exception: {e}")
                 # Continue with next plan
 
         # All plans failed

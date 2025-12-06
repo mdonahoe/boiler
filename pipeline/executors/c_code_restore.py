@@ -7,6 +7,7 @@ import subprocess
 import typing as T
 from pipeline.executors.base import Executor
 from pipeline.models import RepairPlan, RepairResult
+from pipeline.utils import is_verbose
 
 
 class CCodeRestoreExecutor(Executor):
@@ -96,7 +97,8 @@ class CCodeRestoreExecutor(Executor):
             after_hash = hash(after_content)
 
             if before_hash == after_hash:
-                print(f"[Executor:CCodeRestoreExecutor] WARNING: File unchanged after repair attempt for '{missing_pattern}'")
+                if is_verbose():
+                    print(f"[Executor:CCodeRestoreExecutor] WARNING: File unchanged after repair attempt for '{missing_pattern}'")
                 return RepairResult(
                     success=False,
                     plans_attempted=[plan],
@@ -104,7 +106,8 @@ class CCodeRestoreExecutor(Executor):
                     error_message=f"Repair did not modify {file_path} ('{missing_pattern}' may not exist in git history)"
                 )
 
-            print(f"[Executor:CCodeRestoreExecutor] Successfully restored '{missing_pattern}' to {file_path}")
+            if is_verbose():
+                print(f"[Executor:CCodeRestoreExecutor] Successfully restored '{missing_pattern}' to {file_path}")
             return RepairResult(
                 success=True,
                 plans_attempted=[plan],
