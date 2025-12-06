@@ -1,0 +1,18 @@
+{
+  "detectors": [
+    "CLinkerErrorDetector",
+    "FopenNoSuchFileDetector",
+    "MakeMissingTargetDetector",
+    "MakeNoRuleDetector",
+    "TestFailureDetector"
+  ],
+  "planners": [
+    "LinkerUndefinedSymbolsPlanner",
+    "MakeMissingTargetPlanner",
+    "MakeNoRulePlanner",
+    "MissingFilePlanner"
+  ],
+  "executors": [
+    "GitRestoreExecutor"
+  ]
+}
