@@ -8,6 +8,7 @@ import difflib
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from src_repair import filter_code, get_labels, LineAnnotator
+from pipeline.utils import is_verbose
 
 
 EXAMPLE_C = """// some comment
@@ -108,7 +109,7 @@ X = 1
 def bar():
     return 1
 # end"""
-        output = "\n".join(filter_code(code, set(), verbose=True))
+        output = "\n".join(filter_code(code, set(), verbose=is_verbose()))
         expected = """# start
 # define X
 X = 1
@@ -125,7 +126,7 @@ X = 1
 def bar():
     return 1
 # end"""
-        lines = filter_code(code, {".*foo", ".*bar"}, verbose=True)
+        lines = filter_code(code, {".*foo", ".*bar"}, verbose=is_verbose())
         output = "\n".join(lines)
         self.assertMultiLineEqual(code, output)
 
@@ -136,7 +137,7 @@ def bar():
         code = """# start
 import typing as T
 # end"""
-        lines = filter_code(code, {"alias:T"}, verbose=True)
+        lines = filter_code(code, {"alias:T"}, verbose=is_verbose())
         output = "\n".join(lines)
         self.assertMultiLineEqual(code, output)
 

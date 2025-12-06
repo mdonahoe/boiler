@@ -6,6 +6,7 @@ import os
 import typing as T
 from pipeline.planners.base import Planner
 from pipeline.models import ErrorClue, RepairPlan, GitState
+from pipeline.utils import is_verbose
 
 
 class MissingCFunctionPlanner(Planner):
@@ -97,7 +98,8 @@ class MissingCFunctionPlanner(Planner):
             symbols = [clue.context["function_name"]]
 
         if not file_path or not symbols:
-            print(f"[Planner:MissingCFunctionPlanner] Missing file_path or symbols")
+            if is_verbose():
+                print(f"[Planner:MissingCFunctionPlanner] Missing file_path or symbols")
             return []
 
         # Make path relative if it's absolute
@@ -106,16 +108,17 @@ class MissingCFunctionPlanner(Planner):
 
         # Only plan repairs for files that exist
         if not os.path.exists(file_path):
-            print(f"[Planner:MissingCFunctionPlanner] File {file_path} does not exist, skipping")
+            if is_verbose():
+                print(f"[Planner:MissingCFunctionPlanner] File {file_path} does not exist, skipping")
             return []
 
         # Separate stdlib symbols from user-defined symbols
         stdlib_symbols = [s for s in symbols if s in self.STDLIB_SYMBOL_TO_HEADER]
         user_symbols = [s for s in symbols if s not in self.STDLIB_SYMBOL_TO_HEADER]
 
-        if stdlib_symbols:
+        if stdlib_symbols and is_verbose():
             print(f"[Planner:MissingCFunctionPlanner] Found stdlib symbols needing includes: {stdlib_symbols}")
-        if user_symbols:
+        if user_symbols and is_verbose():
             print(f"[Planner:MissingCFunctionPlanner] Planning to restore {len(user_symbols)} user function(s) to {file_path}")
 
         # Create plans
@@ -136,10 +139,12 @@ class MissingCFunctionPlanner(Planner):
                 with open(file_path, 'r') as f:
                     content = f.read()
                     if f'#include <{header}>' in content or f'#include "{header}"' in content:
-                        print(f"[Planner:MissingCFunctionPlanner] Include <{header}> already present, skipping")
+                        if is_verbose():
+                            print(f"[Planner:MissingCFunctionPlanner] Include <{header}> already present, skipping")
                         continue
             except Exception as e:
-                print(f"[Planner:MissingCFunctionPlanner] Error reading {file_path}: {e}")
+                if is_verbose():
+                    print(f"[Planner:MissingCFunctionPlanner] Error reading {file_path}: {e}")
                 continue
 
             plans.append(RepairPlan(
@@ -206,7 +211,8 @@ class MissingCIncludePlanner(Planner):
         struct_name = clue.context.get("struct_name")
 
         if not file_path:
-            print(f"[Planner:MissingCIncludePlanner] Missing file_path")
+            if is_verbose():
+                print(f"[Planner:MissingCIncludePlanner] Missing file_path")
             return []
 
         # Make path relative if it's absolute
@@ -215,7 +221,8 @@ class MissingCIncludePlanner(Planner):
 
         # Only plan repairs for files that exist
         if not os.path.exists(file_path):
-            print(f"[Planner:MissingCIncludePlanner] File {file_path} does not exist, skipping")
+            if is_verbose():
+                print(f"[Planner:MissingCIncludePlanner] File {file_path} does not exist, skipping")
             return []
 
         # Map struct names to their required headers if not suggested
@@ -232,9 +239,11 @@ class MissingCIncludePlanner(Planner):
         if not suggested_include:
             if struct_name and struct_name in STRUCT_TO_HEADER:
                 suggested_include = STRUCT_TO_HEADER[struct_name]
-                print(f"[Planner:MissingCIncludePlanner] Mapped struct '{struct_name}' to header '{suggested_include}'")
+                if is_verbose():
+                    print(f"[Planner:MissingCIncludePlanner] Mapped struct '{struct_name}' to header '{suggested_include}'")
             else:
-                print(f"[Planner:MissingCIncludePlanner] No suggested include and can't map struct '{struct_name}', skipping")
+                if is_verbose():
+                    print(f"[Planner:MissingCIncludePlanner] No suggested include and can't map struct '{struct_name}', skipping")
                 return []
 
         # Check if the include is already present in the file
@@ -243,14 +252,17 @@ class MissingCIncludePlanner(Planner):
                 content = f.read()
                 # Check for both <header.h> and "header.h" styles
                 if f'#include <{suggested_include}>' in content or f'#include "{suggested_include}"' in content:
-                    print(f"[Planner:MissingCIncludePlanner] Include <{suggested_include}> already present in {file_path}, skipping")
+                    if is_verbose():
+                        print(f"[Planner:MissingCIncludePlanner] Include <{suggested_include}> already present in {file_path}, skipping")
                     return []
         except Exception as e:
-            print(f"[Planner:MissingCIncludePlanner] Error reading {file_path}: {e}")
+            if is_verbose():
+                print(f"[Planner:MissingCIncludePlanner] Error reading {file_path}: {e}")
             return []
 
         reason_detail = f"function '{function_name}'" if function_name else f"struct '{struct_name}'"
-        print(f"[Planner:MissingCIncludePlanner] Planning to restore '#include <{suggested_include}>' to {file_path}")
+        if is_verbose():
+            print(f"[Planner:MissingCIncludePlanner] Planning to restore '#include <{suggested_include}>' to {file_path}")
 
         return [
             RepairPlan(

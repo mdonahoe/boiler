@@ -2,6 +2,7 @@
 Registry for managing all repair planners.
 """
 
+import os
 import typing as T
 from pipeline.planners.base import Planner
 from pipeline.models import ErrorClue, RepairPlan, GitState
@@ -40,6 +41,9 @@ class PlannerRegistry:
         # Get unique clue types to determine which planners to call
         clue_types = set(clue.clue_type for clue in clues)
 
+        # Suppress output during tests unless BOIL_VERBOSE is set
+        verbose = os.environ.get("BOIL_VERBOSE", "").lower() in ("1", "true", "yes")
+        
         for planner in self._planners:
             # Check if this planner handles any of the clue types we have
             if not any(planner.can_handle(ct) for ct in clue_types):
@@ -48,12 +52,14 @@ class PlannerRegistry:
             try:
                 plans = planner.plan(clues, git_state)
                 if plans:
-                    print(f"[Planner:{planner.name}] Generated {len(plans)} plan(s)")
+                    if verbose:
+                        print(f"[Planner:{planner.name}] Generated {len(plans)} plan(s)")
                     all_plans.extend(plans)
             except Exception as e:
-                print(f"[Planner:{planner.name}] Error planning: {e}")
-                import traceback
-                traceback.print_exc()
+                if verbose:
+                    print(f"[Planner:{planner.name}] Error planning: {e}")
+                    import traceback
+                    traceback.print_exc()
                 # Continue with other planners
 
         # Sort plans by priority (lower = higher priority)

@@ -6,6 +6,7 @@ import os
 import typing as T
 from pipeline.planners.base import Planner
 from pipeline.models import ErrorClue, RepairPlan, GitState
+from pipeline.utils import is_verbose
 
 
 class MissingPythonCodePlanner(Planner):
@@ -37,7 +38,8 @@ class MissingPythonCodePlanner(Planner):
         missing_element = clue.context.get("missing_element")
 
         if not file_path or not missing_element:
-            print(f"[Planner:MissingPythonCodePlanner] Missing file_path or missing_element")
+            if is_verbose():
+                print(f"[Planner:MissingPythonCodePlanner] Missing file_path or missing_element")
             return []
 
         # Extract element_name and element_type from missing_element
@@ -57,11 +59,13 @@ class MissingPythonCodePlanner(Planner):
         # Skip files that already fully match git
         if os.path.exists(file_path):
             # File exists - this is good, we can use src_repair to add the missing code
-            print(f"[Planner:MissingPythonCodePlanner] File {file_path} exists, planning repair")
+            if is_verbose():
+                print(f"[Planner:MissingPythonCodePlanner] File {file_path} exists, planning repair")
             pass
         else:
             # File doesn't exist - skip it, let other handlers deal with full restoration
-            print(f"[Planner:MissingPythonCodePlanner] File {file_path} does not exist, skipping")
+            if is_verbose():
+                print(f"[Planner:MissingPythonCodePlanner] File {file_path} does not exist, skipping")
             return []
 
         return [
@@ -112,7 +116,8 @@ class PythonNameErrorPlanner(Planner):
         line_number = clue.context.get("line_number")
 
         if not file_path or not undefined_name:
-            print(f"[Planner:PythonNameErrorPlanner] Missing file_path or undefined_name")
+            if is_verbose():
+                print(f"[Planner:PythonNameErrorPlanner] Missing file_path or undefined_name")
             return []
 
         # Make path relative if it's absolute
@@ -121,10 +126,12 @@ class PythonNameErrorPlanner(Planner):
 
         # Only plan repairs for files that exist
         if os.path.exists(file_path):
-            print(f"[Planner:PythonNameErrorPlanner] File {file_path} exists, planning repair for '{undefined_name}'")
+            if is_verbose():
+                print(f"[Planner:PythonNameErrorPlanner] File {file_path} exists, planning repair for '{undefined_name}'")
             pass
         else:
-            print(f"[Planner:PythonNameErrorPlanner] File {file_path} does not exist, skipping")
+            if is_verbose():
+                print(f"[Planner:PythonNameErrorPlanner] File {file_path} does not exist, skipping")
             return []
 
         return [

@@ -6,6 +6,7 @@ import os
 import typing as T
 from pipeline.planners.base import Planner
 from pipeline.models import ErrorClue, RepairPlan, GitState
+from pipeline.utils import is_verbose
 
 
 class MakeMissingTargetPlanner(Planner):
@@ -160,7 +161,8 @@ class MakeNoRulePlanner(Planner):
         # Only restore the first (highest priority) Makefile
         if prioritized_makefiles:
             makefile_to_restore = prioritized_makefiles[0]
-            print(f"[Planner:MakeNoRulePlanner] Found deleted {makefile_to_restore}")
+            if is_verbose():
+                print(f"[Planner:MakeNoRulePlanner] Found deleted {makefile_to_restore}")
             # Use the first clue as the source
             clue = no_rule_clues[0]
             plans.append(RepairPlan(

@@ -2,6 +2,7 @@
 Registry for managing all error detectors.
 """
 
+import os
 import typing as T
 from pipeline.detectors.base import Detector
 from pipeline.models import ErrorClue
@@ -36,16 +37,21 @@ class DetectorRegistry:
         """
         all_clues: T.List[ErrorClue] = []
 
+        # Suppress output during tests unless BOIL_VERBOSE is set
+        verbose = os.environ.get("BOIL_VERBOSE", "").lower() in ("1", "true", "yes")
+        
         for detector in self._detectors:
             try:
                 clues = detector.detect(stderr, stdout)
                 if clues:
-                    print(f"[Detector:{detector.name}] Found {len(clues)} clue(s)")
+                    if verbose:
+                        print(f"[Detector:{detector.name}] Found {len(clues)} clue(s)")
                     all_clues.extend(clues)
             except Exception as e:
-                import traceback
-                print(f"[Detector:{detector.name}] Error: {e}")
-                traceback.print_exc()
+                if verbose:
+                    import traceback
+                    print(f"[Detector:{detector.name}] Error: {e}")
+                    traceback.print_exc()
                 # Continue with other detectors
 
         return all_clues

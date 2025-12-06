@@ -8,6 +8,7 @@ import subprocess
 import typing as T
 from pipeline.planners.base import Planner
 from pipeline.models import ErrorClue, RepairPlan, GitState
+from pipeline.utils import is_verbose
 
 
 class PermissionFixPlanner(Planner):
@@ -140,13 +141,15 @@ class MissingFilePlanner(Planner):
             candidate = os.path.join(source_dir, file_path)
             if candidate in git_state.deleted_files:
                 actual_path = candidate
-                print(f"[Planner] Found {file_path} in source directory: {actual_path}")
+                if is_verbose():
+                    print(f"[Planner] Found {file_path} in source directory: {actual_path}")
         
         # Fallback: search all deleted files
         if not actual_path:
             actual_path = self._find_file_in_deleted(file_path, git_state)
             if actual_path:
-                print(f"[Planner] Found {file_path} in deleted files: {actual_path}")
+                if is_verbose():
+                    print(f"[Planner] Found {file_path} in deleted files: {actual_path}")
         
         # If still not found but file exists locally, check if it matches git
         if not actual_path and os.path.exists(file_path):
@@ -164,11 +167,13 @@ class MissingFilePlanner(Planner):
 
                 if diff_result.returncode == 0:
                     # File already matches git - no plan needed
-                    print(f"[Planner] {file_path} already exists and matches git, skipping")
+                    if is_verbose():
+                        print(f"[Planner] {file_path} already exists and matches git, skipping")
                     return []
             except Exception as e:
                 # If we can't check, proceed with the plan anyway
-                print(f"[Planner] Warning: Could not verify {file_path}: {e}")
+                if is_verbose():
+                    print(f"[Planner] Warning: Could not verify {file_path}: {e}")
 
         # Use the actual path if found, otherwise use the original path
         target_file = actual_path if actual_path else file_path
@@ -230,7 +235,8 @@ class LinkerUndefinedSymbolsPlanner(Planner):
         # Check if lib.c is deleted - it's a special case
         lib_c_candidates = [f for f in deleted_c_files if 'lib.c' in f or f.endswith('/lib.c')]
         if lib_c_candidates:
-            print(f"[Planner] Found deleted lib.c: {lib_c_candidates[0]}")
+            if is_verbose():
+                print(f"[Planner] Found deleted lib.c: {lib_c_candidates[0]}")
             return [RepairPlan(
                 plan_type="restore_file",
                 priority=0,  # Highest priority
@@ -241,7 +247,8 @@ class LinkerUndefinedSymbolsPlanner(Planner):
                 clue_source=clue
             )]
 
-        print(f"[Planner] Found {len(symbols)} undefined symbols, checking {len(deleted_c_files)} deleted C files")
+        if is_verbose():
+            print(f"[Planner] Found {len(symbols)} undefined symbols, checking {len(deleted_c_files)} deleted C files")
 
         # For each deleted C file, check how many symbols it defines
         file_scores = {}
@@ -275,16 +282,19 @@ class LinkerUndefinedSymbolsPlanner(Planner):
 
                 if score > 0:
                     file_scores[c_file] = (score, matched_symbols)
-                    print(f"[Planner]   {c_file}: {score} symbols matched")
+                    if is_verbose():
+                        print(f"[Planner]   {c_file}: {score} symbols matched")
 
             except Exception as e:
-                print(f"[Planner] Error checking {c_file}: {e}")
+                if is_verbose():
+                    print(f"[Planner] Error checking {c_file}: {e}")
                 continue
 
         # Create plans for files with highest scores first
         plans = []
         for c_file, (score, matched_symbols) in sorted(file_scores.items(), key=lambda x: x[1][0], reverse=True):
-            print(f"[Planner] Creating plan to restore {c_file} ({score} symbols)")
+            if is_verbose():
+                print(f"[Planner] Creating plan to restore {c_file} ({score} symbols)")
             plans.append(RepairPlan(
                 plan_type="restore_file",
                 priority=0 - (score / 100),  # Higher scores get higher priority
@@ -297,7 +307,8 @@ class LinkerUndefinedSymbolsPlanner(Planner):
 
         # If no deleted files matched, check existing C files and use src_repair
         if not plans:
-            print(f"[Planner] No deleted C files matched, checking existing C files")
+            if is_verbose():
+                print(f"[Planner] No deleted C files matched, checking existing C files")
             # Look for existing C files that might need functions restored
             import glob
             existing_c_files = glob.glob("*.c") + glob.glob("**/*.c", recursive=True)
@@ -393,7 +404,8 @@ class LinkerUndefinedSymbolsPlanner(Planner):
                                 break
                         
                         if found:
-                            print(f"[Planner] Found function definition for '{symbol}' in {c_file} (git version)")
+                            if is_verbose():
+                                print(f"[Planner] Found function definition for '{symbol}' in {c_file} (git version)")
                             # Create a plan to restore this specific function
                             plans.append(RepairPlan(
                                 plan_type="restore_c_code",
@@ -414,7 +426,8 @@ class LinkerUndefinedSymbolsPlanner(Planner):
                             break
 
                 except Exception as e:
-                    print(f"[Planner] Error checking {c_file}: {e}")
+                    if is_verbose():
+                        print(f"[Planner] Error checking {c_file}: {e}")
                     continue
 
         return plans

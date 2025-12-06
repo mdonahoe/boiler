@@ -522,18 +522,7 @@ class ExampleReposTest(unittest.TestCase):
             msg += "\n" + "=" * 80
             raise AssertionError(msg)
         
-        # Print summary
-        print(f"\n{'='*80}")
-        print("COMPONENT COVERAGE VERIFICATION PASSED")
-        print(f"{'='*80}")
-        print(f"All {len(all_detectors)} detectors covered in expected JSON files")
-        print(f"All {len(all_planners)} planners covered in expected JSON files")
-        print(f"All {len(all_executors)} executors covered in expected JSON files")
-        print(f"\nChecked JSON files: {', '.join(json_files_found)}")
-        print(f"\nCovered components:")
-        print(f"  Detectors ({len(expected_detectors)}): {sorted(expected_detectors)}")
-        print(f"  Planners ({len(expected_planners)}): {sorted(expected_planners)}")
-        print(f"  Executors ({len(expected_executors)}): {sorted(expected_executors)}")
+        # Don't print anything on success - keep it quiet
 
 
 
