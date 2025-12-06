@@ -1,0 +1,13 @@
+{
+  "detectors": [
+    "MakeMissingTargetDetector",
+    "MakeNoRuleDetector"
+  ],
+  "planners": [
+    "MakeMissingTargetPlanner",
+    "MakeNoRulePlanner"
+  ],
+  "executors": [
+    "GitRestoreExecutor"
+  ]
+}

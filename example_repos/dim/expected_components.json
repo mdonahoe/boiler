@@ -1,0 +1,23 @@
+{
+  "detectors": [
+    "CImplicitDeclarationDetector",
+    "CIncompleteTypeDetector",
+    "CLinkerErrorDetector",
+    "FopenNoSuchFileDetector",
+    "MakeMissingTargetDetector",
+    "MakeNoRuleDetector",
+    "TestFailureDetector"
+  ],
+  "planners": [
+    "LinkerUndefinedSymbolsPlanner",
+    "MakeMissingTargetPlanner",
+    "MakeNoRulePlanner",
+    "MissingCFunctionPlanner",
+    "MissingCIncludePlanner",
+    "TestFailurePlanner"
+  ],
+  "executors": [
+    "CCodeRestoreExecutor",
+    "GitRestoreExecutor"
+  ]
+}
