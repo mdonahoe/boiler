@@ -228,7 +228,7 @@ restore_missing_file(file_path)  # Handles errors, logging, etc.
 - handle_rust_env_not_defined
 - handle_rust_module_not_found
 - handle_rust_panic_no_such_file
-- handle_cannot_open_file
+- handle_cannot_open_file (MIGRATED to CannotOpenFileDetector)
 - handle_permission_denied (modified signature)
 - handle_executable_not_found (modified signature)
 - handle_generic_no_such_file

@@ -102,6 +102,40 @@ class ShellCannotOpenDetector(RegexDetector):
     ]
 
 
+class CannotOpenFileDetector(RegexDetector):
+    """
+    Detect generic "Cannot open file" errors from programs.
+
+    Matches patterns like:
+    - Error: Cannot open file 'example.c'
+    - Error: Cannot open file "example.py"
+    - error: Cannot open file 'test.txt'
+    """
+
+    PATTERNS = {
+        "missing_file": r"[Ee]rror:?\s+Cannot open file\s+['\"](?P<file_path>[^'\"]+)['\"]",
+    }
+
+    EXAMPLES = [
+        (
+            "Error: Cannot open file 'example.c'",
+            {
+                "clue_type": "missing_file",
+                "confidence": 1.0,
+                "context": {"file_path": "example.c"},
+            },
+        ),
+        (
+            "error: Cannot open file \"example.py\"",
+            {
+                "clue_type": "missing_file",
+                "confidence": 1.0,
+                "context": {"file_path": "example.py"},
+            },
+        ),
+    ]
+
+
 class ShellCommandNotFoundDetector(RegexDetector):
     """
     Detect shell errors when a command/script is not found.
