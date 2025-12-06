@@ -60,6 +60,7 @@ class RepairResult:
     # Debug information
     clues_detected: T.Optional[T.List[ErrorClue]] = None
     plans_generated: T.Optional[T.List[RepairPlan]] = None
+    timings: T.Optional[T.Dict[str, float]] = None
 
     def __repr__(self) -> str:
         status = "SUCCESS" if self.success else "FAILED"
@@ -114,7 +115,8 @@ class RepairResult:
                     "clues_fixed_count": len(p.clues_fixed)
                 }
                 for p in self.plans_attempted
-            ]
+            ],
+            "timings": self.timings,
         }
 
 

@@ -4,6 +4,7 @@ import os
 import subprocess
 import shutil
 import sys
+import time
 import typing as T
 
 import handlers
@@ -180,7 +181,10 @@ def fix(command: T.List[str], num_iterations: int) -> bool:
     n = len([f for f in os.listdir(".boil") if f.startswith("iter")])
 
     # bootstrap
+    t_start = time.time()
     stdout, stderr, code = handlers.run_command(command)
+    t_run_command = time.time() - t_start
+
     if code == 0:
         # there is nothing to fix.
         return True
@@ -247,6 +251,7 @@ def fix(command: T.List[str], num_iterations: int) -> bool:
                 git_info = get_git_file_info(ref)
                 debug_data["partial_files"] = git_info["partial_files"]
                 debug_data["deleted_files"] = git_info["deleted_files"]
+                debug_data["command_time"] = t_run_command
                 
                 with open(debug_json_path, "w") as f:
                     json.dump(debug_data, f, indent=2)
@@ -267,7 +272,9 @@ def fix(command: T.List[str], num_iterations: int) -> bool:
             raise RuntimeError(message)
 
         # re-run the main command
+        t_start = time.time()
         stdout, stderr, code = handlers.run_command(command)
+        t_run_command = time.time() - t_start
 
         if code == 0:
             # the fix worked!

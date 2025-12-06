@@ -4,11 +4,24 @@ Main pipeline orchestration for the 3-stage repair system.
 This coordinates the flow: Detection → Planning → Execution
 """
 
+import time
 import typing as T
 from pipeline.models import GitState, RepairResult
 from pipeline.detectors.registry import get_detector_registry
 from pipeline.planners.registry import get_planner_registry
 from pipeline.executors.registry import get_executor_registry
+
+
+class Timer:
+    def __init__(self):
+        self.prev = time.time()
+        self.timings = {}
+
+    def __call__(self, name):
+        t = time.time()
+        dt = t - self.prev
+        self.prev = t
+        self.timings[name] = dt
 
 
 def run_pipeline(stderr: str, stdout: str, git_state: GitState, debug: bool = False) -> RepairResult:
@@ -27,6 +40,7 @@ def run_pipeline(stderr: str, stdout: str, git_state: GitState, debug: bool = Fa
     Returns:
         RepairResult indicating success/failure
     """
+    t = Timer()
     if debug:
         print("=" * 80)
         print("PIPELINE START")
@@ -55,6 +69,8 @@ def run_pipeline(stderr: str, stdout: str, git_state: GitState, debug: bool = Fa
         for i, clue in enumerate(all_clues, 1):
             print(f"  {i}. {clue}")
 
+    t("detect_clues")
+
     # Initialize tracking for multi-fix loop
     remaining_clues = list(all_clues)
     all_plans_generated = []
@@ -80,6 +96,7 @@ def run_pipeline(stderr: str, stdout: str, git_state: GitState, debug: bool = Fa
             if not plan.clues_fixed:
                 plan.clues_fixed = [plan.clue_source]
 
+        t(f"plan_round_{fix_round}")
         if not plans:
             if debug:
                 print("No repair plans generated for remaining clues")
@@ -98,6 +115,7 @@ def run_pipeline(stderr: str, stdout: str, git_state: GitState, debug: bool = Fa
         if debug:
             print("\n--- STAGE 3: EXECUTION ---")
         result = executor_registry.execute_plans(plans)
+        t(f"exec_round_{fix_round}")
 
         all_plans_attempted.extend(result.plans_attempted)
         all_files_modified.extend(result.files_modified)
@@ -136,7 +154,8 @@ def run_pipeline(stderr: str, stdout: str, git_state: GitState, debug: bool = Fa
         files_modified=list(set(all_files_modified)),  # Deduplicate
         error_message=None if overall_success else "Could not fix all clues",
         clues_detected=all_clues,
-        plans_generated=all_plans_generated
+        plans_generated=all_plans_generated,
+        timings=t.timings,
     )
 
 

@@ -5,5 +5,6 @@
   "clues_detected": [],
   "plans_generated": [],
   "plans_attempted": [],
+  "timings": null,
   "legacy_handler_used": "handle_syntax_error"
 }
