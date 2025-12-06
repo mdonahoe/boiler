@@ -155,6 +155,7 @@ def analyze_legacy_usage():
     files_repaired_by_iteration = {}
     file_line_ratios = {}  # Track line_ratio per file per iteration
     test_command = None
+    timings_by_iteration = {}  # Track timings per iteration
 
     # Analyze each file
     for json_file in sorted(json_files):
@@ -197,6 +198,11 @@ def analyze_legacy_usage():
                 "iteration": iter_num,
                 "plan": plan
             })
+
+        # Track timings for this iteration
+        timings = data.get("timings", {})
+        if timings and iter_num is not None:
+            timings_by_iteration[iter_num] = timings
 
         # Count pipeline success/failure
         if data.get("success"):
@@ -344,6 +350,21 @@ def analyze_legacy_usage():
         print("  (no files were modified)")
     print()
 
+    # Print timing information
+    print("=" * 80)
+    print("TIMING INFORMATION")
+    print("=" * 80)
+    if timings_by_iteration:
+        for iter_num in sorted(timings_by_iteration.keys()):
+            timings = timings_by_iteration[iter_num]
+            print(f"Iteration {iter_num}:")
+            for timing_key, timing_value in timings.items():
+                print(f"  {timing_key}: {timing_value:.3f}s")
+        print()
+    else:
+        print("  (no timing information available)")
+        print()
+
     # Print all plans attempted
     print("=" * 80)
     print("ALL PLANS ATTEMPTED")
@@ -363,24 +384,27 @@ def analyze_legacy_usage():
                 reason = plan.get("reason", "")
                 clue_source = plan.get("clue_source")
 
-                print(f"  - [{plan_type}] {target_file}")
-                print(f"    Action: {action}")
+                # Build compact first line: [clue_type -> plan_type -> action] target_file
+                clue_type = ""
+                if clue_source:
+                    clue_type = clue_source.get("clue_type", "")
+
+                if clue_type:
+                    print(f"  [{clue_type} -> {plan_type} -> {action}] {target_file}")
+                else:
+                    print(f"  [{plan_type} -> {action}] {target_file}")
+
                 if reason:
                     print(f"    Reason: {reason}")
 
-                # Show clue source details if available
+                # Show error detected if available
                 if clue_source:
                     source_line = clue_source.get("source_line", "")
-                    clue_type = clue_source.get("clue_type", "")
-                    confidence = clue_source.get("confidence", 0)
-
                     if source_line:
                         # Truncate very long source lines
                         if len(source_line) > 100:
                             source_line = source_line[:97] + "..."
                         print(f"    Error detected: {source_line}")
-                    if clue_type:
-                        print(f"    Clue type: {clue_type} (confidence: {confidence:.2f})")
             print()
     else:
         print("  (no plans were attempted)")

@@ -3,7 +3,7 @@
 Profile example repo tests to find bottlenecks
 
 Usage:
-    python3 profile_dim_test.py [repo_name] [options]
+    python3 test_boil.py [repo_name] [options]
 
 Arguments:
     repo_name       Name of the example repo to profile (default: dim)
@@ -19,8 +19,9 @@ import os
 import sys
 import argparse
 
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(__file__))
+# Add parent directory to path (boiler root)
+boiler_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, boiler_root)
 
 from pipeline.handlers import register_all_handlers
 from tests.test_utils import run_boil_with_profiling
@@ -28,8 +29,7 @@ from tests.test_utils import run_boil_with_profiling
 
 def get_available_repos():
     """Get list of available example repos"""
-    boiler_dir = os.path.dirname(__file__)
-    example_repos_dir = os.path.join(boiler_dir, "example_repos")
+    example_repos_dir = os.path.dirname(os.path.abspath(__file__))
 
     if not os.path.exists(example_repos_dir):
         return []
@@ -58,8 +58,8 @@ def profile_repo(repo_name, max_iterations=20, timeout=120, verbose=True):
     """
     register_all_handlers()
 
-    boiler_dir = os.path.dirname(__file__)
-    example_before_dir = os.path.join(boiler_dir, "example_repos", repo_name, "before")
+    example_repos_dir = os.path.dirname(os.path.abspath(__file__))
+    example_before_dir = os.path.join(example_repos_dir, repo_name, "before")
 
     if not os.path.exists(example_before_dir):
         available = get_available_repos()
