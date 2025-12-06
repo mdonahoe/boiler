@@ -19,6 +19,7 @@ from pipeline.detectors.file_errors import (
     FopenNoSuchFileDetector,
     FileNotFoundDetector,
     ShellCannotOpenDetector,
+    CannotOpenFileDetector,
     ShellCommandNotFoundDetector,
     CatNoSuchFileDetector,
     DiffNoSuchFileDetector,
@@ -66,6 +67,7 @@ def register_all_handlers():
     register_detector(FopenNoSuchFileDetector())
     register_detector(FileNotFoundDetector())
     register_detector(ShellCannotOpenDetector())
+    register_detector(CannotOpenFileDetector())
     register_detector(ShellCommandNotFoundDetector())
     register_detector(CatNoSuchFileDetector())
     register_detector(DiffNoSuchFileDetector())
