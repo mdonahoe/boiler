@@ -1,0 +1,11 @@
+{
+  "detectors": [
+      "CCompilationErrorDetector", "CUndeclaredIdentifierDetector", "CannotOpenFileDetector", "CatNoSuchFileDetector", "DiffNoSuchFileDetector", "FileNotFoundDetector", "MissingPythonCodeDetector", "PermissionDeniedDetector", "PythonNameErrorDetector", "ShellCannotOpenDetector", "ShellCommandNotFoundDetector"
+  ],
+  "planners": [
+      "MissingPythonCodePlanner", "PermissionFixPlanner", "PythonNameErrorPlanner"
+  ],
+  "executors": [
+      "PythonCodeRestoreExecutor"
+  ]
+}
