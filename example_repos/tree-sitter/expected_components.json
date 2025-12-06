@@ -3,6 +3,7 @@
     "CLinkerErrorDetector",
     "FopenNoSuchFileDetector",
     "MakeMissingTargetDetector",
+    "MakeEnteringDirectoryDetector",
     "MakeNoRuleDetector",
     "TestFailureDetector"
   ],
