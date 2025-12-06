@@ -36,6 +36,11 @@ class ExampleReposTest(unittest.TestCase):
         """Test that the dim example repo can be boiled successfully"""
         self._test_repo_boiling("dim")
 
+    @unittest.skipIf(os.environ.get('SKIP_SLOW_TESTS') == '1', "Slow test skipped")
+    def test_treesitter_repo_boiling(self):
+        "test tree-sitter"
+        self._test_repo_boiling("tree-sitter")
+
     def _test_repo_boiling(self, repo_name):
         """Helper function to test boiling of a repo"""
         # Get the path to the boil script and example repo
