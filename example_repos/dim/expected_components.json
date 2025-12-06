@@ -4,6 +4,7 @@
     "CIncompleteTypeDetector",
     "CLinkerErrorDetector",
     "FopenNoSuchFileDetector",
+    "MakeEnteringDirectoryDetector",
     "MakeMissingTargetDetector",
     "MakeNoRuleDetector",
     "TestFailureDetector"
