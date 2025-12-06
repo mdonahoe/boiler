@@ -153,6 +153,8 @@ class ExampleReposTest(unittest.TestCase):
             example_after_dir = os.path.join(boiler_dir, "example_repos", repo_name, "after")
             if os.path.exists(example_after_dir):
                 self._verify_after_is_subset_of_boiled(repo_name, example_after_dir, tmpdir)
+            else:
+                raise ValueError(f"directory {example_after_dir} is missing!")
 
             # Analyze .boil/ debug output
             boil_dir = os.path.join(tmpdir, ".boil")
@@ -161,6 +163,8 @@ class ExampleReposTest(unittest.TestCase):
                 
                 # Compare against expected lists if they exist
                 self._compare_against_expected(repo_name, used_components)
+            else:
+                raise ValueError(f"directory {boil_dir} is missing!")
 
     def _verify_after_is_subset_of_boiled(self, repo_name, after_dir, boiled_dir):
         """Verify that after/ is a subset of the boiled directory"""
@@ -260,29 +264,26 @@ class ExampleReposTest(unittest.TestCase):
         
         # Process each JSON file
         for json_file in json_files:
-            try:
-                with open(json_file, 'r') as f:
-                    data = json.load(f)
+            with open(json_file, 'r') as f:
+                data = json.load(f)
+            
+            # Extract detectors from clues_detected
+            for clue in data.get("clues_detected", []):
+                clue_type = clue.get("clue_type", "")
+                if clue_type in clue_to_detector:
+                    used_detectors.add(clue_to_detector[clue_type])
+            
+            # Extract planners from plans_generated/attempted
+            for plan in data.get("plans_generated", []) + data.get("plans_attempted", []):
+                clue_source = plan.get("clue_source", {})
+                clue_type = clue_source.get("clue_type", "")
+                if clue_type in clue_to_planner:
+                    used_planners.add(clue_to_planner[clue_type])
                 
-                # Extract detectors from clues_detected
-                for clue in data.get("clues_detected", []):
-                    clue_type = clue.get("clue_type", "")
-                    if clue_type in clue_to_detector:
-                        used_detectors.add(clue_to_detector[clue_type])
-                
-                # Extract planners from plans_generated/attempted
-                for plan in data.get("plans_generated", []) + data.get("plans_attempted", []):
-                    clue_source = plan.get("clue_source", {})
-                    clue_type = clue_source.get("clue_type", "")
-                    if clue_type in clue_to_planner:
-                        used_planners.add(clue_to_planner[clue_type])
-                    
-                    # Also extract executors from actions
-                    action = plan.get("action", "")
-                    if action in action_to_executor:
-                        used_executors.add(action_to_executor[action])
-            except Exception as e:
-                print(f"Warning: Could not parse {json_file}: {e}")
+                # Also extract executors from actions
+                action = plan.get("action", "")
+                if action in action_to_executor:
+                    used_executors.add(action_to_executor[action])
         
         return {
             'detectors': sorted(used_detectors),
@@ -365,66 +366,61 @@ class ExampleReposTest(unittest.TestCase):
             # No expected file - skip comparison
             return
         
-        try:
-            with open(expected_file, 'r') as f:
-                expected = json.load(f)
-            
-            issues = []
-            
-            # Check detectors
-            expected_detectors = set(expected.get("detectors", []))
-            used_detectors = set(used_components['detectors'])
-            missing_detectors = expected_detectors - used_detectors
-            unexpected_detectors = used_detectors - expected_detectors
-            
-            if missing_detectors:
-                issues.append(f"Missing expected detectors: {sorted(missing_detectors)}")
-            if unexpected_detectors:
-                issues.append(f"Unexpected detectors: {sorted(unexpected_detectors)}")
-            
-            # Check planners
-            expected_planners = set(expected.get("planners", []))
-            used_planners = set(used_components['planners'])
-            missing_planners = expected_planners - used_planners
-            unexpected_planners = used_planners - expected_planners
-            
-            if missing_planners:
-                issues.append(f"Missing expected planners: {sorted(missing_planners)}")
-            if unexpected_planners:
-                issues.append(f"Unexpected planners: {sorted(unexpected_planners)}")
-            
-            # Check executors
-            expected_executors = set(expected.get("executors", []))
-            used_executors = set(used_components['executors'])
-            missing_executors = expected_executors - used_executors
-            unexpected_executors = used_executors - expected_executors
-            
-            if missing_executors:
-                issues.append(f"Missing expected executors: {sorted(missing_executors)}")
-            if unexpected_executors:
-                issues.append(f"Unexpected executors: {sorted(unexpected_executors)}")
-            
-            if issues:
-                msg = "\n".join([
-                    f"Component usage mismatch for {repo_name}:",
-                    ""
-                ] + issues + [
-                    "",
-                    f"Expected:",
-                    f"  Detectors: {sorted(expected_detectors)}",
-                    f"  Planners: {sorted(expected_planners)}",
-                    f"  Executors: {sorted(expected_executors)}",
-                    f"",
-                    f"Actual:",
-                    f"  Detectors: {sorted(used_detectors)}",
-                    f"  Planners: {sorted(used_planners)}",
-                    f"  Executors: {sorted(used_executors)}",
-                ])
-                raise AssertionError(msg)
-        except json.JSONDecodeError as e:
-            print(f"Warning: Could not parse expected_components.json for {repo_name}: {e}")
-        except Exception as e:
-            print(f"Warning: Error comparing expected components for {repo_name}: {e}")
+        with open(expected_file, 'r') as f:
+            expected = json.load(f)
+        
+        issues = []
+        
+        # Check detectors
+        expected_detectors = set(expected.get("detectors", []))
+        used_detectors = set(used_components['detectors'])
+        missing_detectors = expected_detectors - used_detectors
+        unexpected_detectors = used_detectors - expected_detectors
+        
+        if missing_detectors:
+            issues.append(f"Missing expected detectors: {sorted(missing_detectors)}")
+        if unexpected_detectors:
+            issues.append(f"Unexpected detectors: {sorted(unexpected_detectors)}")
+        
+        # Check planners
+        expected_planners = set(expected.get("planners", []))
+        used_planners = set(used_components['planners'])
+        missing_planners = expected_planners - used_planners
+        unexpected_planners = used_planners - expected_planners
+        
+        if missing_planners:
+            issues.append(f"Missing expected planners: {sorted(missing_planners)}")
+        if unexpected_planners:
+            issues.append(f"Unexpected planners: {sorted(unexpected_planners)}")
+        
+        # Check executors
+        expected_executors = set(expected.get("executors", []))
+        used_executors = set(used_components['executors'])
+        missing_executors = expected_executors - used_executors
+        unexpected_executors = used_executors - expected_executors
+        
+        if missing_executors:
+            issues.append(f"Missing expected executors: {sorted(missing_executors)}")
+        if unexpected_executors:
+            issues.append(f"Unexpected executors: {sorted(unexpected_executors)}")
+        
+        if issues:
+            msg = "\n".join([
+                f"Component usage mismatch for {repo_name}:",
+                ""
+            ] + issues + [
+                "",
+                f"Expected:",
+                f"  Detectors: {sorted(expected_detectors)}",
+                f"  Planners: {sorted(expected_planners)}",
+                f"  Executors: {sorted(expected_executors)}",
+                f"",
+                f"Actual:",
+                f"  Detectors: {sorted(used_detectors)}",
+                f"  Planners: {sorted(used_planners)}",
+                f"  Executors: {sorted(used_executors)}",
+            ])
+            raise AssertionError(msg)
 
     def test_component_coverage(self):
         """
