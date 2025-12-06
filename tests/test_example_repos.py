@@ -57,7 +57,6 @@ class ExampleReposTest(unittest.TestCase):
         """Helper function to test boiling of a repo"""
         # Get the path to the boil script and example repo
         boiler_dir = os.path.dirname(os.path.dirname(__file__))
-        boil_script = os.path.join(boiler_dir, "boil")
         # Use before/ folder - it contains the files that should be committed to git
         # After deletion, boiling should restore them
         example_before_dir = os.path.join(boiler_dir, "example_repos", repo_name, "before")
@@ -66,75 +65,24 @@ class ExampleReposTest(unittest.TestCase):
         self.assertTrue(os.path.exists(example_before_dir),
                        f"Example directory not found: {example_before_dir}")
 
-        # Create a temporary directory for the test
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Initialize git repo
-            subprocess.run(["git", "init"], cwd=tmpdir, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.email", "test@example.com"],
-                          cwd=tmpdir, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.name", "Test User"],
-                          cwd=tmpdir, check=True, capture_output=True)
+        # Import the utility function
+        from tests.test_utils import copy_and_boil
 
-            # Copy files from before/ directory (these will be committed to git)
-            for item in os.listdir(example_before_dir):
-                # Skip .boil directory and other hidden files/dirs
-                if item.startswith('.'):
-                    continue
-                src = os.path.join(example_before_dir, item)
-                dst = os.path.join(tmpdir, item)
-                if os.path.isfile(src):
-                    shutil.copy2(src, dst)
-                elif os.path.isdir(src):
-                    shutil.copytree(src, dst)
+        # Special handling for dim.c - clear instead of delete
+        special_handling = {"dim.c": "clear"} if repo_name == "dim" else None
 
-            # Make scripts executable if needed
-            for item in os.listdir(example_before_dir):
-                if not item.startswith('.'):
-                    item_path = os.path.join(tmpdir, item)
-                    if os.path.isfile(item_path) and os.access(os.path.join(example_before_dir, item), os.X_OK):
-                        os.chmod(item_path, 0o755)
-
-            # Verify Makefile was copied
-            self.assertTrue(os.path.exists(os.path.join(tmpdir, "Makefile")),
-                          f"Makefile should be copied for {repo_name}")
-
-            # Commit all files
-            subprocess.run(["git", "add", "."], cwd=tmpdir, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "Initial commit"],
-                          cwd=tmpdir, check=True, capture_output=True)
-
-            # Verify the test works before deletion
-            result = subprocess.run(["make", "test"], cwd=tmpdir, capture_output=True, text=True)
-            self.assertEqual(result.returncode, 0,
-                           f"Test should pass before deletion for {repo_name}. Output:\n{result.stdout}\n{result.stderr}")
-
-            # Delete all files (but keep .git)
-            for item in os.listdir(tmpdir):
-                if item == ".git":
-                    continue
-                item_path = os.path.join(tmpdir, item)
-                if os.path.isfile(item_path):
-                    if item_path.endswith("dim.c"):
-                        # clear the content
-                        with open(item_path, "w"):
-                            pass
-                    else:
-                        os.remove(item_path)
-                elif os.path.isdir(item_path):
-                    shutil.rmtree(item_path)
-
-            # Verify Makefile is deleted
-            self.assertFalse(os.path.exists(os.path.join(tmpdir, "Makefile")),
-                           f"Makefile should be deleted for {repo_name}")
-
-            # Run boil to restore files
-            boil_result = subprocess.run(
-                [boil_script, "make", "test"],
-                cwd=tmpdir,
-                capture_output=True,
-                text=True,
-                timeout=120
-            )
+        # Run the boil test with temporary directory cleanup via context manager
+        with copy_and_boil(
+            src_dir=example_before_dir,
+            test_command=["make", "test"],
+            preserve_tmpdir=False,
+            verify_before=True,
+            delete_files=True,
+            timeout=120,
+            special_file_handling=special_handling
+        ) as result:
+            tmpdir = result['tmpdir']
+            boil_result = result['boil_result']
 
             # Check that boil succeeded
             self.assertEqual(boil_result.returncode, 0,
@@ -160,7 +108,7 @@ class ExampleReposTest(unittest.TestCase):
             boil_dir = os.path.join(tmpdir, ".boil")
             if os.path.exists(boil_dir):
                 used_components = self._analyze_boil_debug(boil_dir)
-                
+
                 # Compare against expected lists if they exist
                 self._compare_against_expected(repo_name, used_components)
             else:
