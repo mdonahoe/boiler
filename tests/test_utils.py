@@ -209,7 +209,8 @@ def run_boil_with_profiling(
     Run copy_and_boil with profiling and detailed output.
 
     This function is designed for profiling and debugging - it preserves
-    the temporary directory and prints detailed timing information.
+    the temporary directory and prints detailed timing information using
+    boil --check.
 
     Args:
         src_dir: Path to the source directory to copy from
@@ -222,7 +223,6 @@ def run_boil_with_profiling(
         str: Path to the temporary directory (preserved for inspection)
     """
     import time
-    import json
 
     env_vars = {}
     if verbose:
@@ -255,23 +255,22 @@ def run_boil_with_profiling(
         print(f"Exit code: {boil_result.returncode}")
         print(f"{'='*60}\n")
 
-        # Analyze .boil directory
-        boil_dir = os.path.join(tmpdir, ".boil")
-        if os.path.exists(boil_dir):
-            print(f"\n.boil directory contents:")
-            for f in sorted(os.listdir(boil_dir)):
-                print(f"  {f}")
+        # Run boil --check to analyze the session
+        boiler_dir = os.path.dirname(os.path.dirname(__file__))
+        boil_script = os.path.join(boiler_dir, "boil")
+        check_result = subprocess.run(
+            [boil_script, "--check"],
+            cwd=tmpdir,
+            capture_output=True,
+            text=True
+        )
 
-            # Analyze pipeline JSON files
-            print(f"\nTiming from pipeline JSON files:")
-            for f in sorted(os.listdir(boil_dir)):
-                if f.endswith('.pipeline.json'):
-                    with open(os.path.join(boil_dir, f)) as jf:
-                        data = json.load(jf)
-                        if 'timings' in data:
-                            print(f"  {f}:")
-                            for k, v in data['timings'].items():
-                                print(f"    {k}: {v:.3f}s")
+        if check_result.returncode == 0:
+            print(check_result.stdout)
+        else:
+            print(f"Warning: boil --check failed with exit code {check_result.returncode}")
+            if check_result.stderr:
+                print(f"Error: {check_result.stderr}")
 
         print(f"\nTemp directory preserved at: {tmpdir}")
         return tmpdir
