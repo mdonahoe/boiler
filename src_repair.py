@@ -217,8 +217,9 @@ def get_c_code_annotations(code_str) -> T.List[T.List[str]]:
 
     try:
         # Run tree_print to get AST as JSON
+        tree_print_path = os.path.join(os.path.dirname(__file__), "print-tree", "tree_print")
         result = subprocess.run(
-            ["/root/tree-sitter/tree_print", "--json", temp_filename],
+            [tree_print_path, "--json", temp_filename],
             capture_output=True,
             text=True
         )
