@@ -19,6 +19,9 @@ from pipeline.detectors.make_errors import (
     MakeMissingTargetDetector,
     MakeNoRuleDetector,
 )
+from pipeline.detectors import registry as detector_registry
+from pipeline import handlers
+
 from pipeline.detectors.permissions import PermissionDeniedDetector
 from pipeline.detectors.python_code import (
     MissingPythonCodeDetector,
@@ -44,25 +47,8 @@ class DetectorExamplesTest(unittest.TestCase):
 
     def setUp(self):
         """Register detectors before each test"""
-        self.detectors = [
-            MakeEnteringDirectoryDetector(),
-            MakeMissingTargetDetector(),
-            MakeNoRuleDetector(),
-            PermissionDeniedDetector(),
-            MissingPythonCodeDetector(),
-            PythonNameErrorDetector(),
-            FopenNoSuchFileDetector(),
-            FileNotFoundDetector(),
-            ShellCannotOpenDetector(),
-            ShellCommandNotFoundDetector(),
-            CatNoSuchFileDetector(),
-            DiffNoSuchFileDetector(),
-            CLinkerErrorDetector(),
-            CCompilationErrorDetector(),
-            CIncompleteTypeDetector(),
-            CImplicitDeclarationDetector(),
-            CUndeclaredIdentifierDetector(),
-        ]
+        handlers.register_all_handlers()
+        self.detectors = detector_registry.get_detector_registry()._detectors
 
     def test_all_detectors_have_examples(self):
         """Verify every detector defines EXAMPLES"""
