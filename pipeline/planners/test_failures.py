@@ -77,24 +77,36 @@ class TestFailurePlanner(Planner):
                 if test_file_candidate:
                     test_file = test_file_candidate
                 else:
-                    # Try to find it in git (might not be deleted)
-                    try:
-                        result = subprocess.run(
-                            ["git", "ls-files", "--", basename],
-                            cwd=git_state.git_toplevel,
-                            capture_output=True,
-                            text=True
-                        )
-                        if result.stdout.strip():
-                            test_file = result.stdout.strip().split('\n')[0]
-                        else:
+                    # Try common test directory locations
+                    test_dirs = ["tests", "test", "t"]
+                    found = False
+                    for test_dir in test_dirs:
+                        candidate_path = os.path.join(git_state.git_toplevel, test_dir, basename)
+                        if os.path.exists(candidate_path):
+                            test_file = os.path.join(test_dir, basename)
+                            test_file_path = candidate_path
+                            found = True
+                            break
+
+                    if not found:
+                        # Try to find it in git (might not be deleted)
+                        try:
+                            result = subprocess.run(
+                                ["git", "ls-files", "--", basename],
+                                cwd=git_state.git_toplevel,
+                                capture_output=True,
+                                text=True
+                            )
+                            if result.stdout.strip():
+                                test_file = result.stdout.strip().split('\n')[0]
+                            else:
+                                if is_verbose():
+                                    print(f"[Planner:TestFailurePlanner] Test file {test_file} not found, skipping")
+                                return []
+                        except Exception:
                             if is_verbose():
                                 print(f"[Planner:TestFailurePlanner] Test file {test_file} not found, skipping")
                             return []
-                    except Exception:
-                        if is_verbose():
-                            print(f"[Planner:TestFailurePlanner] Test file {test_file} not found, skipping")
-                        return []
         
         # Update test_file_path if we found it in git
         if test_file != original_test_file:
@@ -127,33 +139,52 @@ class TestFailurePlanner(Planner):
     def _extract_file_references(self, test_file: str, line_number: int, suspected_files: T.List[str]) -> T.List[str]:
         """Extract file references from test file around the failure line."""
         referenced_files = set(suspected_files)  # Start with suspected files
-        
+
         try:
             with open(test_file, 'r') as f:
                 lines = f.readlines()
-            
+
+            # For C test files, also look at the beginning of the file for comments describing test data
+            full_text = ''.join(lines)
+
             # Look at context around the failure line (10 lines before, 20 lines after)
             start_line = max(0, line_number - 10)
             end_line = min(len(lines), line_number + 20)
             context_lines = lines[start_line:end_line]
             context_text = ''.join(context_lines)
-            
-            # Pattern 1: Command arguments with filenames
+
+            # Pattern 1: Command arguments with filenames (Python tests)
             # Matches: command=["./dim", "filename.txt"] or command=["./dim", 'filename.txt']
             command_pattern = r'command\s*=\s*\[[^\]]*["\']([^"\']+\.(?:py|txt|md|c|h|cpp|hpp|json|yaml|yml|sh))["\']'
             for match in re.finditer(command_pattern, context_text):
                 referenced_files.add(match.group(1))
-            
-            # Pattern 2: assertIn/assertEqual with filenames
+
+            # Pattern 2: assertIn/assertEqual with filenames (Python tests)
             # Matches: assertIn("filename.txt", ...) or assertEqual(..., "filename.txt")
             assert_pattern = r'assert(?:In|Equal|NotIn|NotEqual)\s*\([^)]*["\']([^"\']+\.(?:py|txt|md|c|h|cpp|hpp|json|yaml|yml|sh))["\']'
             for match in re.finditer(assert_pattern, context_text):
                 referenced_files.add(match.group(1))
-            
+
+            # Pattern 3: C string literals with filenames
+            # Matches: const char *filename = "file.txt" or const char *filename = "./file.txt"
+            c_string_pattern = r'["\'](\./)?([^"\']+\.(?:txt|md|c|h|cpp|hpp|json|yaml|yml|sh|dat))["\']'
+            for match in re.finditer(c_string_pattern, context_text):
+                filename = match.group(2)  # Get the filename without ./ prefix if present
+                # Only add if it looks like a data file (not source code being included)
+                if not filename.endswith(('.c', '.h', '.cpp', '.hpp')):
+                    referenced_files.add(filename)
+
+            # Pattern 4: Files mentioned in comments (especially at the top of C test files)
+            # Matches: ./tests/file.txt: or * ./tests/file.txt:
+            comment_file_pattern = r'[*/]\s*(\./)?(?:tests/)?([^:\s]+\.(?:txt|md|json|yaml|yml|sh|dat)):'
+            for match in re.finditer(comment_file_pattern, full_text[:500]):  # Just check first 500 chars
+                filename = match.group(2)
+                referenced_files.add(filename)
+
         except Exception as e:
             if is_verbose():
                 print(f"[Planner:TestFailurePlanner] Error reading {test_file}: {e}")
-        
+
         return list(referenced_files)
 
     def _find_file_in_deleted(self, filename: str, git_state: GitState) -> T.Optional[str]:

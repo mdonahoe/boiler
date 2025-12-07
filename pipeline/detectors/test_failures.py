@@ -21,6 +21,7 @@ class TestFailureDetector(RegexDetector):
     PATTERNS = {
         "test_failure": r"File\s+['\"](?P<test_file>[^'\"]+\.py)['\"],\s+line\s+(?P<line_number>\d+),\s+in\s+(?P<test_name>\w+)",
         "test_assertion_with_filename": r"AssertionError:\s*['\"](?P<suspected_file>[^'\"]+\.(?:py|txt|md|c|h|cpp|hpp|json|yaml|yml|sh))['\"].*?not found",
+        "c_test_failure": r"(?P<test_file>[^\s:]+\.c):(?P<line_number>\d+):\s*(?P<test_name>\w+):\s*Assertion\s*[`'](?P<assertion>[^'`]+)[`']\s*failed",
     }
 
     EXAMPLES = [
@@ -54,18 +55,20 @@ class TestFailureDetector(RegexDetector):
         """
         combined = stderr + "\n" + stdout
         clues = []
-        
+
         # First, find all test failures with file paths
         test_failures = {}
+
+        # Python test failures
         for match in re.finditer(self.PATTERNS["test_failure"], combined, re.MULTILINE):
             test_file = match.group("test_file")
             line_number = match.group("line_number")
             test_name = match.group("test_name")
-            
+
             # Make path relative if absolute
             if "/" in test_file:
                 test_file = test_file.split("/")[-1]  # Just filename for now
-            
+
             key = (test_file, line_number)
             if key not in test_failures:
                 test_failures[key] = {
@@ -73,8 +76,29 @@ class TestFailureDetector(RegexDetector):
                     "line_number": int(line_number),
                     "test_name": test_name,
                     "suspected_files": [],
+                    "assertion": None,
                 }
-        
+
+        # C test failures (assertion failures)
+        for match in re.finditer(self.PATTERNS["c_test_failure"], combined, re.MULTILINE):
+            test_file = match.group("test_file")
+            line_number = match.group("line_number")
+            test_name = match.group("test_name")
+            assertion = match.group("assertion")
+
+            # Make path relative if needed (strip leading ./)
+            test_file = test_file.lstrip("./")
+
+            key = (test_file, line_number)
+            if key not in test_failures:
+                test_failures[key] = {
+                    "test_file": test_file,
+                    "line_number": int(line_number),
+                    "test_name": test_name,
+                    "suspected_files": [],
+                    "assertion": assertion,
+                }
+
         # Extract suspected filenames from assertions
         for match in re.finditer(self.PATTERNS["test_assertion_with_filename"], combined, re.MULTILINE):
             suspected_file = match.group("suspected_file")
@@ -83,7 +107,7 @@ class TestFailureDetector(RegexDetector):
             for key in test_failures:
                 if suspected_file not in test_failures[key]["suspected_files"]:
                     test_failures[key]["suspected_files"].append(suspected_file)
-        
+
         # Create clues for each test failure
         for (test_file, line_number), info in test_failures.items():
             clues.append(ErrorClue(
@@ -94,8 +118,9 @@ class TestFailureDetector(RegexDetector):
                     "line_number": info["line_number"],
                     "test_name": info["test_name"],
                     "suspected_files": info["suspected_files"],
+                    "assertion": info["assertion"],
                 },
                 source_line=f"Test {info['test_name']} failed at {test_file}:{line_number}"
             ))
-        
+
         return clues
