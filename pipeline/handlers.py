@@ -99,13 +99,3 @@ def register_all_handlers():
     register_executor(GitRestoreExecutor())
 
     _handlers_registered = True
-
-    # Only print registration info if explicitly requested (e.g., for debugging)
-    # Commented out to reduce noise during tests
-    # print("[Pipeline] Registered handlers:")
-    # from pipeline.detectors.registry import get_detector_registry
-    # from pipeline.planners.registry import get_planner_registry
-    # from pipeline.executors.registry import get_executor_registry
-    # print(f"  Detectors: {get_detector_registry().list_detectors()}")
-    # print(f"  Planners: {get_planner_registry().list_planners()}")
-    # print(f"  Executors: {get_executor_registry().list_executors()}")
