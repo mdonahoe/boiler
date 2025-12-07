@@ -30,7 +30,7 @@ PermissionError: [Errno 13] Permission denied: './test.py'
 
         git_state = GitState(
             ref="HEAD",
-            deleted_files=set(),
+            deleted_files=[],
             git_toplevel="/root/boiler"
         )
 
@@ -50,7 +50,7 @@ PermissionError: [Errno 13] Permission denied: './test.py'
 
         git_state = GitState(
             ref="HEAD",
-            deleted_files=set(),
+            deleted_files=[],
             git_toplevel="/root/boiler"
         )
 
@@ -68,7 +68,7 @@ PermissionError: [Errno 13] Permission denied: './nonexistent_file_xyz123.py'
 
         git_state = GitState(
             ref="HEAD",
-            deleted_files=set(),
+            deleted_files=[],
             git_toplevel="/root/boiler"
         )
 

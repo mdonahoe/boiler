@@ -28,7 +28,7 @@ class MissingPythonCodeTest(unittest.TestCase):
 
         git_state = GitState(
             ref="HEAD",
-            deleted_files=set(),
+            deleted_files=[],
             git_toplevel="/root/boiler"
         )
 
@@ -46,7 +46,7 @@ class MissingPythonCodeTest(unittest.TestCase):
 
         git_state = GitState(
             ref="HEAD",
-            deleted_files=set(),
+            deleted_files=[],
             git_toplevel="/root/boiler"
         )
 
@@ -64,7 +64,7 @@ class MissingPythonCodeTest(unittest.TestCase):
 
         git_state = GitState(
             ref="HEAD",
-            deleted_files=set(),
+            deleted_files=[],
             git_toplevel="/root/boiler"
         )
 
@@ -83,7 +83,7 @@ class MissingPythonCodeTest(unittest.TestCase):
 
         git_state = GitState(
             ref="HEAD",
-            deleted_files=set(),
+            deleted_files=[],
             git_toplevel="/root/boiler"
         )
 

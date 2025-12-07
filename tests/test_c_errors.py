@@ -115,7 +115,7 @@ class TestMissingFilePlanner(unittest.TestCase):
         # Mock git state
         git_state = GitState(
             ref="HEAD",
-            deleted_files={"lib/src/point.h"},
+            deleted_files=["lib/src/point.h"],
             git_toplevel="/repo"
         )
         
@@ -173,7 +173,7 @@ class TestLinkerUndefinedSymbolsPlanner(unittest.TestCase):
         
         git_state = GitState(
             ref="HEAD",
-            deleted_files={"lib/src/lib.c"},
+            deleted_files=["lib/src/lib.c"],
             git_toplevel="/repo"
         )
         

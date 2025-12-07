@@ -30,7 +30,7 @@ PermissionError: [Errno 13] Permission denied: './test.py'
 
         git_state = GitState(
             ref="HEAD",
-            deleted_files=set(),
+            deleted_files=[],
             git_toplevel="/root/boiler"
         )
 

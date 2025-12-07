@@ -23,7 +23,7 @@ class FileErrorDetectionTest(unittest.TestCase):
     def test_file_not_found(self):
         """Test FileNotFoundError detection"""
         stderr = "FileNotFoundError: [Errno 2] No such file or directory: './test.sh'"
-        git_state = GitState(ref="HEAD", deleted_files=set(), git_toplevel="/root/boiler")
+        git_state = GitState(ref="HEAD", deleted_files=[], git_toplevel="/root/boiler")
 
         result = run_pipeline(stderr, "", git_state, debug=False)
 
@@ -35,7 +35,7 @@ class FileErrorDetectionTest(unittest.TestCase):
     def test_shell_cannot_open(self):
         """Test sh cannot open detection"""
         stderr = "sh: 0: cannot open makeoptions: No such file"
-        git_state = GitState(ref="HEAD", deleted_files=set(), git_toplevel="/root/boiler")
+        git_state = GitState(ref="HEAD", deleted_files=[], git_toplevel="/root/boiler")
 
         result = run_pipeline(stderr, "", git_state, debug=False)
 
@@ -47,7 +47,7 @@ class FileErrorDetectionTest(unittest.TestCase):
     def test_shell_command_not_found(self):
         """Test shell command not found detection"""
         stderr = "./test.sh: line 3: ./configure: No such file or directory"
-        git_state = GitState(ref="HEAD", deleted_files=set(), git_toplevel="/root/boiler")
+        git_state = GitState(ref="HEAD", deleted_files=[], git_toplevel="/root/boiler")
 
         result = run_pipeline(stderr, "", git_state, debug=False)
 
@@ -59,7 +59,7 @@ class FileErrorDetectionTest(unittest.TestCase):
     def test_cat_no_such_file(self):
         """Test cat no such file detection"""
         stderr = "cat: Makefile.in: No such file or directory"
-        git_state = GitState(ref="HEAD", deleted_files=set(), git_toplevel="/root/boiler")
+        git_state = GitState(ref="HEAD", deleted_files=[], git_toplevel="/root/boiler")
 
         result = run_pipeline(stderr, "", git_state, debug=False)
 
@@ -71,7 +71,7 @@ class FileErrorDetectionTest(unittest.TestCase):
     def test_diff_no_such_file(self):
         """Test diff no such file detection"""
         stderr = "diff: test.txt: No such file or directory"
-        git_state = GitState(ref="HEAD", deleted_files=set(), git_toplevel="/root/boiler")
+        git_state = GitState(ref="HEAD", deleted_files=[], git_toplevel="/root/boiler")
 
         result = run_pipeline(stderr, "", git_state, debug=False)
 
@@ -86,7 +86,7 @@ class FileErrorDetectionTest(unittest.TestCase):
    82 | #include "ex.h"
        |          ^~~~~~
 compilation terminated."""
-        git_state = GitState(ref="HEAD", deleted_files=set(), git_toplevel="/root/boiler")
+        git_state = GitState(ref="HEAD", deleted_files=[], git_toplevel="/root/boiler")
 
         result = run_pipeline(stderr, "", git_state, debug=False)
 
