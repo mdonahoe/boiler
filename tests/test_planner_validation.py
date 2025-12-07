@@ -33,7 +33,7 @@ compilation terminated.
         # boil.py exists in the boiler repo and matches HEAD
         git_state = GitState(
             ref="HEAD",
-            deleted_files=set(),
+            deleted_files=[],
             git_toplevel="/root/boiler"
         )
 
@@ -66,7 +66,7 @@ compilation terminated.
 
         git_state = GitState(
             ref="HEAD",
-            deleted_files={"nonexistent123.txt"},
+            deleted_files=["nonexistent123.txt"],
             git_toplevel="/root/boiler"
         )
 

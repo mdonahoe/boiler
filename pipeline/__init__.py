@@ -13,7 +13,7 @@ Usage:
     register_executor(MyExecutor())
 
     # Run the pipeline
-    git_state = GitState(ref="HEAD", deleted_files=set(), git_toplevel="/path")
+    git_state = GitState(ref="HEAD", deleted_files=[], git_toplevel="/path")
     result = run_pipeline(stderr, stdout, git_state)
 """
 

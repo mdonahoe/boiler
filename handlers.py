@@ -82,16 +82,20 @@ def get_git_toplevel() -> str:
     ).strip()
 
 
-def get_deleted_files(ref: str = "HEAD") -> T.Set[str]:
-    """Get the list of deleted files from `git status`."""
+def get_deleted_files(ref: str = "HEAD") -> T.List[str]:
+    """Get the list of deleted files from `git status`.
+
+    Returns a sorted list for deterministic behavior.
+    """
     # Fallback: use the working directory state
     result = subprocess.run(
         ["git", "diff", "--name-status"], stdout=subprocess.PIPE, text=True
     )
     # TODO: what if result fails?
-    return set(
+    deleted = [
         line.split()[-1] for line in result.stdout.splitlines() if line.startswith("D")
-    )
+    ]
+    return sorted(deleted)  # Sort for deterministic iteration
 
 
 def restore_missing_file(missing_file: str, ref: T.Optional[str] = None) -> bool:

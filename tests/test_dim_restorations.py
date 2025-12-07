@@ -59,7 +59,7 @@ make: *** [Makefile:41: dim] Error 1"""
 
         git_state = GitState(
             ref="HEAD",
-            deleted_files=set(),
+            deleted_files=[],
             git_toplevel="/tmp"
         )
 
@@ -219,7 +219,7 @@ dim.c:15:1: note: include '<ctype.h>'"""
         planner = MissingCFunctionPlanner()
         git_state = GitState(
             ref="HEAD",
-            deleted_files=set(),
+            deleted_files=[],
             git_toplevel=self.test_dir
         )
 
@@ -262,7 +262,7 @@ dim.c:759:3: error: implicit declaration of function 'va_end' [-Werror=implicit-
         planner = MissingCFunctionPlanner()
         git_state = GitState(
             ref="HEAD",
-            deleted_files=set(),
+            deleted_files=[],
             git_toplevel=self.test_dir
         )
         
@@ -294,7 +294,7 @@ dim.c:759:3: error: implicit declaration of function 'va_end' [-Werror=implicit-
         planner = MissingCFunctionPlanner()
         git_state = GitState(
             ref="HEAD",
-            deleted_files=set(),
+            deleted_files=[],
             git_toplevel=self.test_dir
         )
 
@@ -335,7 +335,7 @@ undefined reference to `editorRefreshScreen'"""
         planner = MissingCIncludePlanner()
         git_state = GitState(
             ref="HEAD",
-            deleted_files=set(),
+            deleted_files=[],
             git_toplevel=self.test_dir
         )
 
@@ -361,7 +361,7 @@ undefined reference to `editorRefreshScreen'"""
         planner = MissingCIncludePlanner()
         git_state = GitState(
             ref="HEAD",
-            deleted_files=set(),
+            deleted_files=[],
             git_toplevel=self.test_dir
         )
 

@@ -126,5 +126,5 @@ class GitState:
     Helper class to encapsulate git repository state.
     """
     ref: str  # git ref to restore from (e.g., "HEAD")
-    deleted_files: T.Set[str]  # files deleted in working directory
+    deleted_files: T.List[str]  # files deleted in working directory (sorted for determinism)
     git_toplevel: str  # git repository root directory

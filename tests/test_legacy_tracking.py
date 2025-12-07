@@ -35,7 +35,7 @@ SyntaxError: invalid syntax
 
         git_state = GitState(
             ref="HEAD",
-            deleted_files=set(),
+            deleted_files=[],
             git_toplevel="/root/boiler"
         )
 

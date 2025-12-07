@@ -28,7 +28,7 @@ class MakeErrorTest(unittest.TestCase):
 
         git_state = GitState(
             ref="HEAD",
-            deleted_files={"dim.c"},  # Simulate that dim.c is deleted
+            deleted_files=["dim.c"],  # Simulate that dim.c is deleted
             git_toplevel="/root/dim"
         )
 
