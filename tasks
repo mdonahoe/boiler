@@ -1,0 +1,62 @@
+STARTER TASK
+-------------
+
+You are going to be editing one repo (boiler) and running a tool in a target repo.
+In the following instruction, the {target repo} is whatever user told you in the original prompt.
+
+Read boiler/README.md
+
+Then, please "cd /root/{target-repo}; boil make test".
+The boil command will fail because it doesn't know how to handle the error.
+The solution is "git checkout" a missing file, but boiler doesn't know which.
+
+Help write a handler function for boil to handle this case.
+Only edit /root/boiler/handlers.py yourself.
+DO NOT EDIT ANY FILE IN THE TARGET REPO.
+
+You can also call "boil --finish" to reset state in the target repo.
+
+Recommended iteration loop:
+1. "boil make test"
+2. inspect the log from that command and see why it failed
+3. "git log HEAD..boiling" to see a list of commits that boiler added while working.
+    It uses the "boiling" branch, rather than changing HEAD
+    You can "git show <commit>" to see the output of "make test" and any file changes boil attempted.
+4. Based on the error output, and your knowledge of what the true fix is, modify /root/boiler/handlers.py to handle this error.
+5. "boil --abort" to reset the session to the beginning, undoing any file changes boiler makes.
+6. "boil --finish" will delete the "boiling" branch and ".boil" directory, but keep changes to working dir.
+
+
+
+SECOND TASK
+-----------
+
+Iteration Loop:
+Pick a random file in target repo and delete it.
+"boil make test"
+Fix the pipeline until boiler can make the repair on it's own.
+Use "boil --abort" to undo any boil-initiated repairs so you can retry.
+"boil --finish" will delete the boiling session so you are ready for a new one.
+Repeat with a new random file until boil can handle them all.
+
+
+
+THIRD TASK
+----------
+
+
+Iteration loop:
+1. download target repo from github and get it's tests working.
+2. boil the repo while keeping the tests untouched.
+3. Add more handlers as necessary until you can delete all the source files in the target repo and boil it back to life using only the tests.
+
+
+
+FOURTH TASK
+-----------
+
+Target repo = your choice
+
+Iteration loop:
+1. clone a random repo from github
+2. identify tests and boil.
