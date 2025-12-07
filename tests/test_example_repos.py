@@ -246,7 +246,7 @@ class ExampleReposTest(unittest.TestCase):
         # Use PATTERNS attribute from detectors to map clue_types
         for detector in detector_registry._detectors:
             detector_name = detector.name
-            # Check if detector has PATTERNS attribute (RegexDetector subclasses)
+            # Check if detector has PATTERNS attribute (Detector subclasses)
             if hasattr(detector, 'PATTERNS'):
                 for clue_type in detector.PATTERNS.keys():
                     # If multiple detectors produce the same clue_type, keep the first one

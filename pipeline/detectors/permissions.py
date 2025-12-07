@@ -4,11 +4,11 @@ Detectors for permission-related errors.
 
 import re
 import typing as T
-from pipeline.detectors.base import RegexDetector
+from pipeline.detectors.base import Detector
 from pipeline.models import ErrorClue
 
 
-class PermissionDeniedDetector(RegexDetector):
+class PermissionDeniedDetector(Detector):
     """
     Detect permission denied errors.
 
