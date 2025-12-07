@@ -93,6 +93,8 @@ def run_pipeline(stderr: str, stdout: str, git_state: GitState, debug: bool = Fa
 
         # Initialize clues_fixed for each plan to contain at least the clue_source
         for plan in plans:
+            if not plan.clue_source:
+                raise ValueError(f"plan {plan} created without a clue!")
             if not plan.clues_fixed:
                 plan.clues_fixed = [plan.clue_source]
 

@@ -113,7 +113,7 @@ def get_session_status():
     return "⏳ IN PROGRESS", f"Iterations {min(iterations)}-{max_iter} completed"
 
 
-def analyze_legacy_usage():
+def boil_check():
     """Analyze legacy handler usage from JSON debug files"""
 
     # Find all pipeline JSON files
@@ -121,15 +121,6 @@ def analyze_legacy_usage():
     if not os.path.exists(boil_dir):
         print(f"No {boil_dir} directory found. Run boil.py first.")
         return 1
-
-    # Print session status first
-    print("=" * 80)
-    print("BOIL SESSION STATUS")
-    print("=" * 80)
-    status, details = get_session_status()
-    print(f"{status}")
-    print(f"Details: {details}")
-    print()
 
     json_files = [
         f for f in os.listdir(boil_dir)
@@ -410,6 +401,16 @@ def analyze_legacy_usage():
         print("  (no plans were attempted)")
     print()
 
+    # Print session status last
+    print("=" * 80)
+    print("BOIL SESSION STATUS")
+    print("=" * 80)
+    status, details = get_session_status()
+    print(f"{status}")
+    print(f"Details: {details}")
+    print()
+
+
     return 0
 
 
@@ -484,4 +485,4 @@ if __name__ == "__main__":
             print("Error: --debug-iterations must be in format START-END (e.g., 3-9)")
             sys.exit(1)
     else:
-        sys.exit(analyze_legacy_usage())
+        sys.exit(boil_check())

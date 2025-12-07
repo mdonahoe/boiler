@@ -220,7 +220,7 @@ def run_boil_with_profiling(
         timeout: Timeout for boil command in seconds (default: 120)
 
     Returns:
-        str: Path to the temporary directory (preserved for inspection)
+        tuple: (tmpdir, success) - Path to temp directory and whether boiling succeeded
     """
     import time
 
@@ -247,6 +247,7 @@ def run_boil_with_profiling(
     ) as result:
         tmpdir = result['tmpdir']
         boil_result = result['boil_result']
+        success = boil_result.returncode == 0
 
         total_time = time.time() - start_time
 
@@ -273,4 +274,4 @@ def run_boil_with_profiling(
                 print(f"Error: {check_result.stderr}")
 
         print(f"\nTemp directory preserved at: {tmpdir}")
-        return tmpdir
+        return tmpdir, success
