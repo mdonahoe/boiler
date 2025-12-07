@@ -10,7 +10,7 @@ When adding back deleted detector patterns, I created new clue types:
 - `missing_file_simple` (from FileNotFoundDetector)
 - `missing_file_not_found` (from ShellCommandNotFoundDetector)
 
-The base `RegexDetector` class uses **pattern name as clue_type** (line 120 in base.py):
+The base `Detector` class uses **pattern name as clue_type** (line 120 in base.py):
 ```python
 clue_type=pattern_name
 ```

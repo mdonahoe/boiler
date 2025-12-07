@@ -5,7 +5,7 @@
 
 ## Summary
 
-Successfully refactored 11+ detector classes to use only regex named capture groups instead of overriding base class methods. This enforces a cleaner, more maintainable architecture where the base `RegexDetector` class handles all pattern matching logic.
+Successfully refactored 11+ detector classes to use only regex named capture groups instead of overriding base class methods. This enforces a cleaner, more maintainable architecture where the base `Detector` class handles all pattern matching logic.
 
 ## What Was Done
 
@@ -13,7 +13,7 @@ Successfully refactored 11+ detector classes to use only regex named capture gro
 
 **Before:**
 ```python
-class MissingPythonCodeDetector(RegexDetector):
+class MissingPythonCodeDetector(Detector):
     PATTERNS = {
         "missing_python_code": r"'((?:def|class|import)\s+\w+)'.*?([a-zA-Z0-9_-]+\.py)"
     }
@@ -26,7 +26,7 @@ class MissingPythonCodeDetector(RegexDetector):
 
 **After:**
 ```python
-class MissingPythonCodeDetector(RegexDetector):
+class MissingPythonCodeDetector(Detector):
     PATTERNS = {
         "missing_python_code": r"'(?P<missing_element>(?:def|class|import)\s+\w+)'.*?(?P<file_path>[a-zA-Z0-9_-]+\.py)"
     }
@@ -159,7 +159,7 @@ Having good test coverage made this refactoring safe and gave confidence that no
 
 ### After Refactoring
 - ✅ 0 detectors override base methods
-- ✅ All logic in base class (`RegexDetector`)
+- ✅ All logic in base class (`Detector`)
 - ✅ Detectors are just data (`PATTERNS` + `EXAMPLES`)
 - ✅ Consistent approach: patterns → named groups → ErrorClue
 - ✅ Easy to add new detectors (just add patterns!)

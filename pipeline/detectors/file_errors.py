@@ -4,11 +4,11 @@ Detectors for file system errors (missing files, cannot open, etc.).
 
 import re
 import typing as T
-from pipeline.detectors.base import RegexDetector
+from pipeline.detectors.base import Detector
 from pipeline.models import ErrorClue
 
 
-class FopenNoSuchFileDetector(RegexDetector):
+class FopenNoSuchFileDetector(Detector):
     """
     Detect fopen errors when a file cannot be opened.
 
@@ -20,7 +20,7 @@ class FopenNoSuchFileDetector(RegexDetector):
 
     PATTERNS = {
         "missing_file": r"fopen:\s+(?P<file_path>[^\s:]+?):\s*No such file or directory",
-        "missing_file_assertion": r"AssertionError:\s*['\"](?P<file_path>[^'\"]+)['\"].*fopen:\s*No such file or directory",
+        "missing_file_assertion": r"AssertionError:\s*['\"](?P<file_path>[^'\"]+\.(?:py|txt|md|c|h|cpp|hpp|json|yaml|yml|sh|rs|go|java|js|ts|html|css|xml|sql))['\"].*fopen:\s*No such file or directory",
     }
 
     EXAMPLES = [
@@ -43,7 +43,7 @@ class FopenNoSuchFileDetector(RegexDetector):
     ]
 
 
-class FileNotFoundDetector(RegexDetector):
+class FileNotFoundDetector(Detector):
     """
     Detect FileNotFoundError in various formats.
 
@@ -77,7 +77,7 @@ class FileNotFoundDetector(RegexDetector):
     ]
 
 
-class ShellCannotOpenDetector(RegexDetector):
+class ShellCannotOpenDetector(Detector):
     """
     Detect shell errors when a file cannot be opened.
 
@@ -102,7 +102,7 @@ class ShellCannotOpenDetector(RegexDetector):
     ]
 
 
-class CannotOpenFileDetector(RegexDetector):
+class CannotOpenFileDetector(Detector):
     """
     Detect generic "Cannot open file" errors from programs.
 
@@ -136,7 +136,7 @@ class CannotOpenFileDetector(RegexDetector):
     ]
 
 
-class ShellCommandNotFoundDetector(RegexDetector):
+class ShellCommandNotFoundDetector(Detector):
     """
     Detect shell errors when a command/script is not found.
 
@@ -171,7 +171,7 @@ class ShellCommandNotFoundDetector(RegexDetector):
     ]
 
 
-class CatNoSuchFileDetector(RegexDetector):
+class CatNoSuchFileDetector(Detector):
     """
     Detect cat errors when a file is missing.
 
@@ -195,7 +195,7 @@ class CatNoSuchFileDetector(RegexDetector):
     ]
 
 
-class DiffNoSuchFileDetector(RegexDetector):
+class DiffNoSuchFileDetector(Detector):
     """
     Detect diff errors when a file is missing.
 
@@ -219,7 +219,7 @@ class DiffNoSuchFileDetector(RegexDetector):
     ]
 
 
-class CLinkerErrorDetector(RegexDetector):
+class CLinkerErrorDetector(Detector):
     """
     Detect C/C++ linker undefined symbol errors and missing files.
 
@@ -253,7 +253,7 @@ class CLinkerErrorDetector(RegexDetector):
     ]
 
 
-class CCompilationErrorDetector(RegexDetector):
+class CCompilationErrorDetector(Detector):
     """
     Detect C/C++ compilation errors when header files are missing.
 
@@ -281,7 +281,7 @@ class CCompilationErrorDetector(RegexDetector):
     ]
 
 
-class CIncompleteTypeDetector(RegexDetector):
+class CIncompleteTypeDetector(Detector):
     """
     Detect C compilation errors for incomplete struct/type errors.
 
@@ -310,7 +310,7 @@ class CIncompleteTypeDetector(RegexDetector):
     ]
 
 
-class CImplicitDeclarationDetector(RegexDetector):
+class CImplicitDeclarationDetector(Detector):
     """
     Detect C implicit function declaration errors that suggest missing includes.
 
@@ -340,7 +340,7 @@ class CImplicitDeclarationDetector(RegexDetector):
     ]
 
 
-class CUndeclaredIdentifierDetector(RegexDetector):
+class CUndeclaredIdentifierDetector(Detector):
     """
     Detect C compilation errors for undeclared identifiers with include suggestions.
 

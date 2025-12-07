@@ -221,15 +221,15 @@ class DetectorExamplesTest(unittest.TestCase):
             )
 
     def test_detectors_do_not_override_base_methods(self):
-        """Verify detector subclasses don't override detect() or pattern_to_clue()"""
-        from pipeline.detectors.base import RegexDetector
+        """Verify Detector subclasses don't override detect() or pattern_to_clue()"""
+        from pipeline.detectors.base import Detector
 
         for detector in self.detectors:
             class_name = detector.__class__.__name__
 
             # Check if detect() is overridden
             detect_method = detector.__class__.detect
-            base_detect_method = RegexDetector.detect
+            base_detect_method = Detector.detect
             self.assertIs(
                 detect_method,
                 base_detect_method,
@@ -238,7 +238,7 @@ class DetectorExamplesTest(unittest.TestCase):
 
             # Check if pattern_to_clue() is overridden
             pattern_to_clue_method = detector.__class__.pattern_to_clue
-            base_pattern_to_clue_method = RegexDetector.pattern_to_clue
+            base_pattern_to_clue_method = Detector.pattern_to_clue
             self.assertIs(
                 pattern_to_clue_method,
                 base_pattern_to_clue_method,

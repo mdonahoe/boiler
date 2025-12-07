@@ -4,11 +4,11 @@ Detectors for Python code issues (missing classes, functions, etc.).
 
 import re
 import typing as T
-from pipeline.detectors.base import RegexDetector
+from pipeline.detectors.base import Detector
 from pipeline.models import ErrorClue
 
 
-class MissingPythonCodeDetector(RegexDetector):
+class MissingPythonCodeDetector(Detector):
     """
     Detect when Python files are missing expected code (classes, functions, imports).
 
@@ -48,7 +48,7 @@ class MissingPythonCodeDetector(RegexDetector):
     ]
 
 
-class PythonNameErrorDetector(RegexDetector):
+class PythonNameErrorDetector(Detector):
     """
     Detect Python NameError exceptions indicating missing imports or code.
 

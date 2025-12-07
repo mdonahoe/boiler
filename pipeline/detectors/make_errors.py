@@ -4,11 +4,11 @@ Detectors for make/build system errors.
 
 import re
 import typing as T
-from pipeline.detectors.base import RegexDetector
+from pipeline.detectors.base import Detector
 from pipeline.models import ErrorClue
 
 
-class MakeEnteringDirectoryDetector(RegexDetector):
+class MakeEnteringDirectoryDetector(Detector):
     """
     Detect when make has entered a directory.
     Useful for understanding context for later make errors
@@ -31,7 +31,7 @@ class MakeEnteringDirectoryDetector(RegexDetector):
     ]
 
 
-class MakeMissingTargetDetector(RegexDetector):
+class MakeMissingTargetDetector(Detector):
     """
     Detect make errors when a required source file is missing.
 
@@ -72,7 +72,7 @@ class MakeMissingTargetDetector(RegexDetector):
 
 
 
-class MakeNoRuleDetector(RegexDetector):
+class MakeNoRuleDetector(Detector):
     """
     Detect make errors when no rule exists for a target (often means Makefile is missing).
 
@@ -98,7 +98,7 @@ class MakeNoRuleDetector(RegexDetector):
     ]
 
 
-class MakeGlobPatternErrorDetector(RegexDetector):
+class MakeGlobPatternErrorDetector(Detector):
     """
     Detect make errors when a glob pattern file/directory is missing.
 
