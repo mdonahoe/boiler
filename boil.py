@@ -16,7 +16,7 @@ from session import ctx, new_session
 from pipeline import run_pipeline, GitState, has_pipeline_handlers
 from pipeline.handlers import register_all_handlers
 
-from analyze_boil_logs import analyze_legacy_usage, debug_iterations
+from analyze_boil_logs import boil_check, debug_iterations
 """
 git branch "boiling"
 cp .git/index .git/boil.index
@@ -462,11 +462,12 @@ def main() -> int:
             try:
                 start, end = map(int, args.debug_iterations.split('-'))
                 debug_iterations(start, end)
+                return 0
             except ValueError:
                 print("Error: --debug-iterations must be in format START-END (e.g., 3-9)")
                 return 1
         else:
-            return analyze_legacy_usage()
+            return boil_check()
 
     # Handle test-detectors command
     if args.test_detectors:
