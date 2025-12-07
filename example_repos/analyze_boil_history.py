@@ -7,6 +7,19 @@ showing the restoration sequence, with attempts grouped by what they restored.
 
 Usage:
     python3 analyze_boil_history.py boil_history_tree-sitter_20251207_164740.json
+
+
+Example Output:
+    Iteration 1.0:
+        * (/tmp/boil_test_7bm71u5r and 19 others): [make_no_rule -> restore_file -> restore_full] Makefile
+    Iteration 2.0:
+        * (/tmp/boil_test_7bm71u5r and 19 others): [make_missing_target -> restore_file -> restore_full] test_tree_print.py
+    ...
+    Iteration 4.2
+        * (/tmp/boil_test_7bm71u5r and 11 others): [missing_file -> restore_file -> restore_full] grammars/c/src/tree_sitter/array.h
+        * (/tmp/boil_test_qvf803p_ and 7 others): [missing_file -> restore_file -> restore_full] grammars/python/src/tree_sitter/array.h
+    ...
+
 """
 
 import argparse
