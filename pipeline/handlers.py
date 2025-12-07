@@ -14,6 +14,7 @@ from pipeline.detectors.make_errors import (
     MakeEnteringDirectoryDetector,
     MakeMissingTargetDetector,
     MakeNoRuleDetector,
+    MakeGlobPatternErrorDetector,
 )
 from pipeline.detectors.file_errors import (
     FopenNoSuchFileDetector,
@@ -31,7 +32,7 @@ from pipeline.detectors.file_errors import (
 )
 from pipeline.detectors.python_code import MissingPythonCodeDetector, PythonNameErrorDetector
 from pipeline.detectors.test_failures import TestFailureDetector
-from pipeline.planners.file_restore import PermissionFixPlanner, MissingFilePlanner, LinkerUndefinedSymbolsPlanner
+from pipeline.planners.file_restore import PermissionFixPlanner, MissingFilePlanner, LinkerUndefinedSymbolsPlanner, MissingDirectoryPlanner
 from pipeline.planners.make_restore import MakeMissingTargetPlanner, MakeNoRulePlanner
 from pipeline.planners.python_code_restore import MissingPythonCodePlanner, PythonNameErrorPlanner
 from pipeline.planners.c_code_restore import MissingCIncludePlanner, MissingCFunctionPlanner
@@ -62,6 +63,7 @@ def register_all_handlers():
     register_detector(MakeEnteringDirectoryDetector())
     register_detector(MakeMissingTargetDetector())
     register_detector(MakeNoRuleDetector())
+    register_detector(MakeGlobPatternErrorDetector())
     register_detector(MissingPythonCodeDetector())
     register_detector(PythonNameErrorDetector())
     register_detector(FopenNoSuchFileDetector())
@@ -80,6 +82,7 @@ def register_all_handlers():
 
     # Register planners
     register_planner(PermissionFixPlanner())
+    register_planner(MissingDirectoryPlanner())
     register_planner(MissingFilePlanner())
     register_planner(LinkerUndefinedSymbolsPlanner())
     register_planner(MakeMissingTargetPlanner())

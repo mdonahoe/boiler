@@ -1,7 +1,7 @@
 {
   "detectors": [
     "CLinkerErrorDetector",
-    "FopenNoSuchFileDetector",
+    "MakeGlobPatternErrorDetector",
     "MakeMissingTargetDetector",
     "MakeEnteringDirectoryDetector",
     "MakeNoRuleDetector",
