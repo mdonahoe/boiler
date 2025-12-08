@@ -16,6 +16,7 @@ class TestFailureDetector(Detector):
     - unittest tracebacks with file paths and line numbers
     - AssertionError messages that mention filenames
     - Test failure output that indicates missing files
+    - Test files that open and test specific data files
     """
 
     PATTERNS = {

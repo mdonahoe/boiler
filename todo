@@ -1,5 +1,4 @@
 [ ] Resuming a boil counts iterations incorrectly. It counts _all_ the files in .boil instead of only the pipeline files.
-[ ] `boil --check` is incorrectly claiming success even though boiling is failing.
 [ ] add `boil --hard` and `boil --soft` to make boil delete file(s) BEFORE starting a session:
     - "hard" mode should delete all files in the repo
     - "soft" mode should pick a random file and remove all it's lines.
@@ -9,3 +8,7 @@
     - once it can `boil --hard` successfully, add `viw` to example_repos
 [ ] if a source file has ERROR tokens in it, according to tree_print, do not attempt partial repairs. Just restore_full
 [ ] get /root/viless boiling
+[ ] restoring partial files needs to be smarter. fix wip
+[ ] --handle-error should just dry-run and not actually change anything. agents use it to test their changes
+[ ] planners are getting complicated. could we extract clues from git history? maybe we have theories, then theories can lookup stuff froim git and planners consume that.
+[ ] we should use more tree-sitter to find were definitions and declarations are for missing symbols

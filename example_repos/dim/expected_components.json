@@ -3,8 +3,8 @@
     "CImplicitDeclarationDetector",
     "CIncompleteTypeDetector",
     "CLinkerErrorDetector",
+    "CUnknownTypeNameDetector",
     "FopenNoSuchFileDetector",
-    "MakeEnteringDirectoryDetector",
     "MakeMissingTargetDetector",
     "MakeNoRuleDetector",
     "TestFailureDetector"

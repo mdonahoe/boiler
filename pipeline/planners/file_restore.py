@@ -44,11 +44,14 @@ class PermissionFixPlanner(Planner):
             # Check if file exists
             if not os.path.exists(file_path):
                 # File is missing - restore it (high priority)
+                # Header files should be restored in full, source files as stubs
+                is_header_file = file_path.endswith('.h') or file_path.endswith('.hpp')
+                action = "restore_full" if is_header_file else "restore_stub"
                 plans.append(RepairPlan(
                     plan_type="restore_file",
                     priority=0,  # High priority - file missing
                     target_file=file_path,
-                    action="restore_full",
+                    action=action,
                     params={"ref": git_state.ref},
                     reason=f"File {file_path} is missing (permission error implies it should exist)",
                     clue_source=clue
@@ -59,7 +62,7 @@ class PermissionFixPlanner(Planner):
                     plan_type="restore_permissions",
                     priority=1,  # Medium priority - file exists
                     target_file=file_path,
-                    action="restore_full",
+                    action="restore_stub",
                     params={"ref": git_state.ref},
                     reason=f"File {file_path} has wrong permissions, restoring from git",
                     clue_source=clue
@@ -191,11 +194,16 @@ class MissingFilePlanner(Planner):
         # Use the actual path if found, otherwise use the original path
         target_file = actual_path if actual_path else file_path
 
+        # Determine if this is a header file - header files should be restored in full
+        # since they need complete type definitions for compilation
+        is_header_file = target_file.endswith('.h') or target_file.endswith('.hpp')
+        action = "restore_full" if is_header_file else "restore_stub"
+
         return [RepairPlan(
             plan_type="restore_file",
             priority=0,  # High priority - missing files are critical
             target_file=target_file,
-            action="restore_full",
+            action=action,
             params={"ref": git_state.ref},
             reason=f"File {file_path} is missing",
             clue_source=clue
@@ -254,7 +262,7 @@ class LinkerUndefinedSymbolsPlanner(Planner):
                 plan_type="restore_file",
                 priority=0,  # Highest priority
                 target_file=lib_c_candidates[0],
-                action="restore_full",
+                action="restore_stub",
                 params={"ref": git_state.ref},
                 reason=f"Restore {lib_c_candidates[0]} (main compilation unit)",
                 clue_source=clue
@@ -306,17 +314,56 @@ class LinkerUndefinedSymbolsPlanner(Planner):
         # Create plans for files with highest scores first
         plans = []
         for c_file, (score, matched_symbols) in sorted(file_scores.items(), key=lambda x: x[1][0], reverse=True):
-            if is_verbose():
-                print(f"[Planner] Creating plan to restore {c_file} ({score} symbols)")
-            plans.append(RepairPlan(
-                plan_type="restore_file",
-                priority=0 - (score / 100),  # Higher scores get higher priority
-                target_file=c_file,
-                action="restore_full",
-                params={"ref": git_state.ref},
-                reason=f"File {c_file} contains {score} undefined symbols: {', '.join(matched_symbols[:3])}...",
-                clue_source=clue
-            ))
+            # Check if the file exists or is deleted
+            file_exists = os.path.exists(c_file)
+
+            if file_exists:
+                # File exists - restore individual functions
+                if is_verbose():
+                    print(f"[Planner] Creating plan to restore functions to existing file {c_file} ({score} symbols)")
+                for symbol in matched_symbols:
+                    plans.append(RepairPlan(
+                        plan_type="restore_c_code",
+                        priority=0 - (score / 100),  # Higher scores get higher priority
+                        target_file=c_file,
+                        action="restore_c_element",
+                        params={
+                            "ref": git_state.ref,
+                            "element_name": symbol,
+                            "element_type": "function",
+                        },
+                        reason=f"Restore function '{symbol}' to {c_file}",
+                        clue_source=clue
+                    ))
+            else:
+                # File is completely deleted - create stub first
+                if is_verbose():
+                    print(f"[Planner] File {c_file} is deleted, creating stub first")
+                # Create stub
+                plans.append(RepairPlan(
+                    plan_type="restore_file",
+                    priority=0 - (score / 100) - 0.01,  # Slightly higher priority to run first
+                    target_file=c_file,
+                    action="restore_stub",
+                    params={"ref": git_state.ref},
+                    reason=f"Create stub for {c_file} before restoring functions",
+                    clue_source=clue
+                ))
+                # Then restore functions
+                for symbol in matched_symbols:
+                    plans.append(RepairPlan(
+                        plan_type="restore_c_code",
+                        priority=0 - (score / 100),
+                        target_file=c_file,
+                        action="restore_c_element",
+                        params={
+                            "ref": git_state.ref,
+                            "element_name": symbol,
+                            "element_type": "function",
+                        },
+                        reason=f"Restore function '{symbol}' to {c_file}",
+                        clue_source=clue
+                    ))
 
         # If no deleted files matched, check existing C files and use src_repair
         if not plans:
@@ -373,10 +420,6 @@ class LinkerUndefinedSymbolsPlanner(Planner):
             priority_files.sort(key=lambda x: x[0], reverse=True)
             existing_c_files = [f for _, f in priority_files] + other_files
 
-            # Track which symbols we've already created plans for to avoid duplicates
-            # across multiple files
-            symbols_with_plans = set()
-
             for c_file in existing_c_files:
                 if not os.path.exists(c_file):
                     continue
@@ -398,9 +441,7 @@ class LinkerUndefinedSymbolsPlanner(Planner):
 
                     # Check if any undefined symbols are defined in the git version
                     for symbol in symbols:
-                        if symbol in symbols_with_plans:
-                            continue  # Already have a plan for this symbol
-                        
+
                         # Look for function definitions (not just declarations)
                         # Pattern: return_type symbol(...) { or symbol(...) {
                         # Also match: type symbol(...) or symbol(...) with looser matching
@@ -409,20 +450,38 @@ class LinkerUndefinedSymbolsPlanner(Planner):
                             rf'^\s*\w+\s+\*?{re.escape(symbol)}\s*\(',  # With return type
                             rf'^\s*{re.escape(symbol)}\s*\(',  # Function at line start
                         ]
-                        
+
                         found = False
                         for pattern in patterns:
                             if re.search(pattern, git_contents, re.MULTILINE):
                                 found = True
                                 break
-                        
+
                         if found:
-                            if is_verbose():
-                                print(f"[Planner] Found function definition for '{symbol}' in {c_file} (git version)")
+                            # Calculate priority based on how well the filename matches the symbol
+                            # If we're looking for "main" and the file is "main.c" or "src/main.c", prioritize it
+                            priority = 0
+                            basename = os.path.basename(c_file)
+                            basename_no_ext = os.path.splitext(basename)[0]
+
+                            # Special priority boost if filename matches symbol (e.g., main.c for main function)
+                            if basename_no_ext == symbol:
+                                priority = -100  # Highest priority (most negative = highest)
+                                if is_verbose():
+                                    print(f"[Planner] Found function definition for '{symbol}' in {c_file} (git version) - HIGH PRIORITY (filename matches)")
+                            # De-prioritize test files
+                            elif 'test' in c_file.lower():
+                                priority = 100  # Lower priority (more positive = lower)
+                                if is_verbose():
+                                    print(f"[Planner] Found function definition for '{symbol}' in {c_file} (git version) - low priority (test file)")
+                            else:
+                                if is_verbose():
+                                    print(f"[Planner] Found function definition for '{symbol}' in {c_file} (git version)")
+
                             # Create a plan to restore this specific function
                             plans.append(RepairPlan(
                                 plan_type="restore_c_code",
-                                priority=0,
+                                priority=priority,
                                 target_file=c_file,
                                 action="restore_c_element",
                                 params={
@@ -433,10 +492,8 @@ class LinkerUndefinedSymbolsPlanner(Planner):
                                 reason=f"Restore function '{symbol}' to {c_file}",
                                 clue_source=clue
                             ))
-                            symbols_with_plans.add(symbol)
-                            # Stop searching after we find the symbol in a file
-                            # (it's unlikely to be defined in multiple files)
-                            break
+                            # Don't mark as planned - allow multiple plans for the same symbol
+                            # to different files, so we can restore main to all files that need it
 
                 except Exception as e:
                     if is_verbose():
@@ -491,7 +548,7 @@ class MissingDirectoryPlanner(Planner):
                             plan_type="restore_file",
                             priority=0,  # High priority - missing files are critical
                             target_file=deleted_file,
-                            action="restore_full",
+                            action="restore_stub",
                             params={"ref": git_state.ref},
                             reason=f"File {deleted_file} is missing (matches glob pattern {file_path})",
                             clue_source=clue
@@ -511,7 +568,7 @@ class MissingDirectoryPlanner(Planner):
                         plan_type="restore_file",
                         priority=0,  # High priority - missing files are critical
                         target_file=deleted_file,
-                        action="restore_full",
+                        action="restore_stub",
                         params={"ref": git_state.ref},
                         reason=f"File {deleted_file} is missing (part of {file_path} directory)",
                         clue_source=clue

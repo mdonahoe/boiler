@@ -128,3 +128,4 @@ class GitState:
     ref: str  # git ref to restore from (e.g., "HEAD")
     deleted_files: T.List[str]  # files deleted in working directory (sorted for determinism)
     git_toplevel: str  # git repository root directory
+    partial_files: T.List[T.Dict[str, str]] = dataclasses.field(default_factory=list)  # files that are truncated/modified

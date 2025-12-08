@@ -51,6 +51,8 @@ class TestFailurePlanner(Planner):
         line_number = clue.context.get("line_number")
         suspected_files = clue.context.get("suspected_files", [])
 
+
+
         # Convert line_number to int if it's a string
         if isinstance(line_number, str):
             try:
@@ -80,15 +82,27 @@ class TestFailurePlanner(Planner):
         if not test_file:
             return []
         
-        # Make path relative if absolute
+        # Store original test_file for later use
         original_test_file = test_file
-        if os.path.isabs(test_file):
-            test_file = os.path.relpath(test_file, git_state.git_toplevel)
         
-        # Try to resolve test file path
-        test_file_path = test_file
-        if not os.path.isabs(test_file_path):
-            test_file_path = os.path.join(git_state.git_toplevel, test_file_path)
+        # First, try to use the path as-is since it might be an absolute path in the current execution context
+        test_file_path = original_test_file
+        if os.path.isabs(test_file_path) and not os.path.exists(test_file_path):
+            # If absolute path doesn't exist, try to make it relative
+            try:
+                test_file = os.path.relpath(test_file_path, git_state.git_toplevel)
+                test_file_path = os.path.join(git_state.git_toplevel, test_file)
+            except ValueError:
+                # Can't relativize, try just the basename
+                test_file = os.path.basename(test_file_path)
+                test_file_path = os.path.join(git_state.git_toplevel, test_file)
+        elif os.path.isabs(test_file_path) and os.path.exists(test_file_path):
+            # Absolute path exists, keep using it
+            pass
+        else:
+            # Relative path, resolve it relative to git toplevel
+            if not os.path.isabs(test_file):
+                test_file_path = os.path.join(git_state.git_toplevel, test_file)
         
         # Check if test file exists
         # TODO(matt): i dont think this matters. the test cant produce an error if it doesn't exist on disk.
@@ -179,16 +193,33 @@ class TestFailurePlanner(Planner):
             end_line = min(len(lines), line_number + 20)
             context_lines = lines[start_line:end_line]
             context_text = ''.join(context_lines)
+            
+            # Also expand backwards to find the test method definition (look up to 50 lines back for test method)
+            test_method_start = max(0, line_number - 50)
+            test_method_lines = lines[test_method_start:end_line]
+            test_method_text = ''.join(test_method_lines)
+
+            # Pattern 0: Files opened directly in Python code (e.g., open("filename.txt"))
+            open_pattern = r'open\s*\(["\']([^"\']+\.(?:txt|md|c|h|cpp|hpp|py|json|yaml|yml|sh|dat))["\']'
+            for match in re.finditer(open_pattern, context_text):
+                referenced_files.add(match.group(1))
 
             # Pattern 1: Command arguments with filenames (Python tests)
             # Matches: command=["./dim", "filename.txt"] or command=["./dim", 'filename.txt']
             command_pattern = r'command\s*=\s*\[[^\]]*["\']([^"\']+\.(?:py|txt|md|c|h|cpp|hpp|json|yaml|yml|sh))["\']'
-            for match in re.finditer(command_pattern, context_text):
+            for match in re.finditer(command_pattern, test_method_text):
                 referenced_files.add(match.group(1))
+            
+            # Also match direct function calls with file args: ./dim, example.c
+            direct_call_pattern = r'["\']([./]*[^"\'\s]+\.(?:py|txt|md|c|h|cpp|hpp|json|yaml|yml|sh|dat))["\']'
+            for match in re.finditer(direct_call_pattern, test_method_text):
+                filename = match.group(1).lstrip('./')
+                if filename and not filename.startswith('/'):
+                    referenced_files.add(filename)
 
             # Pattern 2: assertIn/assertEqual with filenames (Python tests)
             # Matches: assertIn("filename.txt", ...) or assertEqual(..., "filename.txt")
-            assert_pattern = r'assert(?:In|Equal|NotIn|NotEqual)\s*\([^)]*["\']([^"\']+\.(?:py|txt|md|c|h|cpp|hpp|json|yaml|yml|sh))["\']'
+            assert_pattern = r'assert(?:In|Equal|NotIn|NotEqual)\s*\([^)]*["\']([^"\']+\.(?:py|txt|md|c|h|cpp|hpp|json|yaml|yml|sh|dat))["\']'
             for match in re.finditer(assert_pattern, context_text):
                 referenced_files.add(match.group(1))
 
@@ -215,21 +246,32 @@ class TestFailurePlanner(Planner):
         return list(referenced_files)
 
     def _find_file_in_deleted(self, filename: str, git_state: GitState) -> T.Optional[str]:
-        """Try to find a matching file in the deleted files list"""
+        """Try to find a matching file in the deleted or partial files list"""
         deleted_files = git_state.deleted_files
+        partial_files = git_state.partial_files if git_state.partial_files else []
         
-        # Exact match first
+        # Exact match in deleted files first
         if filename in deleted_files:
             return filename
         
-        # Try with various directory prefixes
+        # Try with various directory prefixes in deleted files
         for deleted_file in deleted_files:
-            # TODO(matt): i think this can just be 
-            # if os.path.basename(deleted_file) == filename
-
             if deleted_file.endswith("/" + filename):
                 return deleted_file
             if deleted_file.endswith(filename) and os.path.basename(deleted_file) == filename:
                 return deleted_file
+        
+        # Also check partial_files (files that exist but are corrupted/truncated)
+        for partial_file_info in partial_files:
+            partial_file = partial_file_info.get("file", "")
+            # Exact match
+            if partial_file == filename:
+                return filename
+            # Match by basename
+            if os.path.basename(partial_file) == filename:
+                return partial_file
+            # Match with prefix
+            if partial_file.endswith("/" + filename):
+                return partial_file
         
         return None

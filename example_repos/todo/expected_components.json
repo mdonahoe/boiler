@@ -3,9 +3,9 @@
       "CCompilationErrorDetector", "CUndeclaredIdentifierDetector", "CannotOpenFileDetector", "CatNoSuchFileDetector", "DiffNoSuchFileDetector", "FileNotFoundDetector", "MissingPythonCodeDetector", "PermissionDeniedDetector", "PythonNameErrorDetector", "ShellCannotOpenDetector", "ShellCommandNotFoundDetector"
   ],
   "planners": [
-      "MissingDirectoryPlanner", "MissingPythonCodePlanner", "PermissionFixPlanner", "PythonNameErrorPlanner"
+      "MissingDirectoryPlanner", "MissingPythonCodePlanner", "PermissionFixPlanner", "PythonNameErrorPlanner", "MissingCTypePlanner"
   ],
   "executors": [
-      "PythonCodeRestoreExecutor"
+      "PythonCodeRestoreExecutor", "GitRestoreStubExecutor"
   ]
 }

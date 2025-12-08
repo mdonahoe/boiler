@@ -29,15 +29,17 @@ from pipeline.detectors.file_errors import (
     CIncompleteTypeDetector,
     CImplicitDeclarationDetector,
     CUndeclaredIdentifierDetector,
+    CUnknownTypeNameDetector,
 )
 from pipeline.detectors.python_code import MissingPythonCodeDetector, PythonNameErrorDetector
 from pipeline.detectors.test_failures import TestFailureDetector
 from pipeline.planners.file_restore import PermissionFixPlanner, MissingFilePlanner, LinkerUndefinedSymbolsPlanner, MissingDirectoryPlanner
 from pipeline.planners.make_restore import MakeMissingTargetPlanner, MakeNoRulePlanner
 from pipeline.planners.python_code_restore import MissingPythonCodePlanner, PythonNameErrorPlanner
-from pipeline.planners.c_code_restore import MissingCIncludePlanner, MissingCFunctionPlanner
+from pipeline.planners.c_code_restore import MissingCIncludePlanner, MissingCFunctionPlanner, MissingCTypePlanner
 from pipeline.planners.test_failures import TestFailurePlanner
 from pipeline.executors.git_restore import GitRestoreExecutor
+from pipeline.executors.git_restore_stub import GitRestoreStubExecutor
 from pipeline.executors.python_code_restore import PythonCodeRestoreExecutor
 from pipeline.executors.c_code_restore import CCodeRestoreExecutor
 
@@ -78,6 +80,7 @@ def register_all_handlers():
     register_detector(CIncompleteTypeDetector())
     register_detector(CImplicitDeclarationDetector())
     register_detector(CUndeclaredIdentifierDetector())
+    register_detector(CUnknownTypeNameDetector())
     register_detector(TestFailureDetector())
 
     # Register planners
@@ -91,11 +94,13 @@ def register_all_handlers():
     register_planner(PythonNameErrorPlanner())
     register_planner(MissingCIncludePlanner())
     register_planner(MissingCFunctionPlanner())
+    register_planner(MissingCTypePlanner())
     register_planner(TestFailurePlanner())
 
     # Register executors
     register_executor(PythonCodeRestoreExecutor())
     register_executor(CCodeRestoreExecutor())
     register_executor(GitRestoreExecutor())
+    register_executor(GitRestoreStubExecutor())
 
     _handlers_registered = True

@@ -370,3 +370,52 @@ class CUndeclaredIdentifierDetector(Detector):
             },
         ),
     ]
+
+
+class CUnknownTypeNameDetector(Detector):
+    """
+    Detect C compilation errors for unknown type names.
+
+    Matches patterns like:
+    - error: unknown type name 'FILE'
+    - note: 'FILE' is defined in header '<stdio.h>'; did you forget to '#include <stdio.h>'?
+    - error: unknown type name 'state_t'
+
+    This handles types/typedefs that are not recognized, which typically means:
+    1. A missing header include (if compiler suggests one)
+    2. A missing local header that defines the type
+    """
+
+    PATTERNS = {
+        # Match "unknown type name" with compiler suggestion for header
+        "missing_c_include": r"(?P<file_path>[a-zA-Z0-9_./\-]+\.c):\d+:\d+:.*?unknown type name\s+['\u2018](?P<type_name>[^'\u2019]+)['\u2019].*?note:.*is defined in header\s+['\u2018]<(?P<suggested_include>[^>]+)>['\u2019]",
+        # Match "unknown type name" without suggestion (likely needs local header or typedef)
+        "missing_c_type": r"(?P<file_path>[a-zA-Z0-9_./\-]+\.c):(?P<line_number>\d+):\d+:\s+error:\s+unknown type name\s+['\u2018]?(?P<type_name>[a-zA-Z0-9_]+)['\u2019]?",
+    }
+
+    EXAMPLES = [
+        (
+            "dim.c:185:3: error: unknown type name 'FILE'\nnote: 'FILE' is defined in header '<stdio.h>'; did you forget to '#include <stdio.h>'?",
+            {
+                "clue_type": "missing_c_include",
+                "confidence": 1.0,
+                "context": {
+                    "file_path": "dim.c",
+                    "type_name": "FILE",
+                    "suggested_include": "stdio.h",
+                },
+            },
+        ),
+        (
+            "src/listeners.c:3:21: error: unknown type name 'state_t'",
+            {
+                "clue_type": "missing_c_type",
+                "confidence": 1.0,
+                "context": {
+                    "file_path": "src/listeners.c",
+                    "line_number": "3",
+                    "type_name": "state_t",
+                },
+            },
+        ),
+    ]
