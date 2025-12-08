@@ -62,21 +62,30 @@ def get_session_status():
     iterations.sort()
     max_iter = iterations[-1]
     
-    # Check if any recent iteration succeeded (could indicate success, then retried and failed)
-    # Check backwards from max_iter to handle cases where boil succeeded then continued
-    for i in range(max_iter, max(0, max_iter - 10), -1):
-        last_json = os.path.join(boil_dir, f"iter{i}.pipeline.json")
-        if os.path.exists(last_json):
-            try:
-                with open(last_json, "r") as f:
-                    data = json.load(f)
-                    if data.get("success"):
-                        if i == max_iter:
-                            return "✓ SUCCEEDED", f"Completed successfully at iteration {i}"
-                        else:
-                            return "✓ SUCCEEDED", f"Completed successfully at iteration {i} (retried but failed at {max_iter})"
-            except:
-                pass
+    # Check the last iteration to determine final status
+    last_json = os.path.join(boil_dir, f"iter{max_iter}.pipeline.json")
+    if os.path.exists(last_json):
+        try:
+            with open(last_json, "r") as f:
+                data = json.load(f)
+                if data.get("success"):
+                    return "✓ SUCCEEDED", f"Completed successfully at iteration {max_iter}"
+                else:
+                    # Last iteration failed - check if any earlier iteration succeeded
+                    for i in range(max_iter - 1, max(0, max_iter - 10), -1):
+                        prev_json = os.path.join(boil_dir, f"iter{i}.pipeline.json")
+                        if os.path.exists(prev_json):
+                            try:
+                                with open(prev_json, "r") as f:
+                                    prev_data = json.load(f)
+                                    if prev_data.get("success"):
+                                        return "✗ FAILED", f"Succeeded at iteration {i} but failed at iteration {max_iter}"
+                            except:
+                                pass
+                    # No prior success found
+                    return "✗ FAILED", f"Failed at iteration {max_iter}"
+        except:
+            pass
     
     # Check if stuck in a loop (many iterations with similar failures)
     if max_iter > 20:
@@ -93,23 +102,13 @@ def get_session_status():
                             recent_failures.append(error_msg)
                 except:
                     pass
-        
+
         if recent_failures and len(set(recent_failures)) <= 2:
             return "⚠ STUCK", f"Max {max_iter} iterations reached with repeating failures"
         else:
             return "⚠ STUCK", f"Max {max_iter} iterations (likely infinite loop)"
-    
-    # If we haven't found a success, check the last iteration for detailed status
-    last_json = os.path.join(boil_dir, f"iter{max_iter}.pipeline.json")
-    if os.path.exists(last_json):
-        try:
-            with open(last_json, "r") as f:
-                data = json.load(f)
-                error = data.get("error_message", "unknown")
-                return "⏳ IN PROGRESS", f"Iteration {max_iter}: {error}"
-        except:
-            return "? UNKNOWN", f"Could not read iter{max_iter}.pipeline.json"
-    
+
+    # Fallback - session appears incomplete
     return "⏳ IN PROGRESS", f"Iterations {min(iterations)}-{max_iter} completed"
 
 
@@ -401,17 +400,143 @@ def boil_check():
         print("  (no plans were attempted)")
     print()
 
+    status, details = get_session_status()
+
+    # If failed, print details of the failure
+    if status == "✗ FAILED":
+        print_failure_details()
+
     # Print session status last
     print("=" * 80)
     print("BOIL SESSION STATUS")
     print("=" * 80)
-    status, details = get_session_status()
     print(f"{status}")
     print(f"Details: {details}")
     print()
 
-
     return 0
+
+
+def print_failure_details():
+    """Print detailed information about the failed iteration"""
+    boil_dir = ".boil"
+
+    # Find the last iteration
+    json_files = sorted([
+        f for f in os.listdir(boil_dir)
+        if re.match(r"iter\d+\.pipeline\.json", f)
+    ])
+
+    if not json_files:
+        return
+
+    # Get the last iteration number
+    last_file = json_files[-1]
+    match = re.match(r"iter(\d+)\.pipeline\.json", last_file)
+    if not match:
+        return
+
+    iter_num = int(match.group(1))
+
+    # Load the failed iteration data
+    json_path = os.path.join(boil_dir, last_file)
+    try:
+        with open(json_path, "r") as f:
+            data = json.load(f)
+    except Exception as e:
+        print(f"Could not read {last_file}: {e}")
+        return
+
+    # Only print details if this iteration failed
+    if data.get("success"):
+        return
+
+    print("=" * 80)
+    print(f"FAILED ITERATION DETAILS (Iteration {iter_num})")
+    print("=" * 80)
+    print()
+
+    # Print clues detected
+    clues = data.get("clues_detected", [])
+    if clues:
+        print("CLUES DETECTED:")
+        for i, clue in enumerate(clues, 1):
+            clue_type = clue.get("clue_type", "unknown")
+            confidence = clue.get("confidence", 0)
+            source_line = clue.get("source_line", "")
+            context = clue.get("context", {})
+
+            print(f"\n  {i}. [{clue_type}] (confidence: {confidence:.2f})")
+
+            # Print relevant context fields
+            if context:
+                for key, value in context.items():
+                    if value:
+                        print(f"     {key}: {value}")
+
+            # Print source line (truncated if too long)
+            if source_line:
+                if len(source_line) > 200:
+                    source_line = source_line[:197] + "..."
+                print(f"     Source: {source_line}")
+        print()
+    else:
+        print("CLUES DETECTED: None\n")
+
+    # Print plans attempted
+    plans = data.get("plans_attempted", [])
+    if plans:
+        print("PLANS ATTEMPTED:")
+        for i, plan in enumerate(plans, 1):
+            plan_type = plan.get("plan_type", "unknown")
+            target_file = plan.get("target_file", "unknown")
+            action = plan.get("action", "unknown")
+            reason = plan.get("reason", "")
+
+            print(f"\n  {i}. [{plan_type} -> {action}] {target_file}")
+            if reason:
+                print(f"     Reason: {reason}")
+        print()
+    else:
+        print("PLANS ATTEMPTED: None\n")
+
+    # Print error message
+    error_msg = data.get("error_message", "")
+    if error_msg:
+        print(f"ERROR MESSAGE: {error_msg}\n")
+
+    # Find and print the exit file content
+    exit_files = sorted([
+        f for f in os.listdir(boil_dir)
+        if re.match(rf"iter{iter_num}\.exit\d+\.txt", f)
+    ])
+
+    if exit_files:
+        # Use the last exit file (highest exit number)
+        exit_file = exit_files[-1]
+        exit_path = os.path.join(boil_dir, exit_file)
+
+        print("=" * 80)
+        print(f"COMMAND OUTPUT ({exit_file})")
+        print("=" * 80)
+        try:
+            with open(exit_path, "r") as f:
+                content = f.read()
+                # Limit output to reasonable size
+                if len(content) > 3000:
+                    lines = content.split('\n')
+                    if len(lines) > 100:
+                        print('\n'.join(lines[:50]))
+                        print(f"\n... ({len(lines) - 100} lines omitted) ...\n")
+                        print('\n'.join(lines[-50:]))
+                    else:
+                        print(content[:3000])
+                        print(f"\n... (output truncated, {len(content) - 3000} chars omitted)")
+                else:
+                    print(content)
+        except Exception as e:
+            print(f"Could not read {exit_file}: {e}")
+        print()
 
 
 def debug_iterations(start_iter, end_iter):
