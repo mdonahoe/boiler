@@ -566,28 +566,70 @@ def debug_iterations(start_iter, end_iter):
         print(f"Iteration {iter_num}")
         print('=' * 80)
 
+        # Show success status and error message
+        success = data.get("success", False)
+        error_msg = data.get("error_message", "")
+        print(f"Success: {success}")
+        if error_msg:
+            print(f"Error: {error_msg}")
+        print()
+
+        # Show clues detected
+        clues = data.get("clues_detected", [])
+        if clues:
+            print("Clues detected:")
+            for i, clue in enumerate(clues, 1):
+                clue_type = clue.get("clue_type", "unknown")
+                confidence = clue.get("confidence", 0)
+                context = clue.get("context", {})
+                print(f"\n  {i}. [{clue_type}] (confidence: {confidence:.2f})")
+                if context:
+                    for key, value in context.items():
+                        if value and key != "source_line":
+                            print(f"     {key}: {value}")
+                source_line = clue.get("source_line", "")
+                if source_line:
+                    if len(source_line) > 150:
+                        source_line = source_line[:147] + "..."
+                    print(f"     source: {source_line}")
+            print()
+        else:
+            print("Clues detected: None\n")
+
+        # Show plans generated
+        plans_generated = data.get("plans_generated", [])
+        if plans_generated:
+            print(f"Plans generated: {len(plans_generated)}")
+            for i, plan in enumerate(plans_generated, 1):
+                plan_type = plan.get("plan_type", "unknown")
+                target = plan.get("target_file", "unknown")
+                action = plan.get("action", "unknown")
+                reason = plan.get("reason", "")
+                print(f"  {i}. [{plan_type} -> {action}] {target}")
+                if reason:
+                    print(f"     Reason: {reason}")
+            print()
+        else:
+            print("Plans generated: None\n")
+
         # Show plans attempted
         plans = data.get("plans_attempted", [])
-        if not plans:
-            print("  No plans attempted")
-            continue
+        if plans:
+            print(f"Plans attempted: {len(plans)}")
+            for i, plan in enumerate(plans, 1):
+                plan_type = plan.get("plan_type", "unknown")
+                target = plan.get("target_file", "unknown")
+                action = plan.get("action", "unknown")
+                reason = plan.get("reason", "")
+                print(f"  {i}. [{plan_type} -> {action}] {target}")
+                if reason:
+                    print(f"     Reason: {reason}")
 
-        for i, plan in enumerate(plans, 1):
-            print(f"\nPlan {i}:")
-            print(f"  Reason: {plan.get('reason', 'N/A')}")
-
-            clue = plan.get("clue_source", {})
-            if clue:
-                context = clue.get("context", {})
-                print(f"  Suggested include: {context.get('suggested_include', 'N/A')}")
-                print(f"  Function name: {context.get('function_name', 'N/A')}")
-                print(f"  Error line: {clue.get('source_line', 'N/A')[:100]}")
-                print(f"  Confidence: {clue.get('confidence', 0):.2f}")
-
-        # Show files modified
-        files_modified = data.get("files_modified", [])
-        print(f"\nFiles modified: {', '.join(files_modified) if files_modified else 'None'}")
-        print(f"Success: {data.get('success', False)}")
+            # Show files modified
+            files_modified = data.get("files_modified", [])
+            print(f"\nFiles modified: {', '.join(files_modified) if files_modified else 'None'}")
+        else:
+            print("Plans attempted: None")
 
 
 if __name__ == "__main__":

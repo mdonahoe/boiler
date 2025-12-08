@@ -29,28 +29,54 @@ class TestFailurePlanner(Planner):
         return "TestFailurePlanner"
 
     def can_handle(self, clue_type: str) -> bool:
-        return clue_type == "test_failure"
+        return clue_type in ("test_failure", "test_docstring_with_missing_file")
 
     def plan(self, clues: T.List[ErrorClue], git_state: GitState) -> T.List[RepairPlan]:
         plans = []
         seen_targets = set()  # Deduplicate plans for the same file
-        
+
         for clue in clues:
-            if clue.clue_type != "test_failure":
+            if clue.clue_type not in ("test_failure", "test_docstring_with_missing_file"):
                 continue
             clue_plans = self._plan_for_clue(clue, git_state)
             for plan in clue_plans:
                 if plan.target_file not in seen_targets:
                     plans.append(plan)
                     seen_targets.add(plan.target_file)
-        
+
         return plans
 
     def _plan_for_clue(self, clue: ErrorClue, git_state: GitState) -> T.List[RepairPlan]:
         test_file = clue.context.get("test_file")
         line_number = clue.context.get("line_number")
         suspected_files = clue.context.get("suspected_files", [])
-        
+
+        # Convert line_number to int if it's a string
+        if isinstance(line_number, str):
+            try:
+                line_number = int(line_number)
+            except (ValueError, TypeError):
+                line_number = None
+
+        # For test_docstring_with_missing_file, we get a suspected_file directly
+        if clue.clue_type == "test_docstring_with_missing_file":
+            suspected_file = clue.context.get("suspected_file")
+            if suspected_file:
+                # Try to find the file in deleted files
+                actual_path = self._find_file_in_deleted(suspected_file, git_state)
+                if actual_path:
+                    return [RepairPlan(
+                        plan_type="restore_file",
+                        priority=1,  # Medium priority - test files
+                        target_file=actual_path,
+                        action="restore_full",
+                        params={"ref": git_state.ref},
+                        reason=f"Restore {suspected_file} (referenced in test docstring)",
+                        clue_source=clue
+                    )]
+            return []
+
+        # For test_failure clues, we need the test file
         if not test_file:
             return []
         
@@ -65,6 +91,7 @@ class TestFailurePlanner(Planner):
             test_file_path = os.path.join(git_state.git_toplevel, test_file_path)
         
         # Check if test file exists
+        # TODO(matt): i dont think this matters. the test cant produce an error if it doesn't exist on disk.
         if not os.path.exists(test_file_path):
             # Try to find it in deleted files
             test_file_candidate = self._find_file_in_deleted(test_file, git_state)
@@ -197,6 +224,9 @@ class TestFailurePlanner(Planner):
         
         # Try with various directory prefixes
         for deleted_file in deleted_files:
+            # TODO(matt): i think this can just be 
+            # if os.path.basename(deleted_file) == filename
+
             if deleted_file.endswith("/" + filename):
                 return deleted_file
             if deleted_file.endswith(filename) and os.path.basename(deleted_file) == filename:
