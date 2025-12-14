@@ -24,7 +24,7 @@ class Timer:
         self.timings[name] = dt
 
 
-def run_pipeline(stderr: str, stdout: str, git_state: GitState, debug: bool = False) -> RepairResult:
+def run_pipeline(stderr: str, stdout: str, git_state: GitState, debug: bool = False, execute: bool = True) -> RepairResult:
     """
     Run the full 3-stage pipeline: Detection → Planning → Execution.
 
@@ -114,6 +114,9 @@ def run_pipeline(stderr: str, stdout: str, git_state: GitState, debug: bool = Fa
         all_plans_generated.extend(plans)
 
         # Stage 3: Execution (try plans until one succeeds)
+        if not execute:
+            print("skipping execution")
+            break
         if debug:
             print("\n--- STAGE 3: EXECUTION ---")
         result = executor_registry.execute_plans(plans)

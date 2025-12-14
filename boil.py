@@ -7,8 +7,9 @@ import sys
 import time
 import typing as T
 
-import handlers
-from handlers import HANDLERS
+import legacy_handlers
+import git_ops
+import helpers
 
 from session import ctx, new_session
 
@@ -32,12 +33,6 @@ git restore --source boiling -- .
 BOILING_BRANCH = "boiling"
 
 
-def get_git_dir() -> str:
-    """Get the .git directory path, works from any subdirectory of a git repo."""
-    return subprocess.check_output(
-        ["git", "rev-parse", "--git-dir"], text=True
-    ).strip()
-
 
 def save_changes(parent: str, message: str, branch_name: T.Optional[str] = None) -> str:
     """
@@ -46,7 +41,7 @@ def save_changes(parent: str, message: str, branch_name: T.Optional[str] = None)
 
     Returns the created commit hash.
     """
-    git_dir = get_git_dir()
+    git_dir = git_ops.get_git_dir()
     index_file = os.path.join(git_dir, "boil.index")
     shutil.copyfile(os.path.join(git_dir, "index"), index_file)
     env = os.environ.copy()
@@ -65,78 +60,7 @@ def save_changes(parent: str, message: str, branch_name: T.Optional[str] = None)
     return commit
 
 
-def get_git_file_info(ref: str) -> T.Dict[str, T.Any]:
-    """
-    Get information about modified and deleted files in the current working directory.
-    
-    Returns:
-        {
-            "partial_files": [{"file": "dim.c", "line_ratio": "40/1001", "status": "M"}, ...],
-            "deleted_files": ["file1.c", "file2.h"],
-            "command": "make test"
-        }
-    """
-    git_dir = get_git_dir()
-    index_file = os.path.join(git_dir, "boil.index")
-    env = os.environ.copy()
-    env["GIT_INDEX_FILE"] = index_file
-    
-    partial_files = []
-    deleted_files = []
-    
-    # Get list of modified and deleted files
-    result = subprocess.run(
-        ["git", "diff", "--name-status", ref],
-        capture_output=True,
-        text=True,
-        env=env
-    )
-    
-    for line in result.stdout.strip().split('\n'):
-        if not line:
-            continue
-        parts = line.split(maxsplit=1)
-        if len(parts) < 2:
-            continue
-        
-        status, file_path = parts[0], parts[1]
-        
-        if status == 'D':
-            deleted_files.append(file_path)
-        elif status == 'M':
-            # Count lines in modified file
-            try:
-                # Get current line count
-                with open(file_path, 'r', errors='ignore') as f:
-                    current_lines = len(f.read().splitlines())
-                
-                # Get total line count from git at the ref
-                result = subprocess.run(
-                    ["git", "show", f"{ref}:{file_path}"],
-                    capture_output=True,
-                    text=True,
-                    # env=env
-                )
-                total_lines = len(result.stdout.splitlines())
-                
-                partial_files.append({
-                    "file": file_path,
-                    "line_ratio": f"{current_lines}/{total_lines}",
-                })
-            except Exception as e:
-                print(f"Warning: Could not get line count for {file_path}: {e}")
-                partial_files.append({
-                    "file": file_path,
-                    "line_ratio": "unknown",
-                })
-    
-    return {
-        "partial_files": partial_files,
-        "deleted_files": deleted_files,
-    }
-
-
-def fix(command: T.List[str], num_iterations: int) -> bool:
+def fix(command: T.List[str], num_iterations: int, allow_legacy:bool = False) -> bool:
     """
     Repeatedly run a command, repairing files until it is fixed.
     """
@@ -182,7 +106,7 @@ def fix(command: T.List[str], num_iterations: int) -> bool:
 
     # bootstrap
     t_start = time.time()
-    stdout, stderr, code = handlers.run_command(command)
+    stdout, stderr, code = helpers.run_command(command)
     t_run_command = time.time() - t_start
 
     if code == 0:
@@ -212,8 +136,8 @@ def fix(command: T.List[str], num_iterations: int) -> bool:
             # Build git state
             git_state = GitState(
                 ref=ref,
-                deleted_files=handlers.get_deleted_files(ref=ref),
-                git_toplevel=handlers.get_git_toplevel()
+                deleted_files=git_ops.get_deleted_files(ref=ref),
+                git_toplevel=git_ops.get_git_toplevel()
             )
 
             # Run pipeline
@@ -226,16 +150,17 @@ def fix(command: T.List[str], num_iterations: int) -> bool:
                 print("[Pipeline] Pipeline did not produce a fix, falling back to old handlers...")
 
         # Fall back to old handler system if pipeline didn't fix it
-        if not message:
-            for handler in handlers.HANDLERS:
+        if not message and allow_legacy:
+            for handler in legacy_handlers.HANDLERS:
                 if handler(err) and has_changes():
                     legacy_handler_used = handler.__name__
                     message = f"fixed with {handler}"
                     print(f"[Legacy] Used legacy handler: {legacy_handler_used}")
                     break
-            else:
-                message = "failed to handle this type of error"
-                exit = True
+
+        if not message:
+            message = "failed to handle this type of error"
+            exit = True
 
         # Save debug JSON with legacy handler info
         if pipeline_result:
@@ -248,7 +173,7 @@ def fix(command: T.List[str], num_iterations: int) -> bool:
                 debug_data["command"] = " ".join(command)
                 
                 # Add git state info
-                git_info = get_git_file_info(ref)
+                git_info = git_ops.get_git_file_info(ref)
                 debug_data["partial_files"] = git_info["partial_files"]
                 debug_data["deleted_files"] = git_info["deleted_files"]
                 debug_data["command_time"] = t_run_command
@@ -273,7 +198,7 @@ def fix(command: T.List[str], num_iterations: int) -> bool:
 
         # re-run the main command
         t_start = time.time()
-        stdout, stderr, code = handlers.run_command(command)
+        stdout, stderr, code = helpers.run_command(command)
         t_run_command = time.time() - t_start
 
         if code == 0:
@@ -290,7 +215,7 @@ def has_changes(verbose:bool=False) -> bool:
     """
     Look for changes in the working directory relative to the boiling branch
     """
-    git_dir = get_git_dir()
+    git_dir = git_ops.get_git_dir()
     index_file = os.path.join(git_dir, "boil.index")
     env = os.environ.copy()
     env["GIT_INDEX_FILE"] = index_file
@@ -433,6 +358,11 @@ def main() -> int:
         help="analyze the current boil session and show status/statistics",
     )
     parser.add_argument(
+        "--legacy",
+        action="store_true",
+        help="fallback to legacy handlers if needed",
+    )
+    parser.add_argument(
         "--debug-iterations",
         type=str,
         default=None,
@@ -514,34 +444,24 @@ def main() -> int:
     # If the user passes the error output explicitly, we can handle it and exit.
     if args.handle_error:
         err = open(args.handle_error).read()
+        ref = ctx().git_ref
 
-        # Try pipeline first
-        if has_pipeline_handlers():
-            print("[Pipeline] Attempting repair with new pipeline system...")
-            git_state = GitState(
-                ref="HEAD",
-                deleted_files=handlers.get_deleted_files(ref="HEAD"),
-                git_toplevel=handlers.get_git_toplevel()
-            )
-            # Assume error output is in stderr
-            pipeline_result = run_pipeline(err, "", git_state, debug=True)
-            if pipeline_result.success:
-                print(f"[Pipeline] Fixed with pipeline (modified {len(pipeline_result.files_modified)} file(s))")
-                return 0
-            print("[Pipeline] Pipeline did not produce a fix, falling back to old handlers...")
+        print("[Pipeline] Attempting repair with new pipeline system...")
+        git_state = GitState(
+            ref=ref,
+            deleted_files=git_ops.get_deleted_files(ref=ref),
+            git_toplevel=git_ops.get_git_toplevel()
+        )
+        # Assume error output is in stderr
+        pipeline_result = run_pipeline(err, "", git_state, debug=True, execute=False)
+        if pipeline_result.success:
+            print(f"[Pipeline] Fixed with pipeline (modified {len(pipeline_result.files_modified)} file(s))")
+            return 0
 
-        # Fall back to old handlers
-        for i, handler in enumerate(HANDLERS):
-            print(handler)
-            if handler(err):
-                print(f"fixed with {handler}")
-                break
-        else:
-            raise RuntimeError("failed to handle this type of error")
-        return 0
+        raise RuntimeError("failed to handle this type of error")
 
     # Otherwise, we iteratively run the command and fix errors, up to n times.
-    success = fix(command, num_iterations=args.n)
+    success = fix(command, num_iterations=args.n, allow_legacy=args.legacy)
     if not success:
         print(f"failed to fix: {command}")
         return 1

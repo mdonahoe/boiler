@@ -22,8 +22,9 @@ from pipeline.detectors.file_errors import (
     CIncompleteTypeDetector,
     CLinkerErrorDetector,
 )
-from pipeline.planners.c_code_restore import MissingCFunctionPlanner, MissingCIncludePlanner
-from pipeline.planners.file_restore import LinkerUndefinedSymbolsPlanner
+from pipeline.planners.missing_c_function import MissingCFunctionPlanner
+from pipeline.planners.missing_c_include import MissingCIncludePlanner
+from pipeline.planners.linker_undefined_symbols import LinkerUndefinedSymbolsPlanner
 from pipeline.models import ErrorClue, GitState
 from pipeline import run_pipeline
 

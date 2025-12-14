@@ -5,100 +5,20 @@ import typing as T
 
 import src_repair
 from session import ctx
+from git_ops import get_git_toplevel, get_deleted_files, git_checkout
+from helpers import run_command
 
-def run_command(command: T.List[str]) -> T.Tuple[str, str, int]:
-    """
-    Run a shell command and return its output, error and exit code.
-
-    Returns standard Unix exit codes:
-    - 126: Permission denied
-    - 127: Command not found
-    """
-    print(f"Running: {' '.join(command)}")
-    try:
-        result = subprocess.run(
-            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-        )
-        return result.stdout, result.stderr, result.returncode
-    except FileNotFoundError as e:
-        # Return exit code 127 (standard for "command not found")
-        return "", f"FileNotFoundError: {e}", 127
-    except PermissionError as e:
-        # Return exit code 126 (standard for "permission denied")
-        return "", f"PermissionError: {e}", 126
-
-def git_checkout(file_path: str, ref: str = "HEAD") -> bool:
-    """Run git checkout for the given file path.
-    
-    file_path should be relative to the git root (as returned by git diff).
-    """
-    deleted_files = set(get_deleted_files(ref=ref))
-    if file_path not in deleted_files:
-        print(f"missing: {file_path}")
-        return False
-
-    # Convert git-root-relative path to cwd-relative path for file operations
-    git_toplevel = get_git_toplevel()
-    cwd = os.getcwd()
-    abs_path = os.path.join(git_toplevel, file_path)
-    cwd_relative_path = os.path.relpath(abs_path, cwd)
-
-    # For Python files, create empty file first and let src_repair handle restoration
-    if file_path.endswith(".py"):
-        print(f"creating empty Python file: {cwd_relative_path}")
-        # Create parent directories if needed
-        os.makedirs(os.path.dirname(cwd_relative_path) or ".", exist_ok=True)
-        # Create empty Python file
-        with open(cwd_relative_path, 'w') as f:
-            f.write("")
-        return True
-
-    # For non-Python files, do full checkout from git root
-    command = ["git", "-C", git_toplevel, "checkout", ref, "--", file_path]
-    stdout, stderr, code = run_command(command)
-    if code != 0:
-        print("stdout:", stdout)
-        print("stderr:", stderr)
-        raise ValueError(file_path)
-    success = os.path.exists(cwd_relative_path)
-    print(f"success = {success}")
-    return success
-
-
-def get_python_file_path(module_name: str) -> str:
+def _get_python_file_path(module_name: str) -> str:
     """Convert a Python module name to a file path."""
     return module_name.replace(".", "/") + ".py"
 
 
-def get_python_init_path(module_name: str) -> str:
+def _get_python_init_path(module_name: str) -> str:
     """Convert a Python module name to a __init__.py path."""
     return module_name.replace(".", "/") + "/__init__.py"
 
 
-def get_git_toplevel() -> str:
-    """Get the git repository root directory."""
-    return subprocess.check_output(
-        ["git", "rev-parse", "--show-toplevel"], text=True
-    ).strip()
-
-
-def get_deleted_files(ref: str = "HEAD") -> T.List[str]:
-    """Get the list of deleted files from `git status`.
-
-    Returns a sorted list for deterministic behavior.
-    """
-    # Fallback: use the working directory state
-    result = subprocess.run(
-        ["git", "diff", "--name-status"], stdout=subprocess.PIPE, text=True
-    )
-    # TODO: what if result fails?
-    deleted = [
-        line.split()[-1] for line in result.stdout.splitlines() if line.startswith("D")
-    ]
-    return sorted(deleted)  # Sort for deterministic iteration
-
-
-def restore_missing_file(missing_file: str, ref: T.Optional[str] = None) -> bool:
+def _restore_missing_file(missing_file: str, ref: T.Optional[str] = None) -> bool:
     """
     Restore a missing_file to disk, inferring the file path based on git diff since provided ref.
     """
@@ -230,7 +150,7 @@ def handle_shell_command_not_found(stderr: str) -> bool:
     if missing_cmd.startswith("./"):
         missing_cmd = missing_cmd[2:]
     
-    return restore_missing_file(missing_cmd)
+    return _restore_missing_file(missing_cmd)
 
 
 def handle_cat_no_such_file(stderr: str) -> bool:
@@ -248,7 +168,7 @@ def handle_cat_no_such_file(stderr: str) -> bool:
     missing_file = match.group(1).strip()
     print(f"cat: missing file: {missing_file}")
     
-    return restore_missing_file(missing_file)
+    return _restore_missing_file(missing_file)
 
 
 def handle_diff_no_such_file(stderr: str) -> bool:
@@ -266,7 +186,7 @@ def handle_diff_no_such_file(stderr: str) -> bool:
     missing_file = match.group(1).strip()
     print(f"diff: missing file: {missing_file}")
     
-    return restore_missing_file(missing_file)
+    return _restore_missing_file(missing_file)
 
 
 def handle_sh_cannot_open(stderr: str) -> bool:
@@ -284,7 +204,7 @@ def handle_sh_cannot_open(stderr: str) -> bool:
     missing_file = match.group(1).strip()
     print(f"sh: cannot open: {missing_file}")
     
-    return restore_missing_file(missing_file)
+    return _restore_missing_file(missing_file)
 
 
 def handle_sh_cant_cd(stderr: str) -> bool:
@@ -303,7 +223,7 @@ def handle_sh_cant_cd(stderr: str) -> bool:
     print(f"sh: can't cd to: {missing_dir}")
     
     # Restore all files in that directory
-    return restore_missing_file(missing_dir)
+    return _restore_missing_file(missing_dir)
 
 
 def handle_no_such_file_or_directory(stderr: str) -> bool:
@@ -318,10 +238,10 @@ def handle_no_such_file_or_directory(stderr: str) -> bool:
     print(f"Missing file or executable: {missing_file}")
 
     # Attempt to `git checkout` the missing file or directory
-    return restore_missing_file(missing_file)
+    return _restore_missing_file(missing_file)
 
 
-def parse_traceback(traceback_text: str) -> T.Tuple[T.Optional[str], T.Optional[str]]:
+def _parse_traceback(traceback_text: str) -> T.Tuple[T.Optional[str], T.Optional[str]]:
     """
     Look for NameErrors in a python traceback and return (file, name).
     """
@@ -355,7 +275,7 @@ def parse_traceback(traceback_text: str) -> T.Tuple[T.Optional[str], T.Optional[
     return None, None
 
 
-def parse_import_error(error_message: str) -> T.Tuple[T.Optional[str], T.Optional[str]]:
+def _parse_import_error(error_message: str) -> T.Tuple[T.Optional[str], T.Optional[str]]:
     """
     Read a traceback and look for import errors, return (file, import name).
     """
@@ -387,7 +307,7 @@ def handle_future_annotations(stderr: str) -> bool:
     and 'from __future__ import annotations' is missing.
     """
     # Parse the NameError to get filepath and name
-    filepath, name = parse_traceback(stderr)
+    filepath, name = _parse_traceback(stderr)
     if filepath is None:
         return False
     
@@ -408,7 +328,7 @@ def handle_future_annotations(stderr: str) -> bool:
     
     relative_path = os.path.relpath(filepath)
     print(f"repairing {relative_path} for future annotations (forward reference {name=})")
-    return do_repair(relative_path, missing="annotations")
+    return _do_repair(relative_path, missing="annotations")
 
 
 def handle_orphaned_method(stderr: str) -> bool:
@@ -460,7 +380,7 @@ def handle_orphaned_method(stderr: str) -> bool:
                         # Try restoring with the method name - src_repair should restore
                         # the entire class context needed for this method
                         print(f"Restoring context for method: {method_name}")
-                        return do_repair(relative_path, missing=method_name)
+                        return _do_repair(relative_path, missing=method_name)
     except (IOError, IndexError) as e:
         print(f"Error reading file: {e}")
         return False
@@ -541,18 +461,18 @@ def handle_indentation_error(stderr: str) -> bool:
     except subprocess.CalledProcessError:
         print(f"Failed to restore {relative_path} from HEAD, trying partial repair")
         # Fallback to general repair attempt
-        return do_repair(relative_path)
+        return _do_repair(relative_path)
 
 
 def handle_import_error2(stderr: str) -> bool:
     # regex to find the filename and the name causing the NameError
-    filepath, import_name = parse_import_error(stderr)
+    filepath, import_name = _parse_import_error(stderr)
     if filepath is None:
         return False
 
     relative_path = os.path.relpath(filepath)
     print(f"repairing {relative_path} for {import_name=}")
-    return do_repair(relative_path, missing=import_name)
+    return _do_repair(relative_path, missing=import_name)
 
 
 def handle_module_attribute_error(err: str) -> bool:
@@ -570,7 +490,7 @@ def handle_module_attribute_error(err: str) -> bool:
 
     # Call the repair tool to restore the missing method
     print(f"repairing {module_path=} for {missing_method=}")
-    return do_repair(module_path, missing_method)
+    return _do_repair(module_path, missing_method)
 
 def handle_object_attribute_error(err: str) -> bool:
     # Match the stack trace pattern to check for AttributeError
@@ -597,7 +517,7 @@ def handle_object_attribute_error(err: str) -> bool:
 
     # Call the repair tool to restore the missing method
     print(f"repairing {file_path} for {missing_method=}")
-    return do_repair(file_path, missing_method)
+    return _do_repair(file_path, missing_method)
 
 
 def handle_missing_pyc(stderr: str) -> bool:
@@ -608,7 +528,7 @@ def handle_missing_pyc(stderr: str) -> bool:
         return False
     missing_file = match.group(1).replace(".pyc", ".py")  # Convert .pyc to .py
     print(f"Missing file: {missing_file}")
-    return restore_missing_file(missing_file)
+    return _restore_missing_file(missing_file)
 
 
 def handle_missing_file(stderr: str) -> bool:
@@ -619,7 +539,7 @@ def handle_missing_file(stderr: str) -> bool:
         return False
     missing_file = match.group(1)
     print(f"Missing file: {missing_file}")
-    return restore_missing_file(missing_file)
+    return _restore_missing_file(missing_file)
 
 
 def handle_missing_py_package(stderr: str) -> bool:
@@ -641,7 +561,7 @@ def handle_missing_py_package(stderr: str) -> bool:
     module_path = actual_import.replace(".", "/")
 
     # Attempt to `git checkout` the missing file or directory
-    if restore_missing_file(module_path):
+    if _restore_missing_file(module_path):
         return True
 
     print(f"Could not restore the missing module: {actual_import}")
@@ -664,7 +584,7 @@ def handle_file_not_found(stderr: str) -> bool:
         missing_file = match.group(1)
     
     print(f"Extracted missing file: {missing_file}")
-    return restore_missing_file(missing_file)
+    return _restore_missing_file(missing_file)
 
 
 def handle_missing_py_module(stderr: str) -> bool:
@@ -677,13 +597,13 @@ def handle_missing_py_module(stderr: str) -> bool:
     print(f"Missing module: {missing_module}")
 
     # Convert the module name to a file path and checkout the file
-    file_path = get_python_file_path(missing_module)
-    if restore_missing_file(file_path):
+    file_path = _get_python_file_path(missing_module)
+    if _restore_missing_file(file_path):
         # successfully restore, try again
         return True
     # git checkout didn't work. Try a folder instead?
-    init_path = get_python_init_path(missing_module)
-    if restore_missing_file(init_path):
+    init_path = _get_python_init_path(missing_module)
+    if _restore_missing_file(init_path):
         return True
 
     # Not sure what this could be.
@@ -719,7 +639,7 @@ def handle_import_error1(stderr: str) -> bool:
     print(f"Attempting to restore: {file_path}")
 
     # Attempt to git checkout the missing file
-    return restore_missing_file(file_path)
+    return _restore_missing_file(file_path)
 
 
 def handle_circular_import_error(err: str) -> bool:
@@ -742,13 +662,13 @@ def handle_circular_import_error(err: str) -> bool:
     submodule_path = module_path.replace(".", "/") + "/" + missing_name + ".py"
     print(f"Attempting to restore submodule: {submodule_path}")
     
-    if restore_missing_file(submodule_path):
+    if _restore_missing_file(submodule_path):
         return True
     
     # Fallback: try to restore missing item from the main module file
     main_module_path = module_path.replace(".", "/") + ".py"
     print(f"Fallback: repairing main module {main_module_path} for {missing_name}")
-    return do_repair(main_module_path, missing_name)
+    return _do_repair(main_module_path, missing_name)
 
 
 def handle_import_name_error(err: str) -> bool:
@@ -765,16 +685,16 @@ def handle_import_name_error(err: str) -> bool:
         return False
     module_path = file_path_match.group(1).replace(".", "/") + ".py"
     print(f"repairing {module_path} for {missing_function=}")
-    if do_repair(module_path, missing_function):
+    if _do_repair(module_path, missing_function):
         return True
     # fail to work. possibly we guessed wrong. Lets assume a package
     package_path = (
         file_path_match.group(1).replace(".", "/") + "/" + missing_function + ".py"
     )
-    return do_repair(package_path)
+    return _do_repair(package_path)
 
 
-def do_repair(
+def _do_repair(
     file_path: str, missing: T.Optional[str] = None, ref: T.Optional[str] = None
 ) -> bool:
     print(f"repair --missing {missing} {file_path}")
@@ -822,7 +742,7 @@ def handle_permission_denied(err: str) -> bool:
     # Check if the file exists
     if not os.path.exists(relative_path):
         print(f"File {relative_path} does not exist, trying to restore")
-        return restore_missing_file(relative_path)
+        return _restore_missing_file(relative_path)
 
     # File exists but has wrong permissions - restore from git
     print(f"File exists but has wrong permissions, restoring from git")
@@ -905,7 +825,7 @@ def handle_ansible_file_not_found(stderr: str) -> bool:
         print(f"Missing file reported by Ansible: {missing_file}")
 
         # Attempt to `git checkout` the missing file
-        if restore_missing_file(missing_file):
+        if _restore_missing_file(missing_file):
             return True
     return False
 
@@ -930,7 +850,7 @@ def handle_ansible_variable(stderr: str) -> bool:
             )
             if var in show_result.stdout:
                 print(f"Found '{var}' in {deleted_file}. Attempting to restore...")
-                return restore_missing_file(deleted_file)
+                return _restore_missing_file(deleted_file)
         except subprocess.CalledProcessError:
             print(f"Error while processing file {deleted_file}")
         except UnicodeDecodeError:
@@ -940,7 +860,7 @@ def handle_ansible_variable(stderr: str) -> bool:
     return False
 
 
-def extract_mypy_names(error_message: str) -> T.Dict[str, T.Set[str]]:
+def _extract_mypy_names(error_message: str) -> T.Dict[str, T.Set[str]]:
     """
     Extracts quoted names and their associated filenames from mypy error messages.
     """
@@ -957,13 +877,13 @@ def handle_mypy_errors(stdout: str) -> bool:
     """
     Attempt to fix every [name-defined] error that mypy reports.
     """
-    files_with_errors = extract_mypy_names(stdout)
+    files_with_errors = _extract_mypy_names(stdout)
     if not files_with_errors:
         return False
 
     for filepath, names in files_with_errors.items():
         for name in names:
-            success = do_repair(filepath, missing=name)
+            success = _do_repair(filepath, missing=name)
             if not success:
                 # TODO
                 raise RuntimeError(name)
@@ -995,7 +915,7 @@ def handle_generic_no_such_file(err: str) -> bool:
     for config_file in common_config_files:
         if config_file in deleted_files:
             print(f"Found deleted config file that's likely needed: {config_file}")
-            if restore_missing_file(config_file):
+            if _restore_missing_file(config_file):
                 return True
 
     # If there's no other context, we can't fix it
@@ -1022,7 +942,7 @@ def handle_generic_no_such_file(err: str) -> bool:
                 matches = re.findall(pattern, context)
                 for file_path in matches:
                     print(f"Found potential missing file: {file_path}")
-                    if restore_missing_file(file_path):
+                    if _restore_missing_file(file_path):
                         return True
 
     print("Generic 'No such file' error but couldn't identify the file")
@@ -1060,7 +980,7 @@ def handle_rust_env_not_defined(err: str) -> bool:
         build_rs_path = os.path.join(crate_dir, 'build.rs')
 
         print(f"Looking for build script: {build_rs_path}")
-        if restore_missing_file(build_rs_path):
+        if _restore_missing_file(build_rs_path):
             print(f"Restored {build_rs_path}")
             return True
 
@@ -1092,7 +1012,7 @@ def handle_rust_module_not_found(err: str) -> bool:
         print(f"Suggested file: {suggested_file}")
 
         # Try to restore the suggested file
-        if restore_missing_file(suggested_file):
+        if _restore_missing_file(suggested_file):
             return True
 
         # Also try the alternative path if mentioned (mod.rs)
@@ -1100,7 +1020,7 @@ def handle_rust_module_not_found(err: str) -> bool:
         if alt_match:
             alt_file = alt_match.group(1)
             print(f"Trying alternative: {alt_file}")
-            if restore_missing_file(alt_file):
+            if _restore_missing_file(alt_file):
                 return True
 
     return False
@@ -1158,7 +1078,7 @@ def handle_rust_panic_no_such_file(err: str) -> bool:
                     matches = re.findall(pattern, context)
                     for file_path in matches:
                         print(f"Found potential missing file in build script: {file_path}")
-                        if restore_missing_file(file_path):
+                        if _restore_missing_file(file_path):
                             return True
     except Exception as e:
         print(f"Error analyzing panic file: {e}")
@@ -1175,7 +1095,7 @@ def handle_cargo_couldnt_read(err: str) -> bool:
 
     missing_file = match.group(1)
     print(f"Cargo couldn't read file: {missing_file}")
-    return restore_missing_file(missing_file)
+    return _restore_missing_file(missing_file)
 
 
 def handle_cargo_missing_library(err: str) -> bool:
@@ -1212,18 +1132,18 @@ def handle_cargo_missing_library(err: str) -> bool:
             print(f"Full path: {full_path}")
 
             # Try to restore the file
-            if restore_missing_file(full_path):
+            if _restore_missing_file(full_path):
                 return True
 
         # Try without crate directory (for workspace root)
-        if restore_missing_file(suggested_path):
+        if _restore_missing_file(suggested_path):
             return True
 
         # Also try with underscores instead of hyphens (common Rust convention)
         alt_path = suggested_path.replace("-", "_")
         if alt_path != suggested_path:
             print(f"Trying alternative path: {alt_path}")
-            if restore_missing_file(alt_path):
+            if _restore_missing_file(alt_path):
                 return True
 
     # Pattern 1b: simpler library pattern
@@ -1234,14 +1154,14 @@ def handle_cargo_missing_library(err: str) -> bool:
         print(f"Missing library: {library_name}, suggested path: {suggested_path}")
 
         # Try to restore the suggested file
-        if restore_missing_file(suggested_path):
+        if _restore_missing_file(suggested_path):
             return True
 
         # Also try with underscores instead of hyphens (common Rust convention)
         alt_path = suggested_path.replace("-", "_")
         if alt_path != suggested_path:
             print(f"Trying alternative path: {alt_path}")
-            if restore_missing_file(alt_path):
+            if _restore_missing_file(alt_path):
                 return True
 
     # Pattern 2: no targets specified
@@ -1266,7 +1186,7 @@ def handle_cargo_missing_library(err: str) -> bool:
             for target_file in ['src/lib.rs', 'src/main.rs']:
                 target_path = os.path.join(crate_dir, target_file)
                 print(f"Trying to restore: {target_path}")
-                if restore_missing_file(target_path):
+                if _restore_missing_file(target_path):
                     restored_any = True
 
             if restored_any:
@@ -1301,11 +1221,11 @@ def handle_cargo_toml_not_found(err: str) -> bool:
         if specific_path.startswith('/root/tree-sitter/'):
             relative_path = specific_path.replace('/root/tree-sitter/', '')
             print(f"Attempting to restore specific Cargo.toml: {relative_path}")
-            if restore_missing_file(relative_path):
+            if _restore_missing_file(relative_path):
                 return True
 
     # Try to restore Cargo.toml in current directory
-    if restore_missing_file("Cargo.toml"):
+    if _restore_missing_file("Cargo.toml"):
         return True
 
     # Check deleted files for any Cargo.toml and restore all of them
@@ -1318,7 +1238,7 @@ def handle_cargo_toml_not_found(err: str) -> bool:
         restored_any = False
         for cargo_file in cargo_files:
             print(f"Restoring {cargo_file}")
-            if restore_missing_file(cargo_file):
+            if _restore_missing_file(cargo_file):
                 restored_any = True
         return restored_any
 
@@ -1361,7 +1281,7 @@ def handle_make_no_makefile_found(err: str) -> bool:
         makefile_path = os.path.join(subdir, makefile)
         if makefile_path in deleted_files:
             print(f"Found missing Makefile: {makefile_path}")
-            return restore_missing_file(makefile_path)
+            return _restore_missing_file(makefile_path)
     
     # Also try to restore all files in that subdirectory
     subdir_files = [f for f in deleted_files if f.startswith(subdir + '/')]
@@ -1369,7 +1289,7 @@ def handle_make_no_makefile_found(err: str) -> bool:
         print(f"Restoring {len(subdir_files)} files from {subdir}/")
         restored_any = False
         for f in subdir_files:
-            if restore_missing_file(f):
+            if _restore_missing_file(f):
                 restored_any = True
         return restored_any
     
@@ -1410,20 +1330,20 @@ def handle_make_missing_target(err: str) -> bool:
             if subdir:
                 full_path = os.path.join(subdir, source_file)
                 print(f"Trying to restore source file: {full_path}")
-                if restore_missing_file(full_path):
+                if _restore_missing_file(full_path):
                     return True
             print(f"Trying to restore source file: {source_file}")
-            if restore_missing_file(source_file):
+            if _restore_missing_file(source_file):
                 return True
     
     # Try with subdirectory prefix first
     if subdir:
         full_path = os.path.join(subdir, missing_file)
         print(f"Trying with subdirectory: {full_path}")
-        if restore_missing_file(full_path):
+        if _restore_missing_file(full_path):
             return True
     
-    return restore_missing_file(missing_file)
+    return _restore_missing_file(missing_file)
 
 
 def handle_make_recipe_failed(err: str) -> bool:
@@ -1451,7 +1371,7 @@ def handle_make_recipe_failed(err: str) -> bool:
     
     if target in deleted_files:
         print(f"Target {target} is a deleted file, restoring directly from git")
-        return restore_missing_file(target)
+        return _restore_missing_file(target)
     
     return False
 
@@ -1467,7 +1387,7 @@ def handle_cannot_open_file(err: str) -> bool:
 
     missing_file = match.group(1)
     print(f"Cannot open file: {missing_file}")
-    return restore_missing_file(missing_file)
+    return _restore_missing_file(missing_file)
 
 
 
@@ -1496,7 +1416,7 @@ def handle_c_linker_missing_object(err: str) -> bool:
         for ext in ['.c', '.cc', '.cpp', '.cxx', '.C']:
             source_file = base + ext
             print(f"Trying to restore source file: {source_file}")
-            if restore_missing_file(source_file):
+            if _restore_missing_file(source_file):
                 restored_any = True
                 break
     
@@ -1539,11 +1459,11 @@ def handle_ar_missing_object(err: str) -> bool:
             if subdir:
                 full_path = os.path.join(subdir, source_file)
                 print(f"Trying to restore source file: {full_path}")
-                if restore_missing_file(full_path):
+                if _restore_missing_file(full_path):
                     restored_any = True
                     break
             print(f"Trying to restore source file: {source_file}")
-            if restore_missing_file(source_file):
+            if _restore_missing_file(source_file):
                 restored_any = True
                 break
     
@@ -1582,12 +1502,12 @@ def handle_c_compilation_error(err: str) -> bool:
         # Try to restore both the header and the corresponding .c file
         c_file = missing_file[:-2] + ".c"
         print(f"Also attempting to restore corresponding C file: {c_file}")
-        if restore_missing_file(c_file):
+        if _restore_missing_file(c_file):
             print(f"Successfully restored {c_file}")
             restored_any = True
 
     # Try to restore the missing file
-    if restore_missing_file(missing_file):
+    if _restore_missing_file(missing_file):
         print(f"Successfully restored {missing_file}")
         restored_any = True
 
@@ -1676,7 +1596,7 @@ def handle_missing_test_output(err: str) -> bool:
         print(f"Using pattern: {pattern}")
 
         try:
-            if do_repair(test_file, missing=pattern):
+            if _do_repair(test_file, missing=pattern):
                 success = True
             else:
                 print(f"Failed to restore test {test_num}")

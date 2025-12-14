@@ -32,10 +32,16 @@ from pipeline.detectors.file_errors import (
 )
 from pipeline.detectors.python_code import MissingPythonCodeDetector, PythonNameErrorDetector
 from pipeline.detectors.test_failures import TestFailureDetector
-from pipeline.planners.file_restore import PermissionFixPlanner, MissingFilePlanner, LinkerUndefinedSymbolsPlanner, MissingDirectoryPlanner
-from pipeline.planners.make_restore import MakeMissingTargetPlanner, MakeNoRulePlanner
-from pipeline.planners.python_code_restore import MissingPythonCodePlanner, PythonNameErrorPlanner
-from pipeline.planners.c_code_restore import MissingCIncludePlanner, MissingCFunctionPlanner
+from pipeline.planners.permission_fix import PermissionFixPlanner
+from pipeline.planners.missing_file import MissingFilePlanner
+from pipeline.planners.linker_undefined_symbols import LinkerUndefinedSymbolsPlanner
+from pipeline.planners.missing_directory import MissingDirectoryPlanner
+from pipeline.planners.make_missing_target import MakeMissingTargetPlanner
+from pipeline.planners.make_no_rule import MakeNoRulePlanner
+from pipeline.planners.missing_python_code import MissingPythonCodePlanner
+from pipeline.planners.python_name_error import PythonNameErrorPlanner
+from pipeline.planners.missing_c_include import MissingCIncludePlanner
+from pipeline.planners.missing_c_function import MissingCFunctionPlanner
 from pipeline.planners.test_failures import TestFailurePlanner
 from pipeline.executors.git_restore import GitRestoreExecutor
 from pipeline.executors.python_code_restore import PythonCodeRestoreExecutor

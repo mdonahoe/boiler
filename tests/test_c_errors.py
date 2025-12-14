@@ -11,7 +11,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from pipeline.handlers import register_all_handlers
 from pipeline.detectors.file_errors import CCompilationErrorDetector, CLinkerErrorDetector, FopenNoSuchFileDetector
 from pipeline.models import ErrorClue, GitState
-from pipeline.planners.file_restore import MissingFilePlanner, LinkerUndefinedSymbolsPlanner
+from pipeline.planners.missing_file import MissingFilePlanner
+from pipeline.planners.linker_undefined_symbols import LinkerUndefinedSymbolsPlanner
 
 
 class TestCCompilationErrorDetector(unittest.TestCase):
