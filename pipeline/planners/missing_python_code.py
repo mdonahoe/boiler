@@ -34,53 +34,12 @@ class MissingPythonCodePlanner(Planner):
         return plans
 
     def _plan_for_clue(self, clue: ErrorClue, git_state: GitState) -> T.List[RepairPlan]:
-        file_path = clue.context.get("file_path")
         missing_element = clue.context.get("missing_element")
 
-        if not file_path or not missing_element:
+        if not missing_element:
             if is_verbose():
-                print(f"[Planner:MissingPythonCodePlanner] Missing file_path or missing_element")
+                print(f"[Planner:MissingPythonCodePlanner] Requires missing_element")
             return []
 
-        # Extract element_name and element_type from missing_element
-        # missing_element is like "def foo", "class Bar", "import baz"
-        parts = missing_element.split(None, 1)
-        if len(parts) < 2:
-            return []
-        element_type = parts[0]  # "def", "class", or "import"
-        # Extract just the name (handle "def foo()" -> "foo")
-        element_name = parts[1].split('(')[0].strip()
-
-        # Make path relative if it's absolute
-        if os.path.isabs(file_path):
-            file_path = os.path.relpath(file_path)
-
-        # Only plan repairs for files that exist (modified) or are in the repo
-        # Skip files that already fully match git
-        if os.path.exists(file_path):
-            # File exists - this is good, we can use src_repair to add the missing code
-            if is_verbose():
-                print(f"[Planner:MissingPythonCodePlanner] File {file_path} exists, planning repair")
-            pass
-        else:
-            # File doesn't exist - skip it, let other handlers deal with full restoration
-            if is_verbose():
-                print(f"[Planner:MissingPythonCodePlanner] File {file_path} does not exist, skipping")
-            return []
-
-        return [
-            RepairPlan(
-                plan_type="restore_python_code",
-                priority=0,  # High priority - missing code in test file
-                target_file=file_path,
-                action="restore_python_element",
-                params={
-                    "ref": git_state.ref,
-                    "element_name": element_name,
-                    "element_type": element_type,
-                    "missing_element": missing_element
-                },
-                reason=f"Missing {element_type} '{element_name}' in {file_path}",
-                clue_source=clue
-            )
-        ]
+        # TODO(matt): search git for any python files that define this element.
+        return []
