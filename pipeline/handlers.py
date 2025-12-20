@@ -10,27 +10,24 @@ from pipeline.executors.registry import register_executor
 
 # Import concrete implementations
 from pipeline.detectors.permissions import PermissionDeniedDetector
-from pipeline.detectors.make_errors import (
-    MakeEnteringDirectoryDetector,
-    MakeMissingTargetDetector,
-    MakeNoRuleDetector,
-    MakeGlobPatternErrorDetector,
-)
-from pipeline.detectors.file_errors import (
-    FopenNoSuchFileDetector,
-    FileNotFoundDetector,
-    ShellCannotOpenDetector,
-    CannotOpenFileDetector,
-    ShellCommandNotFoundDetector,
-    CatNoSuchFileDetector,
-    DiffNoSuchFileDetector,
-    CCompilationErrorDetector,
-    CLinkerErrorDetector,
-    CIncompleteTypeDetector,
-    CImplicitDeclarationDetector,
-    CUndeclaredIdentifierDetector,
-)
-from pipeline.detectors.python_code import MissingPythonCodeDetector, PythonNameErrorDetector
+from pipeline.detectors.make_entering_directory import MakeEnteringDirectoryDetector
+from pipeline.detectors.make_missing_target import MakeMissingTargetDetector
+from pipeline.detectors.make_no_rule import MakeNoRuleDetector
+from pipeline.detectors.make_glob_pattern_error import MakeGlobPatternErrorDetector
+from pipeline.detectors.fopen_no_such_file import FopenNoSuchFileDetector
+from pipeline.detectors.file_not_found import FileNotFoundDetector
+from pipeline.detectors.shell_cannot_open import ShellCannotOpenDetector
+from pipeline.detectors.cannot_open_file import CannotOpenFileDetector
+from pipeline.detectors.shell_command_not_found import ShellCommandNotFoundDetector
+from pipeline.detectors.cat_no_such_file import CatNoSuchFileDetector
+from pipeline.detectors.diff_no_such_file import DiffNoSuchFileDetector
+from pipeline.detectors.c_compilation_error import CCompilationErrorDetector
+from pipeline.detectors.c_linker_error import CLinkerErrorDetector
+from pipeline.detectors.c_incomplete_type import CIncompleteTypeDetector
+from pipeline.detectors.c_implicit_declaration import CImplicitDeclarationDetector
+from pipeline.detectors.c_undeclared_identifier import CUndeclaredIdentifierDetector
+from pipeline.detectors.missing_python_code import MissingPythonCodeDetector
+from pipeline.detectors.python_name_error import PythonNameErrorDetector
 from pipeline.detectors.test_failures import TestFailureDetector
 from pipeline.planners.permission_fix import PermissionFixPlanner
 from pipeline.planners.missing_file import MissingFilePlanner
