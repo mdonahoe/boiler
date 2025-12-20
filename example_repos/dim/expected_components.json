@@ -15,6 +15,7 @@
     "MakeNoRulePlanner",
     "MissingCFunctionPlanner",
     "MissingCIncludePlanner",
+    "MissingFilePlanner",
     "TestFailurePlanner"
   ],
   "executors": [
