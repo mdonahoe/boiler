@@ -1,5 +1,7 @@
 """
 Detector for missing Python code (classes, functions, imports).
+
+only used by dim unit tests
 """
 
 import re
@@ -13,17 +15,11 @@ class MissingPythonCodeDetector(Detector):
     Detect when Python files are missing expected code (classes, functions, imports).
 
     Matches patterns like:
-    - AssertionError: 'class TestClass' not found in '...\nexample.py - 13 lines\n...'
-    - AssertionError: 'def hello_world' not found in '...'
-    - Expected to see 'class ClassName' but got something else
+    - AssertionError: 'class TestClass' not found in 'anything example.py - 13 lines\n...'
     """
 
     PATTERNS = {
-        # Original pattern uses 2 lazy quantifiers but is necessary to handle:
-        # 1. 'class X' not found in 'file.py - N lines'  (simple case)
-        # 2. 'class X' not found in '...\nfile.py - N lines'  (with embedded content)
-        # TODO: Refactor to avoid multiple lazy quantifiers
-        "missing_python_code": r"'(?P<missing_element>(?:def|class|import)\s+\w+(?:\s*\(.*\))?)'.*?not found.*?(?:\\n|[\s\n])*?(?P<file_path>[a-zA-Z0-9_-]+\.py)\s+-\s+\d+\s+lines",
+        "missing_python_code": r"Error: '(?P<missing_element>[^']+)' not found"
     }
 
     EXAMPLES = [
@@ -33,7 +29,6 @@ class MissingPythonCodeDetector(Detector):
                 "clue_type": "missing_python_code",
                 "confidence": 1.0,
                 "context": {
-                    "file_path": "example.py",
                     "missing_element": "class TestClass",
                 },
             },
@@ -44,8 +39,17 @@ class MissingPythonCodeDetector(Detector):
                 "clue_type": "missing_python_code",
                 "confidence": 1.0,
                 "context": {
-                    "file_path": "test.py",
                     "missing_element": "def hello_world",
+                },
+            },
+        ),
+        (
+            "AssertionError: 'class Foo' not found in 'nonexistent.py - 3 lines...'",
+            {
+                "clue_type": "missing_python_code",
+                "confidence": 1.0,
+                "context": {
+                    "missing_element": "class Foo",
                 },
             },
         ),

@@ -19,7 +19,7 @@ class MissingPythonCodeDetector(Detector):
     """
 
     PATTERNS = {
-        "missing_python_code": r"'(?P<missing_element>(?:def|class|import)\s+\w+(?:\s*\(.*\))?)'.*?not found.*?(?:\\n|[\s\n])*?(?P<file_path>[a-zA-Z0-9_-]+\.py)\s+-\s+\d+\s+lines",
+        "missing_python_code": r"'(?P<missing_element>(?:def|class|import)\s+\w+(?:\s*\(.*\))?)'.*not found.*\b(?P<file_path>[a-zA-Z0-9_-]+\.py)\s+-\s+\d+\s+lines",
     }
 
     EXAMPLES = [

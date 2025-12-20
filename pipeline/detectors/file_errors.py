@@ -230,7 +230,7 @@ class CLinkerErrorDetector(Detector):
 
     PATTERNS = {
         "linker_undefined_symbols": r"undefined reference to [`'](?P<symbol>[^'`]+)[`']",
-        "missing_file": r"/usr/bin/ld:.*?cannot find\s+(?P<file_path>[^\s:]+):\s+No such file or directory",
+        "missing_file": r"/usr/bin/ld:.*cannot find\s+(?P<file_path>[^\s:]+):\s+No such file or directory",
     }
 
     EXAMPLES = [
@@ -292,7 +292,7 @@ class CIncompleteTypeDetector(Detector):
     """
 
     PATTERNS = {
-        "missing_c_include": r"(?P<file_path>[a-zA-Z0-9_./\-]+\.c):\d+:\d+:.*?error:.*?(?:has incomplete type|storage size).*?struct\s+(?P<struct_name>termios|winsize|stat|tm|sigaction|dirent)",
+        "missing_c_include": r"(?P<file_path>[a-zA-Z0-9_./\-]+\.c):\d+:\d+:[^\n]*error:[^\n]*(?:has incomplete type|storage size).*struct\s+(?P<struct_name>termios|winsize|stat|tm|sigaction|dirent)",
     }
 
     EXAMPLES = [
@@ -320,7 +320,7 @@ class CImplicitDeclarationDetector(Detector):
     """
 
     PATTERNS = {
-        "missing_c_include": r"(?P<file_path>[a-zA-Z0-9_./\-]+\.c):\d+:\d+:\s+(?:error|warning):\s+implicit declaration of function\s+['\u2018](?P<function_name>[^'\u2019]+)['\u2019].*?note:\s+include\s+['\u2018]<(?P<suggested_include>[^>]+)>['\u2019]",
+        "missing_c_include": r"(?P<file_path>[a-zA-Z0-9_./\-]+\.c):\d+:\d+:\s+(?:error|warning):\s+implicit declaration of function\s+['\u2018](?P<function_name>[^'\u2019]+)['\u2019].*note:\s+include\s+['\u2018]<(?P<suggested_include>[^>]+)>['\u2019]",
         "missing_c_function": r"(?P<file_path>[a-zA-Z0-9_./\-]+\.c):(?P<line_number>\d+):\d+:\s+(?:error|warning):\s+implicit declaration of function\s+['\u2018](?P<function_name>[^'\u2019]+)['\u2019]",
     }
 
@@ -353,7 +353,7 @@ class CUndeclaredIdentifierDetector(Detector):
     """
 
     PATTERNS = {
-        "missing_c_include": r"(?P<file_path>[a-zA-Z0-9_./\-]+\.c):\d+:\d+:.*?undeclared.*?note:.*is defined in header\s+['\u2018]<(?P<suggested_include>[^>]+)>['\u2019]",
+        "missing_c_include": r"(?P<file_path>[a-zA-Z0-9_./\-]+\.c):\d+:\d+:[^\n]*undeclared.*note:.*is defined in header\s+['\u2018]<(?P<suggested_include>[^>]+)>['\u2019]",
         "missing_c_function": r"(?P<file_path>[a-zA-Z0-9_./\-]+\.c):(?P<line_number>\d+):\d+:\s+error:\s+['\u2018](?P<identifier>[^'\u2019]+)['\u2019]\s+undeclared\s+\(first use",
     }
 

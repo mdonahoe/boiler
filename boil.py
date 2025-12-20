@@ -141,7 +141,7 @@ def fix(command: T.List[str], num_iterations: int, allow_legacy:bool = False) ->
             )
 
             # Run pipeline
-            pipeline_result = run_pipeline(stderr, stdout, git_state, debug=True)
+            pipeline_result = run_pipeline(stderr, stdout, git_state, debug=True, execute=True)
 
             if pipeline_result.success and has_changes():
                 message = f"fixed with pipeline (modified {len(pipeline_result.files_modified)} file(s))"

@@ -97,17 +97,18 @@ class DetectorExamplesTest(unittest.TestCase):
     def test_examples_produce_clues(self):
         """Verify each example error text produces at least one clue"""
         for detector in self.detectors:
-            for i, example in enumerate(detector.EXAMPLES):
-                error_text, expected_clue = example
-                clues = detector.detect(error_text)
+            with self.subTest(detector=detector.name):
+                for i, example in enumerate(detector.EXAMPLES):
+                    error_text, expected_clue = example
+                    clues = detector.detect(error_text)
 
-                self.assertGreater(
-                    len(clues),
-                    0,
-                    f"{detector.name} example {i} produced no clues\n"
-                    f"Error text: {error_text}\n"
-                    f"Expected: {expected_clue}",
-                )
+                    self.assertGreater(
+                        len(clues),
+                        0,
+                        f"{detector.name} example {i} produced no clues\n"
+                        f"Error text: {error_text}\n"
+                        f"Expected: {expected_clue}",
+                    )
 
     def test_examples_have_correct_clue_type(self):
         """Verify example errors produce clues with expected clue_type"""
@@ -159,56 +160,57 @@ class DetectorExamplesTest(unittest.TestCase):
             # TODO(claude): use a unittest context manager here so that if a detector fails, the error message makes it clear which
             for i, example in enumerate(detector.EXAMPLES):
                 error_text, expected_clue = example
-                clues = detector.detect(error_text)
+                with self.subTest(detector=detector.name, i=i, error_text=error_text):
+                    clues = detector.detect(error_text)
 
-                self.assertGreater(len(clues), 0)
+                    self.assertGreater(len(clues), 0)
 
-                clue = clues[0]
-                expected_context = expected_clue.get("context", {})
+                    clue = clues[0]
+                    expected_context = expected_clue.get("context", {})
 
-                # Verify all expected context keys are present
-                for key, expected_value in expected_context.items():
-                    self.assertIn(
-                        key,
-                        clue.context,
-                        f"{detector.name} example {i}: "
-                        f"context missing key '{key}'\n"
-                        f"Expected context: {expected_context}\n"
-                        f"Got context: {clue.context}",
-                    )
+                    # Verify all expected context keys are present
+                    for key, expected_value in expected_context.items():
+                        self.assertIn(
+                            key,
+                            clue.context,
+                            f"{detector.name} example {i}: "
+                            f"context missing key '{key}'\n"
+                            f"Expected context: {expected_context}\n"
+                            f"Got context: {clue.context}",
+                        )
 
-                    # Verify value matches (handle both exact and substring matches)
-                    actual_value = clue.context[key]
-                    if isinstance(expected_value, list):
-                        # For lists, check if all expected items are in actual
-                        if isinstance(actual_value, list):
-                            for exp_item in expected_value:
-                                self.assertIn(
-                                    exp_item,
-                                    actual_value,
+                        # Verify value matches (handle both exact and substring matches)
+                        actual_value = clue.context[key]
+                        if isinstance(expected_value, list):
+                            # For lists, check if all expected items are in actual
+                            if isinstance(actual_value, list):
+                                for exp_item in expected_value:
+                                    self.assertIn(
+                                        exp_item,
+                                        actual_value,
+                                        f"{detector.name} example {i}: "
+                                        f"context['{key}'] missing item {exp_item}\n"
+                                        f"Expected: {expected_value}\n"
+                                        f"Got: {actual_value}",
+                                    )
+                            else:
+                                # If actual is not a list, this is an error
+                                self.fail(
                                     f"{detector.name} example {i}: "
-                                    f"context['{key}'] missing item {exp_item}\n"
+                                    f"context['{key}'] expected list, got {type(actual_value)}\n"
                                     f"Expected: {expected_value}\n"
-                                    f"Got: {actual_value}",
+                                    f"Got: {actual_value}"
                                 )
                         else:
-                            # If actual is not a list, this is an error
-                            self.fail(
+                            # For non-list values, check equality
+                            self.assertEqual(
+                                actual_value,
+                                expected_value,
                                 f"{detector.name} example {i}: "
-                                f"context['{key}'] expected list, got {type(actual_value)}\n"
+                                f"context['{key}'] mismatch\n"
                                 f"Expected: {expected_value}\n"
-                                f"Got: {actual_value}"
+                                f"Got: {actual_value}",
                             )
-                    else:
-                        # For non-list values, check equality
-                        self.assertEqual(
-                            actual_value,
-                            expected_value,
-                            f"{detector.name} example {i}: "
-                            f"context['{key}'] mismatch\n"
-                            f"Expected: {expected_value}\n"
-                            f"Got: {actual_value}",
-                        )
 
     def test_detector_names_match_classes(self):
         """Verify detector name property matches the class name"""
