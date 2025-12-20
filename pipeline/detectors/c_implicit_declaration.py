@@ -35,4 +35,16 @@ class CImplicitDeclarationDetector(Detector):
                 },
             },
         ),
+        (
+            "test.c:10:5: error: implicit declaration of function 'myFunction'",
+            {
+                "clue_type": "missing_c_function",
+                "confidence": 1.0,
+                "context": {
+                    "file_path": "test.c",
+                    "line_number": "10",
+                    "function_name": "myFunction",
+                },
+            },
+        ),
     ]
