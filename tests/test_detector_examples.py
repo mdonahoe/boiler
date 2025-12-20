@@ -14,28 +14,8 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from pipeline.detectors.make_errors import (
-    MakeEnteringDirectoryDetector,
-    MakeMissingTargetDetector,
-    MakeNoRuleDetector,
-)
 from pipeline.detectors import registry as detector_registry
 from pipeline import handlers
-
-from pipeline.detectors.permissions import PermissionDeniedDetector
-from pipeline.detectors.file_errors import (
-    FopenNoSuchFileDetector,
-    FileNotFoundDetector,
-    ShellCannotOpenDetector,
-    ShellCommandNotFoundDetector,
-    CatNoSuchFileDetector,
-    DiffNoSuchFileDetector,
-    CLinkerErrorDetector,
-    CCompilationErrorDetector,
-    CIncompleteTypeDetector,
-    CImplicitDeclarationDetector,
-    CUndeclaredIdentifierDetector,
-)
 
 
 class DetectorExamplesTest(unittest.TestCase):
