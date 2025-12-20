@@ -266,6 +266,62 @@ class DetectorExamplesTest(unittest.TestCase):
                 f"{class_name} should not override pattern_to_clue() method",
             )
 
+    def test_clue_types_are_unique_across_detectors(self):
+        """Verify each PATTERN has a unique clue_type name across all Detector subclasses"""
+        from collections import defaultdict
+
+        # Collect all clue_types and which detectors use them
+        clue_type_to_detectors = defaultdict(list)
+
+        for detector in self.detectors:
+            if hasattr(detector, "PATTERNS"):
+                for clue_type in detector.PATTERNS.keys():
+                    clue_type_to_detectors[clue_type].append(detector.name)
+
+        # Find duplicates
+        duplicates = {
+            clue_type: detectors
+            for clue_type, detectors in clue_type_to_detectors.items()
+            if len(detectors) > 1
+        }
+
+        if duplicates:
+            error_msg = "Found duplicate clue_type names across detectors:\n"
+            for clue_type, detectors in sorted(duplicates.items()):
+                error_msg += f"  '{clue_type}' used by {len(detectors)} detectors:\n"
+                for detector_name in sorted(detectors):
+                    error_msg += f"    - {detector_name}\n"
+            self.fail(error_msg)
+
+    def test_all_patterns_have_examples(self):
+        """Verify each PATTERN has at least one matching EXAMPLE"""
+        missing_coverage = []
+
+        for detector in self.detectors:
+            if hasattr(detector, "PATTERNS"):
+                patterns_clue_types = set(detector.PATTERNS.keys())
+
+                # Get clue_types from examples
+                example_clue_types = set()
+                if hasattr(detector, "EXAMPLES"):
+                    for error_text, expected_clue in detector.EXAMPLES:
+                        clue_type = expected_clue.get("clue_type")
+                        if clue_type:
+                            example_clue_types.add(clue_type)
+
+                # Find patterns without examples
+                uncovered = patterns_clue_types - example_clue_types
+                if uncovered:
+                    missing_coverage.append((detector.name, sorted(uncovered)))
+
+        if missing_coverage:
+            error_msg = "Found patterns without matching examples:\n"
+            for detector_name, clue_types in sorted(missing_coverage):
+                error_msg += f"  {detector_name}:\n"
+                for clue_type in clue_types:
+                    error_msg += f"    - '{clue_type}' has no example\n"
+            self.fail(error_msg)
+
 
 if __name__ == "__main__":
     unittest.main()
