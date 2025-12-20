@@ -92,7 +92,7 @@ if (re.search(rf'\b{re.escape(symbol)}\s*\(', file_contents) or
 
 ## Documentation Updates
 
-### AGENT_PROMPT.md
+### AGENTS.md
 
 Added proper instructions for using `boil --abort`:
 - Step 4 (Validate): Changed from `git reset --hard HEAD && rm -rf .boil` to `boil --abort`
