@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
 """
-Unit tests to validate that all detectors have working examples.
+Unit tests to validate Detector subclasses.
 
-Each detector should have an EXAMPLES list with (error_text, expected_clue_dict) tuples.
-This test suite validates that:
-1. Every detector has EXAMPLES defined
-2. Each example error produces a clue with the expected properties
+Each Detector subclass must:
+1. be defined in its own file
+2. be imported into the registry
+3. define PATTERNS and EXAMPLES only. No other methods or properties allowed.
+
+Each PATTERN must:
+1. have a unique "clue_type" name across all other Detector subclasses
+2. be efficient, containing at most one greedy match (.*?)  See TestDetectorRegexEfficiency in test_detector_regex_efficiency.py
+3. have at least one matching EXAMPLE
+
+Each EXAMPLE must:
+1. have a matching PATTERN than can produce it.
 """
 
 from collections import defaultdict
