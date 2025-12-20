@@ -23,9 +23,6 @@ from pipeline.detectors import registry as detector_registry
 from pipeline import handlers
 
 from pipeline.detectors.permissions import PermissionDeniedDetector
-from pipeline.detectors.python_code import (
-    PythonNameErrorDetector,
-)
 from pipeline.detectors.file_errors import (
     FopenNoSuchFileDetector,
     FileNotFoundDetector,
