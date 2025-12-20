@@ -1,8 +1,5 @@
 {
   "detectors": [
-    "CImplicitDeclarationDetector",
-    "CIncompleteTypeDetector",
-    "CLinkerErrorDetector",
     "FopenNoSuchFileDetector",
     "MakeEnteringDirectoryDetector",
     "MakeMissingTargetDetector",
@@ -10,16 +7,12 @@
     "TestFailureDetector"
   ],
   "planners": [
-    "LinkerUndefinedSymbolsPlanner",
     "MakeMissingTargetPlanner",
     "MakeNoRulePlanner",
-    "MissingCFunctionPlanner",
-    "MissingCIncludePlanner",
     "MissingFilePlanner",
     "TestFailurePlanner"
   ],
   "executors": [
-    "CCodeRestoreExecutor",
     "GitRestoreExecutor"
   ]
 }

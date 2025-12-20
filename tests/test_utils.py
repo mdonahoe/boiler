@@ -172,6 +172,11 @@ def copy_and_boil(
 
         # Prepare environment
         env = os.environ.copy()
+        # Set MAKELEVEL to ensure consistent behavior with recursive make
+        # This causes make to print "Entering directory" messages which the
+        # MakeEnteringDirectoryDetector can detect
+        if 'MAKELEVEL' not in env:
+            env['MAKELEVEL'] = '1'
         if env_vars:
             env.update(env_vars)
 

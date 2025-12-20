@@ -1,9 +1,9 @@
 {
   "detectors": [
     "CLinkerErrorDetector",
+    "MakeEnteringDirectoryDetector",
     "MakeGlobPatternErrorDetector",
     "MakeMissingTargetDetector",
-    "MakeEnteringDirectoryDetector",
     "MakeNoRuleDetector",
     "TestFailureDetector"
   ],
