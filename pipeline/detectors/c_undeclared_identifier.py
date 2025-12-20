@@ -21,6 +21,8 @@ class CUndeclaredIdentifierDetector(Detector):
     """
 
     PATTERNS = {
+        # Uses 2 lazy quantifiers to match error line and note line
+        # TODO: Refactor to avoid multiple lazy quantifiers
         "missing_c_include": r"(?P<file_path>[a-zA-Z0-9_./\-]+\.c):\d+:\d+:.*?undeclared.*?note:.*is defined in header\s+['\u2018]<(?P<suggested_include>[^>]+)>['\u2019]",
         "missing_c_function": r"(?P<file_path>[a-zA-Z0-9_./\-]+\.c):(?P<line_number>\d+):\d+:\s+error:\s+['\u2018](?P<identifier>[^'\u2019]+)['\u2019]\s+undeclared\s+\(first use",
     }
