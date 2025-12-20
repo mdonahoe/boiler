@@ -19,6 +19,10 @@ class MissingPythonCodeDetector(Detector):
     """
 
     PATTERNS = {
+        # Original pattern uses 2 lazy quantifiers but is necessary to handle:
+        # 1. 'class X' not found in 'file.py - N lines'  (simple case)
+        # 2. 'class X' not found in '...\nfile.py - N lines'  (with embedded content)
+        # TODO: Refactor to avoid multiple lazy quantifiers
         "missing_python_code": r"'(?P<missing_element>(?:def|class|import)\s+\w+(?:\s*\(.*\))?)'.*?not found.*?(?:\\n|[\s\n])*?(?P<file_path>[a-zA-Z0-9_-]+\.py)\s+-\s+\d+\s+lines",
     }
 

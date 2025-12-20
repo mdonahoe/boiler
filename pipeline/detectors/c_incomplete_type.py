@@ -19,6 +19,8 @@ class CIncompleteTypeDetector(Detector):
     """
 
     PATTERNS = {
+        # Uses 3 lazy quantifiers to match across error message variations
+        # TODO: Refactor to avoid multiple lazy quantifiers
         "missing_c_include": r"(?P<file_path>[a-zA-Z0-9_./\-]+\.c):\d+:\d+:.*?error:.*?(?:has incomplete type|storage size).*?struct\s+(?P<struct_name>termios|winsize|stat|tm|sigaction|dirent)",
     }
 
