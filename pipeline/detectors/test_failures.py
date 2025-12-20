@@ -59,5 +59,18 @@ class TestFailureDetector(Detector):
                 },
             },
         ),
+        (
+            "test_runner.c:42: test_addition: Assertion `result == 5` failed",
+            {
+                "clue_type": "c_test_failure",
+                "confidence": 1.0,
+                "context": {
+                    "test_file": "test_runner.c",
+                    "line_number": "42",
+                    "test_name": "test_addition",
+                    "assertion": "result == 5",
+                },
+            },
+        ),
     ]
 

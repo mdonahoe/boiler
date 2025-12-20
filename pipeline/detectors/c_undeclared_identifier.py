@@ -38,4 +38,16 @@ class CUndeclaredIdentifierDetector(Detector):
                 },
             },
         ),
+        (
+            "test.c:15:3: error: 'disableRawMode' undeclared (first use in this function)",
+            {
+                "clue_type": "missing_c_function",
+                "confidence": 1.0,
+                "context": {
+                    "file_path": "test.c",
+                    "line_number": "15",
+                    "identifier": "disableRawMode",
+                },
+            },
+        ),
     ]
