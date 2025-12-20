@@ -71,29 +71,15 @@ def build_clue_to_detector_map(detector_registry):
                 if clue_type not in mapping:
                     mapping[clue_type] = detector_name
 
-    # Also test detectors with their EXAMPLES to catch any clue_types not in PATTERNS
-    for detector in detector_registry._detectors:
-        if hasattr(detector, 'EXAMPLES'):
-            for example_text, expected in detector.EXAMPLES:
-                clue_type = expected.get('clue_type')
-                if clue_type and clue_type not in mapping:
-                    mapping[clue_type] = detector.name
-
     return mapping
 
 
-def build_clue_to_planner_map(planner_registry):
+def build_clue_to_planner_map(planner_registry, clues):
     """Build mapping from clue_type to planner name"""
     mapping = {}
     for planner in planner_registry._planners:
         # Test which clue types this planner handles
-        test_clue_types = [
-            "missing_file", "missing_file_simple", "permission_denied",
-            "make_no_rule", "make_missing_target", "linker_undefined_symbols",
-            "missing_c_include", "missing_c_function", "missing_python_code",
-            "python_name_error", "test_failure"
-        ]
-        for clue_type in test_clue_types:
+        for clue_type in clues:
             if planner.can_handle(clue_type):
                 mapping[clue_type] = planner.name
     return mapping
@@ -131,7 +117,7 @@ def analyze_boil_debug(boil_dir):
     # Map clue_types to detectors
     clue_to_detector = build_clue_to_detector_map(detector_registry)
     # Map clue_types to planners
-    clue_to_planner = build_clue_to_planner_map(planner_registry)
+    clue_to_planner = build_clue_to_planner_map(planner_registry, clues=clue_to_detector.keys())
     # Map actions to executors
     action_to_executor = build_action_to_executor_map(executor_registry)
 
