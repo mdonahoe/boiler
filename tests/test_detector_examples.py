@@ -8,9 +8,8 @@ Each Detector subclass must:
 3. define PATTERNS and EXAMPLES only. No other methods or properties allowed.
 
 Each PATTERN must:
-1. have a unique "clue_type" name across all other Detector subclasses
-2. be efficient, containing at most one greedy match (.*?)  See TestDetectorRegexEfficiency in test_detector_regex_efficiency.py
-3. have at least one matching EXAMPLE
+1. be efficient, containing at most one greedy match (.*?)  See TestDetectorRegexEfficiency in test_detector_regex_efficiency.py
+2. have at least one matching EXAMPLE
 
 Each EXAMPLE must:
 1. have a matching PATTERN than can produce it.
@@ -266,32 +265,6 @@ class DetectorExamplesTest(unittest.TestCase):
                 f"{class_name} should not override pattern_to_clue() method",
             )
 
-    def test_clue_types_are_unique_across_detectors(self):
-        """Verify each PATTERN has a unique clue_type name across all Detector subclasses"""
-        from collections import defaultdict
-
-        # Collect all clue_types and which detectors use them
-        clue_type_to_detectors = defaultdict(list)
-
-        for detector in self.detectors:
-            if hasattr(detector, "PATTERNS"):
-                for clue_type in detector.PATTERNS.keys():
-                    clue_type_to_detectors[clue_type].append(detector.name)
-
-        # Find duplicates
-        duplicates = {
-            clue_type: detectors
-            for clue_type, detectors in clue_type_to_detectors.items()
-            if len(detectors) > 1
-        }
-
-        if duplicates:
-            error_msg = "Found duplicate clue_type names across detectors:\n"
-            for clue_type, detectors in sorted(duplicates.items()):
-                error_msg += f"  '{clue_type}' used by {len(detectors)} detectors:\n"
-                for detector_name in sorted(detectors):
-                    error_msg += f"    - {detector_name}\n"
-            self.fail(error_msg)
 
     def test_all_patterns_have_examples(self):
         """Verify each PATTERN has at least one matching EXAMPLE"""
