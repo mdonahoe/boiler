@@ -16,12 +16,10 @@ import subprocess
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from pipeline.handlers import register_all_handlers
-from pipeline.detectors.file_errors import (
-    CImplicitDeclarationDetector,
-    CUndeclaredIdentifierDetector,
-    CIncompleteTypeDetector,
-    CLinkerErrorDetector,
-)
+from pipeline.detectors.c_implicit_declaration import CImplicitDeclarationDetector
+from pipeline.detectors.c_undeclared_identifier import CUndeclaredIdentifierDetector
+from pipeline.detectors.c_incomplete_type import CIncompleteTypeDetector
+from pipeline.detectors.c_linker_error import CLinkerErrorDetector
 from pipeline.planners.missing_c_function import MissingCFunctionPlanner
 from pipeline.planners.missing_c_include import MissingCIncludePlanner
 from pipeline.planners.linker_undefined_symbols import LinkerUndefinedSymbolsPlanner
