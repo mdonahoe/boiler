@@ -33,7 +33,8 @@ from tests.test_utils import (
     build_clue_to_detector_map,
     build_clue_to_planner_map,
     build_action_to_executor_map,
-    analyze_boil_debug
+    analyze_boil_debug,
+    copy_and_boil,
 )
 
 
@@ -71,11 +72,9 @@ class ExampleReposTest(unittest.TestCase):
         self.assertTrue(os.path.exists(example_before_dir),
                        f"Example directory not found: {example_before_dir}")
 
-        # Import the utility function
-        from tests.test_utils import copy_and_boil
-
         # Special handling for dim.c - clear instead of delete
-        special_handling = {"dim.c": "clear"} if repo_name == "dim" else None
+        # special_handling = {"dim.c": "clear"} if repo_name == "dim" else None
+        special_handling = None
 
         # Run the boil test with temporary directory cleanup via context manager
         with copy_and_boil(

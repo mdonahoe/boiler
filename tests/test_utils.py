@@ -12,6 +12,7 @@ import shutil
 import tempfile
 import glob
 import json
+import time
 
 
 class BoilTestContext:
@@ -224,8 +225,6 @@ def run_boil_with_profiling(
     Returns:
         tuple: (tmpdir, success) - Path to temp directory and whether boiling succeeded
     """
-    import time
-
     env_vars = {}
     if verbose:
         env_vars['BOIL_VERBOSE'] = '1'
