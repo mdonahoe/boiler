@@ -8,8 +8,11 @@ This test suite validates that:
 2. Each example error produces a clue with the expected properties
 """
 
+from collections import defaultdict
 import sys
 import os
+import re
+import subprocess
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -26,6 +29,38 @@ class DetectorExamplesTest(unittest.TestCase):
         handlers.register_all_handlers()
         self.detectors = detector_registry.get_detector_registry()._detectors
 
+    def test_all_detectors_subclasses_are_registered(self):
+        detectors_found = defaultdict(list)  # map from classname to list of files
+        files_found = defaultdict(list)
+        res = subprocess.run(['git', 'grep', 'class.*Detector', '--', 'pipeline/detectors'], capture_output=True)
+        for line in res.stdout.decode('utf-8').splitlines():
+            filename, classdef = line.split(":", 1)
+            match = re.search(r'class (.*)\(Detector\)', classdef)
+            if match:
+                classname = match.group(1)
+                detectors_found[classname].append(filename)
+                files_found[filename].append(classname)
+
+        # We should have found something
+        if not detectors_found:
+            raise AssertionError("no detectors found")
+
+        # Ensure all found detectors are in the registry
+        detectors_registered = {d.name for d in self.detectors}
+        unregistered = set(detectors_found.keys()) - detectors_registered
+        if unregistered:
+            raise AssertionError(f"Found {len(unregistered)} unregistered Detector subclasses: {unregistered}")
+
+        # Ensure all found detectors are only defined once
+        for detector, files in detectors_found.items():
+            with self.subTest(detector=detector):
+                self.assertEqual(1, len(files), f"{detector} is defined in multiple files: {files}")
+
+        # Ensure every file only defines a single detector
+        for file, detectors in files_found.items():
+            with self.subTest(file=file):
+                self.assertEqual(1, len(detectors), f"{file} is defines in multiple detectors: {detectors}")
+        
     def test_all_detectors_have_examples(self):
         """Verify every detector defines EXAMPLES"""
         for detector in self.detectors:
