@@ -121,6 +121,7 @@ class TestDetectorRegexEfficiency(unittest.TestCase):
         for detector_class in detector_classes:
             detector = detector_class()
 
+            # Check each pattern
             for pattern_name, pattern in detector.PATTERNS.items():
                 lazy_count = self._count_lazy_quantifiers(pattern)
 
