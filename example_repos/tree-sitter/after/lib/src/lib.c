@@ -10,4 +10,3 @@
 #include "./subtree.c"
 #include "./tree_cursor.c"
 #include "./tree.c"
-#include "./wasm_store.c"
