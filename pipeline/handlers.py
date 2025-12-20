@@ -26,7 +26,6 @@ from pipeline.detectors.c_linker_error import CLinkerErrorDetector
 from pipeline.detectors.c_incomplete_type import CIncompleteTypeDetector
 from pipeline.detectors.c_implicit_declaration import CImplicitDeclarationDetector
 from pipeline.detectors.c_undeclared_identifier import CUndeclaredIdentifierDetector
-from pipeline.detectors.missing_python_code import MissingPythonCodeDetector
 from pipeline.detectors.python_name_error import PythonNameErrorDetector
 from pipeline.detectors.test_failures import TestFailureDetector
 from pipeline.planners.permission_fix import PermissionFixPlanner
@@ -35,7 +34,6 @@ from pipeline.planners.linker_undefined_symbols import LinkerUndefinedSymbolsPla
 from pipeline.planners.missing_directory import MissingDirectoryPlanner
 from pipeline.planners.make_missing_target import MakeMissingTargetPlanner
 from pipeline.planners.make_no_rule import MakeNoRulePlanner
-from pipeline.planners.missing_python_code import MissingPythonCodePlanner
 from pipeline.planners.python_name_error import PythonNameErrorPlanner
 from pipeline.planners.missing_c_include import MissingCIncludePlanner
 from pipeline.planners.missing_c_function import MissingCFunctionPlanner
@@ -67,7 +65,6 @@ def register_all_handlers():
     register_detector(MakeMissingTargetDetector())
     register_detector(MakeNoRuleDetector())
     register_detector(MakeGlobPatternErrorDetector())
-    register_detector(MissingPythonCodeDetector())
     register_detector(PythonNameErrorDetector())
     register_detector(FopenNoSuchFileDetector())
     register_detector(FileNotFoundDetector())
@@ -90,7 +87,6 @@ def register_all_handlers():
     register_planner(LinkerUndefinedSymbolsPlanner())
     register_planner(MakeMissingTargetPlanner())
     register_planner(MakeNoRulePlanner())
-    register_planner(MissingPythonCodePlanner())
     register_planner(PythonNameErrorPlanner())
     register_planner(MissingCIncludePlanner())
     register_planner(MissingCFunctionPlanner())

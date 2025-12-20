@@ -24,7 +24,6 @@ from pipeline import handlers
 
 from pipeline.detectors.permissions import PermissionDeniedDetector
 from pipeline.detectors.python_code import (
-    MissingPythonCodeDetector,
     PythonNameErrorDetector,
 )
 from pipeline.detectors.file_errors import (
