@@ -4,12 +4,22 @@ Test that enforces after/ folder is a strict subset of before/ folder.
 
 For each subrepo in example_repos/:
 - The after/ folder must not have any files that don't exist in before/
-- Each file in after/ must have the same or fewer lines as in before/
-- Lines in after/ must appear in the same order as in before/ (deletions only)
+- Each file in after/ must have the same or fewer chars as in before/
+- Chars in after/ must appear in the same order as in before/ (deletions only)
 """
 
 import os
 import unittest
+
+def is_subsequence(before, after):
+    i = 0
+    for ch in after:
+        while i < len(before) and before[i] != ch:
+            i += 1
+        if i == len(before):
+            return False
+        i += 1
+    return True
 
 
 class AfterIsSubsetTest(unittest.TestCase):
@@ -100,35 +110,9 @@ class AfterIsSubsetTest(unittest.TestCase):
 
     def _check_lines_in_order(self, subrepo_name, file_path, before_lines, after_lines):
         """Verify after_lines appear in order within before_lines"""
-        before_idx = 0
-
-        for after_idx, after_line in enumerate(after_lines):
-            # Find this line in before starting from current position
-            found = False
-            for idx in range(before_idx, len(before_lines)):
-                if before_lines[idx] == after_line:
-                    before_idx = idx + 1
-                    found = True
-                    break
-
-            if not found:
-                msg = f"\n{'='*70}\n"
-                msg += f"[{subrepo_name}] LINE IN after/ NOT FOUND OR OUT OF ORDER IN before/\n"
-                msg += f"{'='*70}\n"
-                msg += f"File: {file_path}\n"
-                msg += f"Problem at line {after_idx + 1} in after/:\n"
-                msg += f"  {after_line.rstrip()}\n\n"
-                msg += f"before/{file_path}:\n"
-                for i, line in enumerate(before_lines, 1):
-                    prefix = ">>>" if i > before_idx - 5 and i <= before_idx else "   "
-                    msg += f"  {prefix} {i:3d}: {line.rstrip()}\n"
-                msg += f"\nafter/{file_path}:\n"
-                for i, line in enumerate(after_lines, 1):
-                    mark = " <-- PROBLEM HERE" if i == after_idx + 1 else ""
-                    msg += f"   {i:3d}: {line.rstrip()}{mark}\n"
-                msg += f"\nExpected to find line {after_idx + 1} somewhere after line {before_idx} in before/\n"
-                msg += f"{'='*70}\n"
-                self.fail(msg)
+        if not is_subsequence('\n'.join(before_lines), '\n'.join(after_lines)):
+            self.fail(f"{subrepo} AFTER has extra content in {file_path}")
+            # TODO(matt): show the offending line
 
     def _get_all_files(self, directory):
         """Recursively get all files in directory (excluding hidden files)"""
