@@ -29,6 +29,12 @@ from pipeline.handlers import register_all_handlers
 from pipeline.detectors.registry import get_detector_registry
 from pipeline.planners.registry import get_planner_registry
 from pipeline.executors.registry import get_executor_registry
+from tests.test_utils import (
+    build_clue_to_detector_map,
+    build_clue_to_planner_map,
+    build_action_to_executor_map,
+    analyze_boil_debug
+)
 
 
 class ExampleReposTest(unittest.TestCase):
@@ -107,7 +113,7 @@ class ExampleReposTest(unittest.TestCase):
             # Analyze .boil/ debug output
             boil_dir = os.path.join(tmpdir, ".boil")
             if os.path.exists(boil_dir):
-                used_components = self._analyze_boil_debug(boil_dir)
+                used_components = analyze_boil_debug(boil_dir)
 
                 # Compare against expected lists if they exist
                 self._compare_against_expected(repo_name, used_components)
@@ -185,116 +191,6 @@ class ExampleReposTest(unittest.TestCase):
                     files.append(os.path.join(root, filename))
         return files
 
-    def _analyze_boil_debug(self, boil_dir):
-        """
-        Analyze .boil/ debug output to extract used detectors, planners, and executors.
-        
-        Returns dict with keys: 'detectors', 'planners', 'executors'
-        """
-        used_detectors = set()
-        used_planners = set()
-        used_executors = set()
-        
-        # Get all pipeline JSON files
-        json_files = glob.glob(os.path.join(boil_dir, "iter*.pipeline.json"))
-        
-        # Build mappings from clue_types/plan_types/actions to component names
-        detector_registry = get_detector_registry()
-        planner_registry = get_planner_registry()
-        executor_registry = get_executor_registry()
-        
-        # Map clue_types to detectors
-        clue_to_detector = self._build_clue_to_detector_map(detector_registry)
-        # Map clue_types to planners
-        clue_to_planner = self._build_clue_to_planner_map(planner_registry)
-        # Map actions to executors
-        action_to_executor = self._build_action_to_executor_map(executor_registry)
-        
-        # Process each JSON file
-        for json_file in json_files:
-            with open(json_file, 'r') as f:
-                data = json.load(f)
-            
-            # Extract detectors from clues_detected
-            for clue in data.get("clues_detected", []):
-                clue_type = clue.get("clue_type", "")
-                if clue_type in clue_to_detector:
-                    used_detectors.add(clue_to_detector[clue_type])
-            
-            # Extract planners from plans_generated/attempted
-            for plan in data.get("plans_generated", []) + data.get("plans_attempted", []):
-                clue_source = plan.get("clue_source", {})
-                clue_type = clue_source.get("clue_type", "")
-                if clue_type in clue_to_planner:
-                    used_planners.add(clue_to_planner[clue_type])
-                
-                # Also extract executors from actions
-                action = plan.get("action", "")
-                if action in action_to_executor:
-                    used_executors.add(action_to_executor[action])
-        
-        return {
-            'detectors': sorted(used_detectors),
-            'planners': sorted(used_planners),
-            'executors': sorted(used_executors)
-        }
-    
-    def _build_clue_to_detector_map(self, detector_registry):
-        """Build mapping from clue_type to detector name"""
-        mapping = {}
-        
-        # Use PATTERNS attribute from detectors to map clue_types
-        for detector in detector_registry._detectors:
-            detector_name = detector.name
-            # Check if detector has PATTERNS attribute (Detector subclasses)
-            if hasattr(detector, 'PATTERNS'):
-                for clue_type in detector.PATTERNS.keys():
-                    # If multiple detectors produce the same clue_type, keep the first one
-                    # (in practice, each clue_type should map to one detector)
-                    if clue_type not in mapping:
-                        mapping[clue_type] = detector_name
-                    else:
-                        # Multiple detectors for same clue_type - keep both
-                        # Store as list if needed, but for now just overwrite
-                        # (we can improve this later if needed)
-                        pass
-        
-        # Also test detectors with their EXAMPLES to catch any clue_types not in PATTERNS
-        for detector in detector_registry._detectors:
-            if hasattr(detector, 'EXAMPLES'):
-                for example_text, expected in detector.EXAMPLES:
-                    clue_type = expected.get('clue_type')
-                    if clue_type and clue_type not in mapping:
-                        mapping[clue_type] = detector.name
-        
-        return mapping
-    
-    def _build_clue_to_planner_map(self, planner_registry):
-        """Build mapping from clue_type to planner name"""
-        mapping = {}
-        for planner in planner_registry._planners:
-            # Test which clue types this planner handles
-            test_clue_types = [
-                "missing_file", "missing_file_simple", "permission_denied",
-                "make_no_rule", "make_missing_target", "linker_undefined_symbols",
-                "missing_c_include", "missing_c_function", "missing_python_code",
-                "python_name_error", "test_failure"
-            ]
-            for clue_type in test_clue_types:
-                if planner.can_handle(clue_type):
-                    mapping[clue_type] = planner.name
-        return mapping
-    
-    def _build_action_to_executor_map(self, executor_registry):
-        """Build mapping from action to executor name"""
-        mapping = {}
-        test_actions = ["restore_full", "restore_c_element", "restore_python_element"]
-        for executor in executor_registry._executors:
-            for action in test_actions:
-                if executor.can_handle(action):
-                    mapping[action] = executor.name
-        return mapping
-    
     def _compare_against_expected(self, repo_name, used_components):
         """
         Compare used components against expected lists for this repo.

@@ -26,17 +26,13 @@ from datetime import datetime
 import tempfile
 import subprocess
 import shutil
-import glob
 
 # Add parent directory to path (boiler root)
 boiler_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, boiler_root)
 
 from pipeline.handlers import register_all_handlers
-from pipeline.detectors.registry import get_detector_registry
-from pipeline.planners.registry import get_planner_registry
-from pipeline.executors.registry import get_executor_registry
-from tests.test_utils import run_boil_with_profiling
+from tests.test_utils import run_boil_with_profiling, analyze_boil_debug
 
 
 def get_available_repos():
@@ -54,101 +50,6 @@ def get_available_repos():
             repos.append(item)
 
     return sorted(repos)
-
-
-def build_clue_to_detector_map(detector_registry):
-    """Build mapping from clue_type to detector name"""
-    mapping = {}
-
-    # Use PATTERNS attribute from detectors to map clue_types
-    for detector in detector_registry._detectors:
-        detector_name = detector.name
-        # Check if detector has PATTERNS attribute (Detector subclasses)
-        if hasattr(detector, 'PATTERNS'):
-            for clue_type in detector.PATTERNS.keys():
-                # If multiple detectors produce the same clue_type, keep the first one
-                # (in practice, each clue_type should map to one detector)
-                if clue_type not in mapping:
-                    mapping[clue_type] = detector_name
-
-    return mapping
-
-
-def build_clue_to_planner_map(planner_registry, clues):
-    """Build mapping from clue_type to planner name"""
-    mapping = {}
-    for planner in planner_registry._planners:
-        # Test which clue types this planner handles
-        for clue_type in clues:
-            if planner.can_handle(clue_type):
-                mapping[clue_type] = planner.name
-    return mapping
-
-
-def build_action_to_executor_map(executor_registry):
-    """Build mapping from action to executor name"""
-    mapping = {}
-    test_actions = ["restore_full", "restore_c_element", "restore_python_element"]
-    for executor in executor_registry._executors:
-        for action in test_actions:
-            if executor.can_handle(action):
-                mapping[action] = executor.name
-    return mapping
-
-
-def analyze_boil_debug(boil_dir):
-    """
-    Analyze .boil/ debug output to extract used detectors, planners, and executors.
-
-    Returns dict with keys: 'detectors', 'planners', 'executors'
-    """
-    used_detectors = set()
-    used_planners = set()
-    used_executors = set()
-
-    # Get all pipeline JSON files
-    json_files = glob.glob(os.path.join(boil_dir, "iter*.pipeline.json"))
-
-    # Build mappings from clue_types/plan_types/actions to component names
-    detector_registry = get_detector_registry()
-    planner_registry = get_planner_registry()
-    executor_registry = get_executor_registry()
-
-    # Map clue_types to detectors
-    clue_to_detector = build_clue_to_detector_map(detector_registry)
-    # Map clue_types to planners
-    clue_to_planner = build_clue_to_planner_map(planner_registry, clues=clue_to_detector.keys())
-    # Map actions to executors
-    action_to_executor = build_action_to_executor_map(executor_registry)
-
-    # Process each JSON file
-    for json_file in json_files:
-        with open(json_file, 'r') as f:
-            data = json.load(f)
-
-        # Extract detectors from clues_detected
-        for clue in data.get("clues_detected", []):
-            clue_type = clue.get("clue_type", "")
-            if clue_type in clue_to_detector:
-                used_detectors.add(clue_to_detector[clue_type])
-
-        # Extract planners from plans_generated/attempted
-        for plan in data.get("plans_generated", []) + data.get("plans_attempted", []):
-            clue_source = plan.get("clue_source", {})
-            clue_type = clue_source.get("clue_type", "")
-            if clue_type in clue_to_planner:
-                used_planners.add(clue_to_planner[clue_type])
-
-            # Also extract executors from actions
-            action = plan.get("action", "")
-            if action in action_to_executor:
-                used_executors.add(action_to_executor[action])
-
-    return {
-        'detectors': sorted(used_detectors),
-        'planners': sorted(used_planners),
-        'executors': sorted(used_executors)
-    }
 
 
 def profile_repo(repo_name, max_iterations=1000, timeout=120, verbose=True):
