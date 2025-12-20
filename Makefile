@@ -10,3 +10,6 @@ test:
 
 check:
 	CHECK_MODE=1 SKIP_SLOW_TESTS=1 python3 -m unittest discover -s tests -p "test*.py"
+
+quick:
+	SKIP_SLOW_TESTS=1 python3 -m unittest discover -s tests -p "test*.py"
