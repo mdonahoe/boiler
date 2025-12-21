@@ -53,10 +53,10 @@ def walk(node, output, name):
     if node['type'] == 'if_statement' and has_name(node, name):
         expression, then_block, else_block = extract_if(node)
         keep_then = True
-        keep_else = True
+        keep_else = else_block is not None
         if has_name(expression, name) or has_name(then_block, name):
             keep_then = False
-        if has_name(else_block, name):
+        if else_block and has_name(else_block, name):
             keep_else = False
         if keep_else and not keep_then:
             # pull out just the statement
