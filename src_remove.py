@@ -108,6 +108,7 @@ def main():
     parser.add_argument('--src-file')
     parser.add_argument('--json-file')
     parser.add_argument('skipname')
+    parser.add_argument('--inplace', action='store_true')
     args = parser.parse_args()
     jsonfile = args.json_file
     if jsonfile:
@@ -118,7 +119,11 @@ def main():
     chunks = []
     walk(nodes, chunks, args.skipname)
     text = output_text(chunks)
-    print(text)
+    if args.inplace and args.src_file:
+        with open(args.src_file, 'w') as out:
+            out.write(text)
+    else:
+        print(text)
 
 if __name__ == '__main__':
     main()
