@@ -1,5 +1,6 @@
 import argparse
 import json
+import subprocess
 
 
 def extract_if(node):
@@ -45,9 +46,10 @@ def walk(node, output, name):
     if 'text' in node:
         output.append(node)
         return
-    if node['type'] == 'function_definition':
-        if defines_name(node, name):
-            return
+    if node['type'] == 'function_definition' and defines_name(node, name):
+        return
+    if node['type'] == 'expression_statement' and has_name(node, name):
+        return
     if node['type'] == 'if_statement' and has_name(node, name):
         expression, then_block, else_block = extract_if(node)
         keep_then = True
@@ -103,10 +105,16 @@ def output_text(chunks):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('filename')
+    parser.add_argument('--src-file')
+    parser.add_argument('--json-file')
     parser.add_argument('skipname')
     args = parser.parse_args()
-    nodes = json.load(open(args.filename))
+    jsonfile = args.json_file
+    if jsonfile:
+        output = open(jsonfile).read()
+    else:
+        output = subprocess.check_output(['/root/boiler/print-tree/tree_print', '--json', args.src_file])
+    nodes = json.loads(output)
     chunks = []
     walk(nodes, chunks, args.skipname)
     text = output_text(chunks)
