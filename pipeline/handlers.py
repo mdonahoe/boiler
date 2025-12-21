@@ -26,6 +26,7 @@ from pipeline.detectors.c_linker_error import CLinkerErrorDetector
 from pipeline.detectors.c_incomplete_type import CIncompleteTypeDetector
 from pipeline.detectors.c_implicit_declaration import CImplicitDeclarationDetector
 from pipeline.detectors.c_undeclared_identifier import CUndeclaredIdentifierDetector
+from pipeline.detectors.c_syntax_error import CSyntaxErrorDetector
 from pipeline.detectors.python_name_error import PythonNameErrorDetector
 from pipeline.detectors.test_failures import TestFailureDetector
 from pipeline.planners.permission_fix import PermissionFixPlanner
@@ -37,6 +38,7 @@ from pipeline.planners.make_no_rule import MakeNoRulePlanner
 from pipeline.planners.python_name_error import PythonNameErrorPlanner
 from pipeline.planners.missing_c_include import MissingCIncludePlanner
 from pipeline.planners.missing_c_function import MissingCFunctionPlanner
+from pipeline.planners.c_syntax_error import CSyntaxErrorPlanner
 from pipeline.planners.test_failures import TestFailurePlanner
 from pipeline.executors.git_restore import GitRestoreExecutor
 from pipeline.executors.python_code_restore import PythonCodeRestoreExecutor
@@ -78,6 +80,7 @@ def register_all_handlers():
     register_detector(CIncompleteTypeDetector())
     register_detector(CImplicitDeclarationDetector())
     register_detector(CUndeclaredIdentifierDetector())
+    register_detector(CSyntaxErrorDetector())
     register_detector(TestFailureDetector())
 
     # Register planners
@@ -90,6 +93,7 @@ def register_all_handlers():
     register_planner(PythonNameErrorPlanner())
     register_planner(MissingCIncludePlanner())
     register_planner(MissingCFunctionPlanner())
+    register_planner(CSyntaxErrorPlanner())
     register_planner(TestFailurePlanner())
 
     # Register executors
