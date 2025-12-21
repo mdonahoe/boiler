@@ -10,16 +10,18 @@ from pipeline.models import ErrorClue
 
 class CSyntaxErrorDetector(Detector):
     """
-    Detect C/C++ syntax errors that indicate corrupted header files.
+    Detect C/C++ syntax errors that indicate corrupted source or header files.
 
     Matches patterns like:
     - tree-sitter/lib/include/tree_sitter/api.h:1336:9: error: expected identifier or '(' before 'void'
     - foo.h:42:1: error: expected ';', identifier or '(' before 'int'
     - bar.h:10:5: error: expected declaration specifiers before 'return'
+    - dim.c:2197:3: error: expected identifier or '(' before 'return'
     """
 
     PATTERNS = {
         "c_syntax_error_in_header": r"(?P<file_path>[^\s:]+\.h):(?P<line_number>\d+):\d+:\s+error:\s+expected\s+.+?\s+before\s+['\u2018](?P<unexpected_token>[^'\u2019']+)['\u2019']",
+        "c_syntax_error_in_source": r"(?P<file_path>[^\s:]+\.c):(?P<line_number>\d+):\d+:\s+error:\s+expected\s+.+?\s+before\s+['\u2018](?P<unexpected_token>[^'\u2019']+)['\u2019']",
     }
 
     EXAMPLES = [
@@ -44,6 +46,18 @@ class CSyntaxErrorDetector(Detector):
                     "file_path": "foo.h",
                     "line_number": "42",
                     "unexpected_token": "int",
+                },
+            },
+        ),
+        (
+            "dim.c:2197:3: error: expected identifier or '(' before 'return'",
+            {
+                "clue_type": "c_syntax_error_in_source",
+                "confidence": 1.0,
+                "context": {
+                    "file_path": "dim.c",
+                    "line_number": "2197",
+                    "unexpected_token": "return",
                 },
             },
         ),
