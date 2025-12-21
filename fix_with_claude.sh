@@ -28,10 +28,15 @@ echo ""
 
 cd "$BOILER_DIR"
 
-# Add both directories as additional working directories
-echo "$PROMPT" | claude --print \
-    --dangerously-skip-permissions \
-    2>&1 || true
+# Give bot user access to the target repo if needed
+if [ "$REPO_PATH" != "$BOILER_DIR" ]; then
+    sudo chmod -R 755 "$REPO_PATH" 2>/dev/null || true
+fi
+
+# Invoke Claude as bot user (not root) so --dangerously-skip-permissions works
+# We run from boiler directory with proper permissions
+echo "Running claude as 'bot' user..."
+echo "$PROMPT" | sudo -u bot bash -c "cd $BOILER_DIR && claude --print --dangerously-skip-permissions" 2>&1 || true
 
 echo ""
 echo "================================================================================"
