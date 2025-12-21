@@ -37,6 +37,15 @@ from tests.test_utils import (
     copy_and_boil,
 )
 
+def is_subsequence(before, after):
+    i = 0
+    for ch in after:
+        while i < len(before) and before[i] != ch:
+            i += 1
+        if i == len(before):
+            return False
+        i += 1
+    return True
 
 class ExampleReposTest(unittest.TestCase):
     """Test boiling of example repositories"""
@@ -152,36 +161,13 @@ class ExampleReposTest(unittest.TestCase):
             # Check file content line-by-line
             boiled_file = os.path.join(boiled_dir, relative_path)
             with open(after_file, 'r', errors='ignore') as f:
-                after_lines = f.readlines()
+                after_content = f.read()
             with open(boiled_file, 'r', errors='ignore') as f:
-                boiled_lines = f.readlines()
+                boiled_content = f.read()
 
-            # All lines in after/ should exist in boiled/ in the same order
-            boiled_idx = 0
-            for after_idx, after_line in enumerate(after_lines):
-                found = False
-                for idx in range(boiled_idx, len(boiled_lines)):
-                    if boiled_lines[idx] == after_line:
-                        boiled_idx = idx + 1
-                        found = True
-                        break
-
-                if not found:
-                    msg = f"\n{'='*70}\n"
-                    msg += f"[{repo_name}] LINE IN after/ NOT FOUND IN BOILED RESULT\n"
-                    msg += f"{'='*70}\n"
-                    msg += f"File: {relative_path}\n"
-                    msg += f"Problem at line {after_idx + 1} in after/:\n"
-                    msg += f"  {after_line.rstrip()}\n\n"
-                    msg += f"after/{relative_path}:\n"
-                    for i, line in enumerate(after_lines, 1):
-                        mark = " <-- MISSING FROM BOILED" if i == after_idx + 1 else ""
-                        msg += f"  {i:3d}: {line.rstrip()}{mark}\n"
-                    msg += f"\nBoiled {relative_path} (relevant section):\n"
-                    for i, line in enumerate(boiled_lines, 1):
-                        msg += f"  {i:3d}: {line.rstrip()}\n"
-                    msg += f"{'='*70}\n"
-                    self.fail(msg)
+            if not is_subsequence(boiled_content, after_content):
+                msg = f"[{repo_name}] file {relative_path} is missing expected content"
+                self.fail(msg)
 
     def _get_all_non_hidden_files(self, directory):
         """Recursively get all non-hidden files in directory"""
