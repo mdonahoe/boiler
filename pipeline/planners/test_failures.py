@@ -29,14 +29,14 @@ class TestFailurePlanner(Planner):
         return "TestFailurePlanner"
 
     def can_handle(self, clue_type: str) -> bool:
-        return clue_type in ("test_failure", "test_docstring_with_missing_file")
+        return clue_type in ("test_failure", "test_docstring_with_missing_file", "c_test_failure")
 
     def plan(self, clues: T.List[ErrorClue], git_state: GitState) -> T.List[RepairPlan]:
         plans = []
         seen_targets = set()  # Deduplicate plans for the same file
 
         for clue in clues:
-            if clue.clue_type not in ("test_failure", "test_docstring_with_missing_file"):
+            if clue.clue_type not in ("test_failure", "test_docstring_with_missing_file", "c_test_failure"):
                 continue
             clue_plans = self._plan_for_clue(clue, git_state)
             for plan in clue_plans:
@@ -48,7 +48,7 @@ class TestFailurePlanner(Planner):
         # This handles cases where files aren't missing, but have incomplete content
         if not plans and git_state.partial_files:
             # Group all test_failure clues for this batch
-            test_failure_clues = [c for c in clues if c.clue_type in ("test_failure", "test_docstring_with_missing_file")]
+            test_failure_clues = [c for c in clues if c.clue_type in ("test_failure", "test_docstring_with_missing_file", "c_test_failure")]
 
             if test_failure_clues:
                 # For each partial file, create a plan to restore it
