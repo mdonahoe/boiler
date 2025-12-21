@@ -134,10 +134,12 @@ def fix(command: T.List[str], num_iterations: int, allow_legacy:bool = False) ->
             print("[Pipeline] Attempting repair with new pipeline system...")
 
             # Build git state
+            git_info = git_ops.get_git_file_info(ref)
             git_state = GitState(
                 ref=ref,
-                deleted_files=git_ops.get_deleted_files(ref=ref),
-                git_toplevel=git_ops.get_git_toplevel()
+                deleted_files=git_info["deleted_files"],
+                git_toplevel=git_ops.get_git_toplevel(),
+                partial_files=git_info["partial_files"]
             )
 
             # Run pipeline
@@ -447,10 +449,12 @@ def main() -> int:
         ref = ctx().git_ref
 
         print("[Pipeline] Attempting repair with new pipeline system...")
+        git_info = git_ops.get_git_file_info(ref)
         git_state = GitState(
             ref=ref,
-            deleted_files=git_ops.get_deleted_files(ref=ref),
-            git_toplevel=git_ops.get_git_toplevel()
+            deleted_files=git_info["deleted_files"],
+            git_toplevel=git_ops.get_git_toplevel(),
+            partial_files=git_info["partial_files"]
         )
         # Assume error output is in stderr
         pipeline_result = run_pipeline(err, "", git_state, debug=True, execute=False)
