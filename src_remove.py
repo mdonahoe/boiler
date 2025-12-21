@@ -28,6 +28,8 @@ def defines_name(node, name):
             
 
 def has_name(node, name):
+    if node is None:
+        return False
     if node['type'] == 'identifier':
         if node['text'] == name:
             return True
@@ -49,6 +51,8 @@ def walk(node, output, name):
     if node['type'] == 'function_definition' and defines_name(node, name):
         return
     if node['type'] == 'expression_statement' and has_name(node, name):
+        return
+    if node['type'] == 'declaration' and has_name(node, name):
         return
     if node['type'] == 'if_statement' and has_name(node, name):
         expression, then_block, else_block = extract_if(node)
@@ -72,7 +76,8 @@ def walk(node, output, name):
                     return
 
         if keep_then and not keep_else:
-            else_block['skip'] = True
+            if else_block is not None:
+                else_block['skip'] = True
 
         if not keep_then and not keep_else:
             return
@@ -114,7 +119,7 @@ def main():
     if jsonfile:
         output = open(jsonfile).read()
     else:
-        output = subprocess.check_output(['/root/boiler/print-tree/tree_print', '--json', args.src_file])
+        output = subprocess.check_output(['tree_print', '--json', args.src_file])
     nodes = json.loads(output)
     chunks = []
     walk(nodes, chunks, args.skipname)
