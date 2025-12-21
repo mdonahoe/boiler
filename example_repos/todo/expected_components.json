@@ -1,9 +1,9 @@
 {
   "detectors": [
-    "CIncompleteTypeDetector", "CImplicitDeclarationDetector", "CCompilationErrorDetector", "CUndeclaredIdentifierDetector", "CannotOpenFileDetector", "CatNoSuchFileDetector", "DiffNoSuchFileDetector", "FileNotFoundDetector", "PermissionDeniedDetector", "PythonNameErrorDetector", "ShellCannotOpenDetector", "ShellCommandNotFoundDetector"
+    "CIncompleteTypeDetector", "CImplicitDeclarationDetector", "CCompilationErrorDetector", "CUndeclaredIdentifierDetector", "CannotOpenFileDetector", "CatNoSuchFileDetector", "DiffNoSuchFileDetector", "FileNotFoundDetector", "PermissionDeniedDetector", "PythonNameErrorDetector", "ShellCannotOpenDetector", "ShellCommandNotFoundDetector", "CSyntaxErrorDetector"
   ],
   "planners": [
-    "MissingCIncludePlanner", "MissingCFunctionPlanner", "MissingDirectoryPlanner", "PermissionFixPlanner", "PythonNameErrorPlanner"
+    "MissingCIncludePlanner", "MissingCFunctionPlanner", "MissingDirectoryPlanner", "PermissionFixPlanner", "PythonNameErrorPlanner", "CSyntaxErrorPlanner"
   ],
   "executors": [
       "PythonCodeRestoreExecutor", "CCodeRestoreExecutor"

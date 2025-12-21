@@ -255,6 +255,7 @@ class ExampleReposTest(unittest.TestCase):
             ])
             raise AssertionError(msg)
 
+    @unittest.skipIf(os.environ.get('SKIP_SLOW_TESTS') == '1', "Slow test skipped")
     def test_component_coverage(self):
         """
         Verify that all registered detectors, planners, and executors are covered
