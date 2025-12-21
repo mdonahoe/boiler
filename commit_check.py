@@ -1,3 +1,6 @@
+"""
+See if a given commit is deletion-only, and thus a good candidate for a boiler test
+"""
 import subprocess
 import sys
 
