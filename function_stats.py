@@ -8,6 +8,7 @@ import json
 import subprocess
 import sys
 from collections import defaultdict
+from pathlib import Path
 
 
 def analyze_file(file_path):
@@ -20,17 +21,22 @@ def analyze_file(file_path):
     Returns:
         Dict with 'calls' and 'declarations' lists containing function names
     """
+    # Convert to absolute path to ensure it works from any working directory
+    abs_file_path = str(Path(file_path).resolve())
+
     try:
         result = subprocess.run(
-            ['python3', 'ast_analyzer.py', '--src-file', file_path],
+            ['python3', 'ast_analyzer.py', '--src-file', abs_file_path],
             capture_output=True,
             text=True,
-            check=True
+            check=True,
+            cwd=Path(__file__).parent
         )
         output = result.stdout.strip()
     except subprocess.CalledProcessError as e:
         print(f"Error analyzing {file_path}: {e}", file=sys.stderr)
         print(f"stderr: {e.stderr}", file=sys.stderr)
+        print(f"stdout: {e.stdout}", file=sys.stderr)
         return {'calls': [], 'declarations': []}
     except FileNotFoundError:
         print("Error: ast_analyzer.py not found or python3 not available", file=sys.stderr)
