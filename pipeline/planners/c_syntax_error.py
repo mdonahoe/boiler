@@ -11,11 +11,11 @@ from pipeline.utils import is_verbose
 
 class CSyntaxErrorPlanner(Planner):
     """
-    Plan fixes for C syntax errors in header files.
+    Plan fixes for C syntax errors in source and header files.
 
     Strategy:
-    - Detect when header files have syntax errors (like missing function declarations)
-    - Restore the entire header file from git to fix corruption
+    - Detect when C/C++ files have syntax errors (like missing code or function declarations)
+    - Restore the entire file from git to fix corruption
     """
 
     @property
@@ -23,14 +23,14 @@ class CSyntaxErrorPlanner(Planner):
         return "CSyntaxErrorPlanner"
 
     def can_handle(self, clue_type: str) -> bool:
-        return clue_type == "c_syntax_error_in_header"
+        return clue_type in ["c_syntax_error_in_header", "c_syntax_error_in_source"]
 
     def plan(self, clues: T.List[ErrorClue], git_state: GitState) -> T.List[RepairPlan]:
         plans = []
         seen_files = set()
 
         for clue in clues:
-            if clue.clue_type != "c_syntax_error_in_header":
+            if clue.clue_type not in ["c_syntax_error_in_header", "c_syntax_error_in_source"]:
                 continue
 
             file_path = clue.context.get("file_path")
