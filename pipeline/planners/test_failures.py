@@ -44,6 +44,33 @@ class TestFailurePlanner(Planner):
                     plans.append(plan)
                     seen_targets.add(plan.target_file)
 
+        # If we have test failures but no plans yet, check for partial files
+        # This handles cases where files aren't missing, but have incomplete content
+        if not plans and git_state.partial_files:
+            # Group all test_failure clues for this batch
+            test_failure_clues = [c for c in clues if c.clue_type in ("test_failure", "test_docstring_with_missing_file")]
+
+            if test_failure_clues:
+                # For each partial file, create a plan to restore it
+                for partial_file_info in git_state.partial_files:
+                    file_path = partial_file_info["file"]
+                    line_ratio = partial_file_info.get("line_ratio", "unknown")
+
+                    if file_path not in seen_targets:
+                        # Create a plan to restore the partial file
+                        # Use the first test failure clue as the source
+                        plans.append(RepairPlan(
+                            plan_type="restore_file",
+                            priority=0,  # High priority - likely causing test failures
+                            target_file=file_path,
+                            action="restore_full",
+                            params={"ref": git_state.ref},
+                            reason=f"Restore {file_path} (partial: {line_ratio}) - likely causing {len(test_failure_clues)} test failure(s)",
+                            clue_source=test_failure_clues[0],
+                            clues_fixed=test_failure_clues  # This might fix all test failures
+                        ))
+                        seen_targets.add(file_path)
+
         return plans
 
     def _plan_for_clue(self, clue: ErrorClue, git_state: GitState) -> T.List[RepairPlan]:
