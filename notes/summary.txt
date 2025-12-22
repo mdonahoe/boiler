@@ -18,9 +18,9 @@ The project underwent a major architectural refactoring from monolithic handlers
 - Clear separation of concerns
 
 **Key Files:**
-- `/home/bot/boiler/pipeline/models.py` - Core data structures
-- `/home/bot/boiler/pipeline/pipeline.py` - Orchestration
-- `/home/bot/boiler/pipeline/handlers.py` - Registration system
+- `boiler/pipeline/models.py` - Core data structures
+- `boiler/pipeline/pipeline.py` - Orchestration
+- `boiler/pipeline/handlers.py` - Registration system
 
 ### Migration Progress
 - **Migrated:** 8+ handlers from legacy system to pipeline

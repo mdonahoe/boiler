@@ -35,7 +35,9 @@
       "Bash(git mv:*)",
       "Bash(git show:*)",
       "Bash(git ls-files:*)",
-      "Bash(bd stats:*)"
+      "Bash(bd stats:*)",
+      "Bash(/tmp/test-install/bin/boil:*)",
+      "Bash(/tmp/test-install/bin/tree_print:*)"
     ],
     "deny": [],
     "ask": []
