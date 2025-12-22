@@ -24,8 +24,8 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from pipeline.detectors import registry as detector_registry
-from pipeline import handlers
+from src.pipeline.detectors import registry as detector_registry
+from src.pipeline import handlers
 
 
 class DetectorExamplesTest(unittest.TestCase):
@@ -39,7 +39,7 @@ class DetectorExamplesTest(unittest.TestCase):
     def test_all_detectors_subclasses_are_registered(self):
         detectors_found = defaultdict(list)  # map from classname to list of files
         files_found = defaultdict(list)
-        res = subprocess.run(['git', 'grep', 'class.*Detector', '--', 'pipeline/detectors'], capture_output=True)
+        res = subprocess.run(['git', 'grep', 'class.*Detector', '--', 'src/pipeline/detectors'], capture_output=True)
         for line in res.stdout.decode('utf-8').splitlines():
             filename, classdef = line.split(":", 1)
             match = re.search(r'class (.*)\(Detector\)', classdef)
@@ -242,7 +242,7 @@ class DetectorExamplesTest(unittest.TestCase):
 
     def test_detectors_do_not_override_base_methods(self):
         """Verify Detector subclasses don't override detect() or pattern_to_clue()"""
-        from pipeline.detectors.base import Detector
+        from src.pipeline.detectors.base import Detector
 
         for detector in self.detectors:
             class_name = detector.__class__.__name__

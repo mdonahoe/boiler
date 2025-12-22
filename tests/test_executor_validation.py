@@ -11,8 +11,8 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from pipeline.executors.git_restore import GitRestoreExecutor
-from pipeline.models import RepairPlan, ErrorClue
+from src.pipeline.executors.git_restore import GitRestoreExecutor
+from src.pipeline.models import RepairPlan, ErrorClue
 
 
 class ExecutorValidationTest(unittest.TestCase):

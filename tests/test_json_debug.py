@@ -10,8 +10,8 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from pipeline import run_pipeline, GitState
-from pipeline.handlers import register_all_handlers
+from src.pipeline import run_pipeline, GitState
+from src.pipeline.handlers import register_all_handlers
 
 
 class JSONDebugTest(unittest.TestCase):

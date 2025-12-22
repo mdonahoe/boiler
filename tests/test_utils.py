@@ -333,9 +333,9 @@ def analyze_boil_debug(boil_dir):
     Returns:
         dict with keys: 'detectors', 'planners', 'executors'
     """
-    from pipeline.detectors.registry import get_detector_registry
-    from pipeline.planners.registry import get_planner_registry
-    from pipeline.executors.registry import get_executor_registry
+    from src.pipeline.detectors.registry import get_detector_registry
+    from src.pipeline.planners.registry import get_planner_registry
+    from src.pipeline.executors.registry import get_executor_registry
 
     used_detectors = set()
     used_planners = set()

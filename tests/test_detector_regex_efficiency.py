@@ -8,8 +8,8 @@ import importlib
 import pkgutil
 from pathlib import Path
 
-import pipeline.detectors
-from pipeline.detectors.base import Detector
+import src.pipeline.detectors
+from src.pipeline.detectors.base import Detector
 
 
 class TestDetectorRegexEfficiency(unittest.TestCase):
@@ -26,7 +26,7 @@ class TestDetectorRegexEfficiency(unittest.TestCase):
         detector_classes = []
 
         # Get the path to the detectors package
-        detectors_path = Path(pipeline.detectors.__file__).parent
+        detectors_path = Path(src.pipeline.detectors.__file__).parent
 
         # Iterate through all modules in the detectors package
         for module_info in pkgutil.iter_modules([str(detectors_path)]):

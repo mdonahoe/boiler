@@ -25,10 +25,10 @@ from collections import defaultdict
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from pipeline.handlers import register_all_handlers
-from pipeline.detectors.registry import get_detector_registry
-from pipeline.planners.registry import get_planner_registry
-from pipeline.executors.registry import get_executor_registry
+from src.pipeline.handlers import register_all_handlers
+from src.pipeline.detectors.registry import get_detector_registry
+from src.pipeline.planners.registry import get_planner_registry
+from src.pipeline.executors.registry import get_executor_registry
 from tests.test_utils import (
     build_clue_to_detector_map,
     build_clue_to_planner_map,

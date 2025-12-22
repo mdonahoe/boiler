@@ -8,13 +8,13 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from pipeline.handlers import register_all_handlers
-from pipeline.detectors.c_compilation_error import CCompilationErrorDetector
-from pipeline.detectors.c_linker_error import CLinkerErrorDetector
-from pipeline.detectors.fopen_no_such_file import FopenNoSuchFileDetector
-from pipeline.models import ErrorClue, GitState
-from pipeline.planners.missing_file import MissingFilePlanner
-from pipeline.planners.linker_undefined_symbols import LinkerUndefinedSymbolsPlanner
+from src.pipeline.handlers import register_all_handlers
+from src.pipeline.detectors.c_compilation_error import CCompilationErrorDetector
+from src.pipeline.detectors.c_linker_error import CLinkerErrorDetector
+from src.pipeline.detectors.fopen_no_such_file import FopenNoSuchFileDetector
+from src.pipeline.models import ErrorClue, GitState
+from src.pipeline.planners.missing_file import MissingFilePlanner
+from src.pipeline.planners.linker_undefined_symbols import LinkerUndefinedSymbolsPlanner
 
 
 class TestCCompilationErrorDetector(unittest.TestCase):
