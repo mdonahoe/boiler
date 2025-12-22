@@ -172,8 +172,6 @@ def main():
 
     # Create prompt
     prompt = create_claude_prompt(repo_path, error_data, error_summary)
-    print(prompt)
-    return 0
 
     # Try to invoke Claude CLI, fall back to manual prompt
     success = invoke_claude_cli(prompt)
@@ -185,7 +183,8 @@ def main():
         print(f"  boil --abort")
         print(f"  boil make test")
     else:
-        print("it didnt work")
+        print("\nFailed to automatically invoke Claude.")
+        print("See the prompt above and manually provide it to Claude.")
 
     return 0
 
