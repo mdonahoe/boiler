@@ -97,7 +97,7 @@ Make boiler handle this error pattern generically for ANY repository, not just t
     return prompt
 
 
-def invoke_claude_cli(prompt):
+def invoke_claude_cli(prompt, cli=False):
     """Invoke Claude via CLI"""
     # Check if 'claude' command is available
     claude_check = subprocess.run(
@@ -128,7 +128,7 @@ def invoke_claude_cli(prompt):
         # Invoke claude by piping the prompt to stdin
         # Stream output in real-time by reading line by line
         process = subprocess.Popen(
-            ["claude", "--print"],
+            ["claude", "--dangerously-skip-permissions", "--print"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -164,7 +164,7 @@ def invoke_claude_cli(prompt):
         return False
 
 
-def main():
+def main(cli=False):
     repo_path = get_repo_path()
 
     print(f"Checking boiler status in: {repo_path}")
@@ -188,17 +188,21 @@ def main():
     prompt = create_claude_prompt(repo_path, error_data, error_summary)
 
     # Try to invoke Claude CLI, fall back to manual prompt
-    success = invoke_claude_cli(prompt)
+    if cli:
+        success = invoke_claude_cli(prompt)
 
-    if success:
-        print("\nClaude has analyzed and attempted to fix boiler.")
-        print("Please review the changes and test with:")
-        print(f"  cd {repo_path}")
-        print(f"  boil --abort")
-        print(f"  boil make test")
+        if success:
+            print("\nClaude has analyzed and attempted to fix boiler.")
+            print("Please review the changes and test with:")
+            print(f"  cd {repo_path}")
+            print(f"  boil --abort")
+            print(f"  boil make test")
+        else:
+            print("\nFailed to automatically invoke Claude.")
+            print("See the prompt above and manually provide it to Claude.")
     else:
-        print("\nFailed to automatically invoke Claude.")
-        print("See the prompt above and manually provide it to Claude.")
+        print(prompt)
+
 
     return 0
 
