@@ -29,7 +29,7 @@ import shutil
 boiler_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, boiler_root)
 
-from pipeline.handlers import register_all_handlers
+# from pipeline.handlers import register_all_handlers
 from tests.test_utils import run_boil_with_profiling, analyze_boil_debug, copy_and_boil
 
 
@@ -62,7 +62,7 @@ def profile_repo(repo_name, max_iterations=1000, timeout=120, verbose=True):
     Returns:
         tuple: (tmpdir, success) - Path to temp directory and whether boiling succeeded
     """
-    register_all_handlers()
+    # register_all_handlers()
 
     example_repos_dir = os.path.dirname(os.path.abspath(__file__))
     example_before_dir = os.path.join(example_repos_dir, repo_name, "before")
@@ -151,7 +151,7 @@ def generate_tests():
 
     print(f"Found example repos: {repos}")
 
-    register_all_handlers()
+    # register_all_handlers()
 
     # Analyze each repo
     results = {}
