@@ -94,7 +94,7 @@ boiler/
 ```bash
 cd ~/boiler
 make check  # Fast checks (integrity + linting)
-make test   # Full test suite
+make test   # Full test suite (takes several minutes)
 ```
 
 2. **Make changes**
