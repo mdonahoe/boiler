@@ -50,7 +50,9 @@
       "Bash(bd relate --help:*)",
       "Bash(bd relate:*)",
       "Bash(BOIL_VERBOSE=1 /tmp/boil-test:*)",
-      "Bash(/tmp/boil-test:*)"
+      "Bash(/tmp/boil-test:*)",
+      "Bash(go test:*)",
+      "Bash(boil:*)"
     ],
     "deny": [],
     "ask": []
