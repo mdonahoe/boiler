@@ -32,7 +32,8 @@
       "Bash(git fetch:*)",
       "Bash(bd list:*)",
       "Bash(bd update:*)",
-      "Bash(git mv:*)"
+      "Bash(git mv:*)",
+      "Bash(git show:*)"
     ],
     "deny": [],
     "ask": []
