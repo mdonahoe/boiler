@@ -551,6 +551,11 @@ def main() -> int:
         print("Error: Cannot use both --hard and --soft at the same time", file=sys.stderr)
         return 1
 
+    # Validate that a command is provided when using --hard or --soft
+    if (args.hard or args.soft) and not command:
+        print("Error: --hard and --soft require a test command (e.g., 'boil --soft make test')", file=sys.stderr)
+        return 1
+
     if args.hard:
         delete_all_files_hard()
 
