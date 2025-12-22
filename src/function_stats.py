@@ -5,15 +5,17 @@ Uses ast_analyzer.py to extract function calls and declarations from each file.
 """
 import argparse
 import json
-import subprocess
 import sys
 from collections import defaultdict
 from pathlib import Path
 
+# Import ast_analyzer instead of using subprocess
+from . import ast_analyzer
+
 
 def analyze_file(file_path):
     """
-    Run ast_analyzer.py on a file and parse its output.
+    Analyze a file using ast_analyzer.
 
     Args:
         file_path: Path to the source file to analyze
@@ -24,42 +26,12 @@ def analyze_file(file_path):
     # Convert to absolute path to ensure it works from any working directory
     abs_file_path = str(Path(file_path).resolve())
 
-    # ast_analyzer.py is now in the same directory (src/)
-    ast_analyzer_path = Path(__file__).parent / 'ast_analyzer.py'
-
     try:
-        result = subprocess.run(
-            ['python3', str(ast_analyzer_path), '--src-file', abs_file_path],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        output = result.stdout.strip()
-    except subprocess.CalledProcessError as e:
+        results = ast_analyzer.analyze_file(abs_file_path)
+        return results
+    except Exception as e:
         print(f"Error analyzing {file_path}: {e}", file=sys.stderr)
-        print(f"stderr: {e.stderr}", file=sys.stderr)
-        print(f"stdout: {e.stdout}", file=sys.stderr)
         return {'calls': [], 'declarations': []}
-    except FileNotFoundError:
-        print("Error: ast_analyzer.py not found or python3 not available", file=sys.stderr)
-        sys.exit(1)
-
-    calls = []
-    declarations = []
-
-    for line in output.split('\n'):
-        line = line.strip()
-        if not line:
-            continue
-
-        if line.startswith('function_call: '):
-            func_name = line.replace('function_call: ', '')
-            calls.append(func_name)
-        elif line.startswith('function_declaration: '):
-            func_name = line.replace('function_declaration: ', '')
-            declarations.append(func_name)
-
-    return {'calls': calls, 'declarations': declarations}
 
 
 def compute_stats(files):

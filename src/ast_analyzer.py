@@ -79,13 +79,16 @@ def walk_ast(node, results):
             walk_ast(child, results)
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description='Extract function calls and declarations from source files using tree_print'
-    )
-    parser.add_argument('--src-file', required=True, help='Source file to analyze')
-    args = parser.parse_args()
+def analyze_file(src_file):
+    """
+    Analyze a source file and extract function calls and declarations.
 
+    Args:
+        src_file: Path to the source file to analyze
+
+    Returns:
+        Dict with 'calls' and 'declarations' lists containing function names
+    """
     # Run tree_print to get the AST as JSON
     # tree_print is in the repository root, not in src/
     import os
@@ -94,7 +97,7 @@ def main():
 
     try:
         result = subprocess.run(
-            [tree_print_path, '--json', args.src_file],
+            [tree_print_path, '--json', src_file],
             capture_output=True,
             text=True,
             check=True
@@ -103,21 +106,36 @@ def main():
     except subprocess.CalledProcessError as e:
         print(f"Error running tree_print: {e}", file=sys.stderr)
         print(f"stderr: {e.stderr}", file=sys.stderr)
-        sys.exit(1)
+        raise
     except FileNotFoundError:
         print(f"Error: tree_print command not found at {tree_print_path}", file=sys.stderr)
-        sys.exit(1)
+        raise
 
     # Parse the JSON
     try:
         ast = json.loads(ast_json)
     except json.JSONDecodeError as e:
         print(f"Error parsing JSON: {e}", file=sys.stderr)
-        sys.exit(1)
+        raise
 
     # Walk the AST and collect results
     results = {'calls': [], 'declarations': []}
     walk_ast(ast, results)
+
+    return results
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='Extract function calls and declarations from source files using tree_print'
+    )
+    parser.add_argument('--src-file', required=True, help='Source file to analyze')
+    args = parser.parse_args()
+
+    try:
+        results = analyze_file(args.src_file)
+    except Exception:
+        sys.exit(1)
 
     # Print declarations first
     for decl in results['declarations']:

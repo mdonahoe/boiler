@@ -7,14 +7,18 @@ Can optionally use src_remove.py to remove the identified function.
 import argparse
 import json
 import re
-import subprocess
 import sys
 from pathlib import Path
+
+# Import modules instead of using subprocess
+from . import function_stats
+from . import ast_analyzer
+from . import src_remove
 
 
 def get_function_stats(files, only_declared=True):
     """
-    Run function_stats.py on the given files and return the statistics.
+    Get function statistics for the given files.
 
     Args:
         files: List of file paths to analyze
@@ -26,31 +30,21 @@ def get_function_stats(files, only_declared=True):
     # Convert to absolute paths to ensure they work from the boiler directory
     abs_files = [str(Path(f).resolve()) for f in files]
 
-    # function_stats.py is now in the same directory (src/)
-    function_stats_path = Path(__file__).parent / 'function_stats.py'
-
-    cmd = ['python3', str(function_stats_path), '--format', 'json']
-    if only_declared:
-        cmd.append('--only-declared')
-    cmd.extend(abs_files)
-
+    # Use imported function_stats module instead of subprocess
     try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        stats = json.loads(result.stdout)
+        stats = function_stats.compute_stats(abs_files)
+
+        # Filter out functions that aren't declared if --only-declared is set
+        if only_declared:
+            stats = {
+                func_name: func_stats
+                for func_name, func_stats in stats.items()
+                if func_stats['function_declaration']
+            }
+
         return stats
-    except subprocess.CalledProcessError as e:
-        print(f"Error running function_stats.py: {e}", file=sys.stderr)
-        print(f"stderr: {e.stderr}", file=sys.stderr)
-        print(f"stdout: {e.stdout}", file=sys.stderr)
-        sys.exit(1)
-    except json.JSONDecodeError as e:
-        print(f"Error parsing JSON from function_stats.py: {e}", file=sys.stderr)
-        print(f"Result stdout: {result.stdout}", file=sys.stderr)
+    except Exception as e:
+        print(f"Error computing function stats: {e}", file=sys.stderr)
         sys.exit(1)
 
 
@@ -145,39 +139,23 @@ def verify_function_removed(func_name, src_file):
     """
     abs_file_path = str(Path(src_file).resolve())
 
-    # ast_analyzer.py is now in the same directory (src/)
-    ast_analyzer_path = Path(__file__).parent / 'ast_analyzer.py'
-
-    # First check using ast_analyzer for declarations and calls
+    # Use imported ast_analyzer module instead of subprocess
     try:
-        result = subprocess.run(
-            ['python3', str(ast_analyzer_path), '--src-file', abs_file_path],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        output = result.stdout.strip()
-    except subprocess.CalledProcessError as e:
+        results = ast_analyzer.analyze_file(abs_file_path)
+    except Exception as e:
         print(f"Error verifying removal in {src_file}: {e}", file=sys.stderr)
-        print(f"stderr: {e.stderr}", file=sys.stderr)
         return None, None
 
     declarations = []
     calls = []
 
-    for line in output.split('\n'):
-        line = line.strip()
-        if not line:
-            continue
+    # Check if the function is in the declarations or calls
+    if func_name in results['declarations']:
+        declarations.append(f"function_declaration: {func_name}")
 
-        if line.startswith('function_call: '):
-            found_func = line.replace('function_call: ', '')
-            if found_func == func_name:
-                calls.append(line)
-        elif line.startswith('function_declaration: '):
-            found_func = line.replace('function_declaration: ', '')
-            if found_func == func_name:
-                declarations.append(line)
+    for call in results['calls']:
+        if call == func_name:
+            calls.append(f"function_call: {func_name}")
 
     # Also do a simple text search to catch any remaining references
     # (e.g., function name used as a callback parameter)
@@ -209,21 +187,9 @@ def remove_function(func_name, src_file, inplace=False):
     Returns:
         The modified source code (if not inplace) or None
     """
-    # src_remove.py is now in the same directory (src/)
-    src_remove_path = Path(__file__).parent / 'src_remove.py'
-
-    cmd = ['python3', str(src_remove_path), '--src-file', src_file]
-    if inplace:
-        cmd.append('--inplace')
-    cmd.append(func_name)
-
+    # Use imported src_remove module instead of subprocess
     try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=True
-        )
+        result = src_remove.remove_function(src_file, func_name, inplace=inplace)
 
         # Verify the function was removed
         if inplace:
@@ -243,12 +209,9 @@ def remove_function(func_name, src_file, inplace=False):
                     print(f"You may need to manually remove call sites or references first.", file=sys.stderr)
                     sys.exit(1)
 
-        if not inplace:
-            return result.stdout
-        return None
-    except subprocess.CalledProcessError as e:
-        print(f"Error running src_remove.py: {e}", file=sys.stderr)
-        print(f"stderr: {e.stderr}", file=sys.stderr)
+        return result
+    except Exception as e:
+        print(f"Error removing function: {e}", file=sys.stderr)
         sys.exit(1)
 
 

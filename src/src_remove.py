@@ -108,6 +108,42 @@ def output_text(chunks):
     text = ''.join(s for s in strs)
     return text
 
+def remove_function(src_file, function_name, inplace=False, json_file=None):
+    """
+    Remove a function from a source file.
+
+    Args:
+        src_file: Path to the source file
+        function_name: Name of the function to remove
+        inplace: If True, modify the file in-place
+        json_file: Optional path to pre-parsed JSON AST
+
+    Returns:
+        The modified source code (if not inplace) or None
+    """
+    import os
+
+    if json_file:
+        output = open(json_file).read()
+    else:
+        # tree_print is in the repository root, not in src/
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        tree_print_path = os.path.join(repo_root, "print-tree", "tree_print")
+        output = subprocess.check_output([tree_print_path, '--json', src_file])
+
+    nodes = json.loads(output)
+    chunks = []
+    walk(nodes, chunks, function_name)
+    text = output_text(chunks)
+
+    if inplace and src_file:
+        with open(src_file, 'w') as out:
+            out.write(text)
+        return None
+    else:
+        return text
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--src-file')
@@ -115,24 +151,16 @@ def main():
     parser.add_argument('skipname')
     parser.add_argument('--inplace', action='store_true')
     args = parser.parse_args()
-    jsonfile = args.json_file
-    if jsonfile:
-        output = open(jsonfile).read()
-    else:
-        # tree_print is in the repository root, not in src/
-        import os
-        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        tree_print_path = os.path.join(repo_root, "print-tree", "tree_print")
-        output = subprocess.check_output([tree_print_path, '--json', args.src_file])
-    nodes = json.loads(output)
-    chunks = []
-    walk(nodes, chunks, args.skipname)
-    text = output_text(chunks)
-    if args.inplace and args.src_file:
-        with open(args.src_file, 'w') as out:
-            out.write(text)
-    else:
-        print(text)
+
+    result = remove_function(
+        args.src_file,
+        args.skipname,
+        inplace=args.inplace,
+        json_file=args.json_file
+    )
+
+    if result is not None:
+        print(result)
 
 if __name__ == '__main__':
     main()
