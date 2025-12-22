@@ -33,7 +33,9 @@
       "Bash(bd list:*)",
       "Bash(bd update:*)",
       "Bash(git mv:*)",
-      "Bash(git show:*)"
+      "Bash(git show:*)",
+      "Bash(git ls-files:*)",
+      "Bash(bd stats:*)"
     ],
     "deny": [],
     "ask": []
