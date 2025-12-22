@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -102,30 +103,28 @@ func Fix(command []string, numIterations int, allowLegacy bool) (bool, error) {
 		message := ""
 		exit := false
 
+		// Build git state for pipeline (always needed for debug JSON)
+		gitInfo, _ := GetGitFileInfo(ref)
+		gitState := &pipeline.GitState{
+			Ref:          ref,
+			DeletedFiles: gitInfo.DeletedFiles,
+			GitToplevel:  gitInfo.GitToplevel,
+			PartialFiles: gitInfo.PartialFiles,
+		}
+
 		// Try pipeline system
 		var pipelineResult *pipeline.RepairResult
-		if pipeline.HasPipelineHandlers() {
-			fmt.Println("[Pipeline] Attempting repair with new pipeline system...")
+		fmt.Println("[Pipeline] Attempting repair with new pipeline system...")
 
-			// Build git state
-			gitInfo, _ := GetGitFileInfo(ref)
-			gitState := &pipeline.GitState{
-				Ref:          ref,
-				DeletedFiles: gitInfo.DeletedFiles,
-				GitToplevel:  gitInfo.GitToplevel,
-				PartialFiles: gitInfo.PartialFiles,
-			}
+		// Always run pipeline (it will return "no handlers" if none registered)
+		pipelineResult, _ = pipeline.RunPipeline(stderr, stdout, gitState, true, true)
 
-			// Run pipeline
-			pipelineResult, _ = pipeline.RunPipeline(stderr, stdout, gitState, true, true)
-
-			hasChanges, _ := HasChanges()
-			if pipelineResult != nil && pipelineResult.Success && hasChanges {
-				message = fmt.Sprintf("fixed with pipeline (modified %d file(s))", len(pipelineResult.FilesModified))
-				fmt.Printf("[Pipeline] Success: %s\n", message)
-			} else {
-				fmt.Println("[Pipeline] Pipeline did not produce a fix")
-			}
+		hasChanges, _ := HasChanges()
+		if pipelineResult != nil && pipelineResult.Success && hasChanges {
+			message = fmt.Sprintf("fixed with pipeline (modified %d file(s))", len(pipelineResult.FilesModified))
+			fmt.Printf("[Pipeline] Success: %s\n", message)
+		} else {
+			fmt.Println("[Pipeline] Pipeline did not produce a fix")
 		}
 
 		// Legacy handlers would go here if allowLegacy is true
@@ -136,23 +135,33 @@ func Fix(command []string, numIterations int, allowLegacy bool) (bool, error) {
 			exit = true
 		}
 
-		// Save debug JSON
+		// Always save debug JSON (even if pipeline didn't run or failed)
+		debugJSONPath := fmt.Sprintf(".boil/iter%d.pipeline.json", n)
+		var debugData map[string]interface{}
 		if pipelineResult != nil {
-			debugJSONPath := fmt.Sprintf(".boil/iter%d.pipeline.json", n)
-			debugData := pipelineResult.ToDict()
-			debugData["command"] = strings.Join(command, " ")
-
-			gitInfo, _ := GetGitFileInfo(ref)
-			debugData["partial_files"] = gitInfo.PartialFiles
-			debugData["deleted_files"] = gitInfo.DeletedFiles
-			debugData["command_time"] = tRunCommand.Seconds()
-
-			jsonBytes, _ := json.MarshalIndent(debugData, "", "  ")
-			os.WriteFile(debugJSONPath, jsonBytes, 0644)
-			fmt.Printf("[Pipeline] Debug info saved to %s\n", debugJSONPath)
+			debugData = pipelineResult.ToDict()
+		} else {
+			// Create minimal debug data if pipeline didn't run
+			debugData = map[string]interface{}{
+				"success":         false,
+				"error_message":   "Pipeline did not run",
+				"files_modified":  []string{},
+				"clues_detected":  []interface{}{},
+				"plans_generated": []interface{}{},
+				"plans_attempted": []interface{}{},
+				"timings":         map[string]float64{},
+			}
 		}
+		debugData["command"] = strings.Join(command, " ")
+		debugData["partial_files"] = gitInfo.PartialFiles
+		debugData["deleted_files"] = gitInfo.DeletedFiles
+		debugData["command_time"] = tRunCommand.Seconds()
 
-		hasChanges, _ := HasChanges()
+		jsonBytes, _ := json.MarshalIndent(debugData, "", "  ")
+		os.WriteFile(debugJSONPath, jsonBytes, 0644)
+		fmt.Printf("[Pipeline] Debug info saved to %s\n", debugJSONPath)
+
+		hasChanges, _ = HasChanges()
 		if !hasChanges {
 			return false, fmt.Errorf("no change")
 		}
@@ -272,9 +281,233 @@ func FinishBoiling() int {
 
 // BoilCheck analyzes the current boil session and shows status/statistics
 func BoilCheck() int {
-	// TODO: Implement full boil check analysis
-	fmt.Println("TODO: BoilCheck() not yet implemented")
-	return 1
+	boilDir := ".boil"
+	if _, err := os.Stat(boilDir); os.IsNotExist(err) {
+		fmt.Printf("No %s directory found. Run boil first.\n", boilDir)
+		return 1
+	}
+
+	// Find all pipeline JSON files
+	entries, err := os.ReadDir(boilDir)
+	if err != nil {
+		fmt.Printf("Error reading %s directory: %v\n", boilDir, err)
+		return 1
+	}
+
+	var jsonFiles []string
+	for _, entry := range entries {
+		if strings.HasSuffix(entry.Name(), ".pipeline.json") {
+			jsonFiles = append(jsonFiles, entry.Name())
+		}
+	}
+
+	if len(jsonFiles) == 0 {
+		fmt.Printf("No pipeline JSON files found in %s\n", boilDir)
+		return 1
+	}
+
+	fmt.Printf("Found %d pipeline iterations\n\n", len(jsonFiles))
+
+	// Counters
+	pipelineSuccesses := 0
+	pipelineFailures := 0
+	errorTypesDetected := make(map[string]int)
+	failureReasons := make(map[string]int)
+	var allPlansAttempted []map[string]interface{}
+	filesRepairedByIteration := make(map[int][]string)
+	var testCommand string
+	timingsByIteration := make(map[int]map[string]float64)
+
+	// Analyze each file
+	for _, jsonFile := range jsonFiles {
+		path := filepath.Join(boilDir, jsonFile)
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			fmt.Printf("Warning: Could not read %s: %v\n", jsonFile, err)
+			continue
+		}
+
+		var fileData map[string]interface{}
+		if err := json.Unmarshal(data, &fileData); err != nil {
+			fmt.Printf("Warning: Could not parse %s: %v\n", jsonFile, err)
+			continue
+		}
+
+		// Extract iteration number
+		var iterNum int
+		if matches := strings.Split(jsonFile, "iter"); len(matches) > 1 {
+			fmt.Sscanf(matches[1], "%d", &iterNum)
+		}
+
+		// Capture test command
+		if cmd, ok := fileData["command"].(string); ok && testCommand == "" {
+			testCommand = cmd
+		}
+
+		// Track files repaired
+		if filesModified, ok := fileData["files_modified"].([]interface{}); ok && len(filesModified) > 0 {
+			var files []string
+			for _, f := range filesModified {
+				if s, ok := f.(string); ok {
+					files = append(files, s)
+				}
+			}
+			if len(files) > 0 {
+				filesRepairedByIteration[iterNum] = files
+			}
+		}
+
+		// Track timings
+		if timings, ok := fileData["timings"].(map[string]interface{}); ok {
+			timingMap := make(map[string]float64)
+			for k, v := range timings {
+				if fv, ok := v.(float64); ok {
+					timingMap[k] = fv
+				}
+			}
+			if len(timingMap) > 0 {
+				timingsByIteration[iterNum] = timingMap
+			}
+		}
+
+		// Count pipeline success/failure
+		if success, ok := fileData["success"].(bool); ok {
+			if success {
+				pipelineSuccesses++
+			} else {
+				pipelineFailures++
+				// Track failure reasons
+				if errorMsg, ok := fileData["error_message"].(string); ok {
+					failureReasons[errorMsg]++
+				}
+			}
+		}
+
+		// Count clue types detected
+		if clues, ok := fileData["clues_detected"].([]interface{}); ok {
+			for _, clue := range clues {
+				if clueMap, ok := clue.(map[string]interface{}); ok {
+					if clueType, ok := clueMap["clue_type"].(string); ok {
+						errorTypesDetected[clueType]++
+					}
+				}
+			}
+		}
+
+		// Track plans attempted
+		if plans, ok := fileData["plans_attempted"].([]interface{}); ok {
+			for _, plan := range plans {
+				planMap := map[string]interface{}{
+					"iteration": iterNum,
+					"plan":      plan,
+				}
+				allPlansAttempted = append(allPlansAttempted, planMap)
+			}
+		}
+	}
+
+	// Print results
+	fmt.Println(strings.Repeat("=", 80))
+	fmt.Println("PIPELINE PERFORMANCE")
+	fmt.Println(strings.Repeat("=", 80))
+	fmt.Printf("Pipeline successes: %d\n", pipelineSuccesses)
+	fmt.Printf("Pipeline failures:  %d\n", pipelineFailures)
+	if pipelineSuccesses+pipelineFailures > 0 {
+		successRate := float64(pipelineSuccesses) / float64(pipelineSuccesses+pipelineFailures) * 100
+		fmt.Printf("Success rate:       %.1f%%\n", successRate)
+	}
+	fmt.Println()
+
+	if len(failureReasons) > 0 {
+		fmt.Println(strings.Repeat("=", 80))
+		fmt.Println("FAILURE REASONS (Most Common)")
+		fmt.Println(strings.Repeat("=", 80))
+		// Sort by count (simple implementation)
+		type reasonCount struct {
+			reason string
+			count  int
+		}
+		var reasons []reasonCount
+		for reason, count := range failureReasons {
+			reasons = append(reasons, reasonCount{reason, count})
+		}
+		// Sort (bubble sort for simplicity)
+		for i := 0; i < len(reasons); i++ {
+			for j := i + 1; j < len(reasons); j++ {
+				if reasons[j].count > reasons[i].count {
+					reasons[i], reasons[j] = reasons[j], reasons[i]
+				}
+			}
+		}
+		for i, rc := range reasons {
+			if i >= 5 {
+				break
+			}
+			fmt.Printf("  [%dx] %s\n", rc.count, rc.reason)
+		}
+		fmt.Println()
+	}
+
+	fmt.Println(strings.Repeat("=", 80))
+	fmt.Println("ERROR TYPES DETECTED BY PIPELINE")
+	fmt.Println(strings.Repeat("=", 80))
+	if len(errorTypesDetected) > 0 {
+		for errorType, count := range errorTypesDetected {
+			fmt.Printf("  %-30s : %3d times\n", errorType, count)
+		}
+	} else {
+		fmt.Println("  (none)")
+	}
+	fmt.Println()
+
+	if testCommand != "" {
+		fmt.Println(strings.Repeat("=", 80))
+		fmt.Println("TEST COMMAND")
+		fmt.Println(strings.Repeat("=", 80))
+		fmt.Printf("  %s\n", testCommand)
+		fmt.Println()
+	}
+
+	fmt.Println(strings.Repeat("=", 80))
+	fmt.Println("FILES REPAIRED BY ITERATION")
+	fmt.Println(strings.Repeat("=", 80))
+	if len(filesRepairedByIteration) > 0 {
+		// Sort iteration numbers
+		var iterNums []int
+		for iterNum := range filesRepairedByIteration {
+			iterNums = append(iterNums, iterNum)
+		}
+		for i := 0; i < len(iterNums); i++ {
+			for j := i + 1; j < len(iterNums); j++ {
+				if iterNums[j] < iterNums[i] {
+					iterNums[i], iterNums[j] = iterNums[j], iterNums[i]
+				}
+			}
+		}
+
+		allFilesRepaired := make(map[string]bool)
+		for _, iterNum := range iterNums {
+			files := filesRepairedByIteration[iterNum]
+			for _, f := range files {
+				allFilesRepaired[f] = true
+			}
+			fmt.Printf("  Iteration %2d: %s\n", iterNum, strings.Join(files, ", "))
+		}
+
+		fmt.Println()
+		fmt.Printf("Total unique files repaired: %d\n", len(allFilesRepaired))
+		var allFiles []string
+		for f := range allFilesRepaired {
+			allFiles = append(allFiles, f)
+		}
+		fmt.Printf("Files: %s\n", strings.Join(allFiles, ", "))
+	} else {
+		fmt.Println("  (no files were modified)")
+	}
+	fmt.Println()
+
+	return 0
 }
 
 // DebugIterations shows detailed debug for iterations
