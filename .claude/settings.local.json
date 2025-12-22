@@ -48,7 +48,9 @@
       "Bash(bd --help:*)",
       "Bash(bd epic --help:*)",
       "Bash(bd relate --help:*)",
-      "Bash(bd relate:*)"
+      "Bash(bd relate:*)",
+      "Bash(BOIL_VERBOSE=1 /tmp/boil-test:*)",
+      "Bash(/tmp/boil-test:*)"
     ],
     "deny": [],
     "ask": []
