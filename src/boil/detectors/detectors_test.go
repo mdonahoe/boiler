@@ -26,9 +26,21 @@ func verifyClues(t *testing.T, clues []*pipeline.ErrorClue, ex DetectorExample) 
 		t.Fatalf("Expected at least 1 clue, got 0\nInput: %s", ex.Input)
 	}
 
-	clue := clues[0]
-	if clue.ClueType != ex.ClueType {
-		t.Errorf("ClueType mismatch: expected %q, got %q", ex.ClueType, clue.ClueType)
+	// Find a clue with matching ClueType
+	var clue *pipeline.ErrorClue
+	for _, c := range clues {
+		if c.ClueType == ex.ClueType {
+			clue = c
+			break
+		}
+	}
+
+	if clue == nil {
+		clueTypes := make([]string, len(clues))
+		for i, c := range clues {
+			clueTypes[i] = c.ClueType
+		}
+		t.Fatalf("Expected clue type %q not found, got: %v", ex.ClueType, clueTypes)
 	}
 
 	for key, expectedValue := range ex.Context {
@@ -747,6 +759,18 @@ func TestTestFailureDetector(t *testing.T) {
 				"test_name":   "test_addition",
 				"assertion":   "result == 5",
 			},
+		},
+		{
+			// Multiline test - (?s) flag enables . to match newlines
+			Name: "test_docstring_with_missing_file",
+			Input: `Test that dim can open README.md and display its first line.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/test_dim.py", line 235, in test_open_readme
+    self.assertIn("dim", result.output)
+AssertionError: 'dim' not found in 'fopen: No such file or directory'`,
+			ClueType: "test_docstring_with_missing_file",
+			Context:  map[string]string{"suspected_file": "README.md"},
 		},
 	}
 

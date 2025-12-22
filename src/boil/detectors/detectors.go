@@ -323,7 +323,8 @@ func NewTestFailureDetector() (*TestFailureDetector, error) {
 		"test_failure":                   `File\s+['"](?P<test_file>[^'"]+\.py)['"]\s*,\s+line\s+(?P<line_number>\d+),\s+in\s+(?P<test_name>\w+)`,
 		"test_assertion_with_filename":   `AssertionError:\s*['"](?P<suspected_file>[^'"]+\.(?:py|txt|md|c|h|cpp|hpp|json|yaml|yml|sh))['"].*not found`,
 		"c_test_failure":                 "(?P<test_file>[^\\s:]+\\.c):(?P<line_number>\\d+):\\s*(?P<test_name>\\w+):\\s*Assertion\\s*[`'](?P<assertion>[^'`]+)[`']\\s*failed",
-		"test_docstring_with_missing_file": `Test that[^\n]*(?:can open|open)\s+(?P<suspected_file>(?:README\.md|[a-zA-Z0-9_-]+\.(?:c|h|cpp|hpp|py|txt|md|json|yaml|yml|sh|rs|go|java|js|ts))).*fopen:\s*No such file or directory`,
+		// (?s) enables single-line mode where . matches newlines (equivalent to Python's re.DOTALL)
+		"test_docstring_with_missing_file": `(?s)Test that[^\n]*(?:can open|open)\s+(?P<suspected_file>(?:README\.md|[a-zA-Z0-9_-]+\.(?:c|h|cpp|hpp|py|txt|md|json|yaml|yml|sh|rs|go|java|js|ts))).*?fopen:\s*No such file or directory`,
 	})
 	if err != nil {
 		return nil, err
