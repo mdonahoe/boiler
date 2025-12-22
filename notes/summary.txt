@@ -1,0 +1,277 @@
+# Comprehensive Summary of Boiler Project Notes
+
+## Migration & Architecture Evolution
+
+### 3-Stage Pipeline System
+The project underwent a major architectural refactoring from monolithic handlers to a clean 3-stage pipeline:
+
+**Architecture:**
+- **Stage 1: Detection** - Pattern matching to identify errors (ErrorClue objects)
+- **Stage 2: Planning** - Convert clues into concrete repair plans (RepairPlan objects)
+- **Stage 3: Execution** - Safely execute repairs with validation (RepairResult objects)
+
+**Benefits Achieved:**
+- Reduced handler complexity from 50-100 lines to 10-20 lines per component
+- Each stage is independently testable
+- Better validation prevents infinite loops
+- Enables prioritization across different error types
+- Clear separation of concerns
+
+**Key Files:**
+- `/home/bot/boiler/pipeline/models.py` - Core data structures
+- `/home/bot/boiler/pipeline/pipeline.py` - Orchestration
+- `/home/bot/boiler/pipeline/handlers.py` - Registration system
+
+### Migration Progress
+- **Migrated:** 8+ handlers from legacy system to pipeline
+- **Remaining:** 65+ legacy handlers (still active as fallback)
+- **Success Rate:** Achieved 86-100% pipeline success on test repos
+- **Legacy Handler Tracking:** JSON debug output now tracks which legacy handlers are used, enabling data-driven migration prioritization
+
+## C Error Handling (Critical Learnings)
+
+### File Validation is Essential
+**Problem:** Tools like `src_repair` were claiming success without actually modifying files, causing infinite loops.
+
+**Solution:**
+- Capture file hash before repair
+- Verify hash changes after repair
+- Return failure if no changes detected
+
+### Distinguish Error Types
+Not all undeclared symbols are restorable:
+1. **Missing includes/headers** (stdlib functions like `printf`, `open`) - NOT restorable via git
+2. **Missing project functions** - Restorable via git history
+3. **Declaration/ordering issues** - Need forward declarations
+
+**Implementation:** Maintain lists of known stdlib functions/constants and filter them out before creating repair clues
+
+### Compiler Quirks
+- **GCC uses Unicode smart quotes** (', ') not ASCII quotes (') in error messages
+- Must match both in regex: `['\u2018]([^'\u2019]+)['\u2019]`
+
+### Content-Based > Name-Based Matching
+**Failed Approach:** Match undefined symbols to filenames using patterns like `ts_<filename>_<function>`
+
+**Correct Approach:** Search deleted file contents for symbols using `git show`:
+```python
+for c_file in deleted_c_files:
+    contents = git_show(c_file)
+    score = sum(1 for symbol in undefined_symbols if symbol in contents)
+    # Restore files with highest scores first
+```
+
+## Pipeline Improvements & Detectors
+
+### Detector Architecture Evolution
+**Major Refactoring (2025-11-30):** Eliminated all method overrides in detectors
+
+**Before:**
+```python
+class MyDetector(Detector):
+    PATTERNS = {...}
+    def pattern_to_clue(self, pattern_name, match, combined):
+        # Complex extraction logic
+```
+
+**After:**
+```python
+class MyDetector(Detector):
+    PATTERNS = {
+        "error_type": r"(?P<file_path>...) (?P<symbol>...)"
+    }
+    EXAMPLES = [...]
+    # No method overrides - base class handles everything via named groups
+```
+
+**Benefits:**
+- Detectors are now pure data (patterns + examples)
+- Consistent approach across all detectors
+- Self-documenting via EXAMPLES
+- Easier to add new detectors
+
+### Validation Layers (Defense in Depth)
+The system now has 3 layers preventing infinite loops:
+
+1. **Planner Validation:** Checks if file exists and matches git before creating plan
+2. **Executor Validation:** Validates plan before execution (file exists in git)
+3. **Executor Post-Check:** Verifies restoration created actual changes
+
+### Key Detectors Added
+- **MakeMissingTargetDetector** - "No rule to make target" errors
+- **MakeGlobPatternErrorDetector** - Directory/glob pattern errors
+- **CLinkerErrorDetector** - Undefined symbols, missing libraries
+- **FopenNoSuchFileDetector** - Multiple patterns for fopen errors
+- **TestFailureDetector** - C assertion failures with test file analysis
+- **PythonNameErrorDetector** - Python NameError exceptions
+- **MissingPythonCodeDetector** - Missing classes/functions/imports
+
+## Testing & Validation
+
+### Example Repos Testing Framework
+Created comprehensive testing for validating boiler on example repositories:
+
+**Structure:**
+- `before/` - Complete source code committed to git
+- `after/` - Expected state after boiling (subset of before)
+
+**Validation:**
+- `test_after_is_subset.py` - Ensures after/ is valid subset of before/
+- `test_example_repos.py` - End-to-end testing of boiler workflow
+
+**Key Insight:** Clear, structured error output is critical for debugging test failures
+
+### Testing Best Practices
+- Use `boil --abort` to reset to clean state
+- Run `boil --check` to see pipeline statistics
+- Use `BOIL_VERBOSE=1` for detailed planner/detector output
+- Always run `make check` to ensure no regressions
+
+## Debug Output & Analysis
+
+### JSON Debug Output
+Each iteration saves detailed debug info to `.boil/iterN.pipeline.json`:
+
+**Structure:**
+```json
+{
+  "success": true/false,
+  "files_modified": ["list", "of", "files"],
+  "error_message": "error or null",
+  "clues_detected": [...],
+  "plans_generated": [...],
+  "plans_attempted": [...],
+  "legacy_handler_used": "handler_name or null"
+}
+```
+
+**Benefits:**
+- Full visibility into what pipeline detected/planned/executed
+- Enables automated analysis for migration priorities
+- Reproducibility for debugging
+- Metrics tracking
+
+### Analysis Tool
+`boil --check` provides:
+- Pipeline success rate
+- Error types detected
+- Most frequently used legacy handlers
+- Migration priority recommendations
+
+## Repository-Specific Learnings
+
+### viw Repository (2025-12-07)
+**Key Achievements:**
+- 100% pipeline success rate without legacy handlers
+- Detected and fixed 5 error types across 16 iterations
+
+**Important Discoveries:**
+- Legacy handlers mask pipeline gaps - disable by default with `--legacy` flag
+- Test failures contain valuable hints - read test files to infer required data files
+- Separation of concerns: MissingDirectoryPlanner separate from MissingFilePlanner
+
+### tree-sitter Repository
+**Challenges:**
+- Rust/Cargo build system errors cascade
+- Generated files in git (can restore directly instead of regenerating)
+- Subdirectory context needed for relative paths
+
+**Handlers Added:**
+- 10 new handlers for Rust/Cargo errors
+- Enhanced C compilation/linker error detection
+- Symbol matching for function pointers and declarations
+
+### heirloom-ex-vi Repository
+**Key Lessons:**
+- Shell dialect differences (dash vs bash error formats)
+- Subdirectory context from "Entering directory" messages
+- Object files → source file conversion (.o → .c)
+- Build script analysis to find missing files
+
+## Error Patterns & Detection
+
+### Common Error Pattern Categories
+
+| Pattern | Example | Detector Type |
+|---------|---------|--------------|
+| Missing file | `fatal error: file.h: No such file` | File errors |
+| Undefined symbols | `undefined reference to 'symbol'` | Linker errors |
+| Python errors | `NameError: name 'x' is not defined` | Python code |
+| Make errors | `No rule to make target 'x'` | Make errors |
+| Permission | `Permission denied: './script.sh'` | Permission errors |
+| Test failures | `Assertion failed at line 42` | Test failures |
+
+### Detection Strategy Patterns
+1. **Direct pattern matching** - Explicit filename in error
+2. **Inference from context** - Extract from surrounding text
+3. **Test file analysis** - Read test code to find required files
+4. **Build script analysis** - Parse build.rs/Makefile for file operations
+
+## Key Technical Decisions
+
+### Priority Guidelines
+- **0**: Critical - missing files blocking execution
+- **1**: High - wrong permissions, missing executables
+- **2**: Medium - missing Python symbols
+- **3**: Low - missing imports
+- **4+**: Very low - optional features
+
+### Handler Ordering
+Specific handlers before generic ones:
+1. Specific build system errors (cargo, make)
+2. Compilation errors (C, Rust)
+3. Linking errors
+4. File access errors
+5. Runtime errors
+6. Generic catch-alls last
+
+### Git Operations Best Practices
+- Use `git show` to read deleted file contents (don't checkout + read + reset)
+- Cache `get_deleted_files()` result
+- Use `restore_missing_file()` consistently
+- Avoid git commands with `-i` flag (interactive not supported)
+
+## Future Improvements
+
+### Recommended Next Steps
+1. **Pattern Library** - Common error patterns for different ecosystems
+2. **Smart File Matching** - Levenshtein distance, directory hints
+3. **Error Context Extraction** - Multi-line error understanding
+4. **Handler Composition** - Batch restore related files
+5. **Testing Framework** - Synthetic error corpus, regression tests
+
+### Potential Enhancements
+- ML-based prioritization of repair plans
+- Dry-run mode (skip execution stage)
+- User confirmation between planning and execution
+- Non-git backends support
+- Timing information in JSON output
+- Aggregated metrics across iterations
+
+## Tools & Utilities
+
+### Auto-Fix Scripts
+When boiler fails, automated tools to invoke Claude for fixes:
+- `fix_with_claude.sh` - All-in-one wrapper (recommended)
+- `auto_fix_boiler.py` - Prompt generator
+- `auto_fix_boiler.sh` - Manual copy-paste version
+
+### Code Analysis
+`identify_removable.py` - Tool for identifying and removing dead code:
+- Static analysis of function usage
+- Empirical testing of removals
+- Safe removal with verification
+
+## Critical Success Factors
+
+1. **Validation at every stage** prevents infinite loops
+2. **Clear separation of concerns** makes code maintainable
+3. **Comprehensive testing** ensures reliability
+4. **Debug output** enables understanding failures
+5. **Backward compatibility** allows gradual migration
+6. **Data-driven decisions** via legacy handler tracking
+7. **User feedback** guides improvement priorities
+
+---
+
+This summary captures the evolution of boiler from a monolithic handler system to a robust, well-tested pipeline architecture with comprehensive error detection, intelligent planning, and validated execution. The documentation shows a mature understanding of the challenges in automated code repair and the solutions developed to address them.
