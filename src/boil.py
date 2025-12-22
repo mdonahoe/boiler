@@ -388,6 +388,13 @@ def main() -> int:
         metavar='FILES',
         help="identify functions that can be removed from the codebase",
     )
+    parser.add_argument(
+        "--fix",
+        type=str,
+        choices=['claude'],
+        metavar='METHOD',
+        help="invoke an AI assistant to fix boiler for unfixable errors (choices: claude)",
+    )
 
     # Use parse_known_args to separate known and unknown arguments
     args, unknown_args = parser.parse_known_args()
@@ -454,6 +461,25 @@ def main() -> int:
             return identify_removable.main()
         finally:
             sys.argv = original_argv
+
+    # Handle --fix command
+    if args.fix:
+        if args.fix == 'claude':
+            # Import the auto_fix_boiler module and call its main function
+            from src import auto_fix_boiler
+            # Get the target repo path from unknown_args or use current directory
+            original_argv = sys.argv
+            try:
+                if unknown_args:
+                    sys.argv = ['auto_fix_boiler'] + unknown_args
+                else:
+                    sys.argv = ['auto_fix_boiler']
+                return auto_fix_boiler.main()
+            finally:
+                sys.argv = original_argv
+        else:
+            print(f"Error: Unknown fix method '{args.fix}'", file=sys.stderr)
+            return 1
 
     # Store the remaining arguments as a single command string
     # TODO(matt): parse leading --dash-commands and complain because they are probs typos.

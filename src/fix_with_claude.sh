@@ -12,8 +12,8 @@ echo "Target repo: $REPO_PATH"
 echo "Boiler dir:  $BOILER_DIR"
 echo ""
 
-# Generate the prompt
-PROMPT=$(python3 "$BOILER_DIR/auto_fix_boiler.py" "$REPO_PATH")
+# Generate the prompt (auto_fix_boiler.py is now in src/)
+PROMPT=$(python3 "$BOILER_DIR/src/auto_fix_boiler.py" "$REPO_PATH")
 
 # Save to temp file for easy debugging
 TEMP_PROMPT="/tmp/claude_boiler_fix_prompt.txt"
