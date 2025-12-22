@@ -14,7 +14,7 @@ $(GOBIN): src/boil/**/*.go
 	cd src/boil && go build -o ../../$(GOBIN) .
 
 test:
-	python3 -m unittest discover -s tests -p "test*.py"
+	CHECK_MODE=1 python3 -m unittest discover -s tests -p "test*.py"
 
 check:
 	CHECK_MODE=1 SKIP_SLOW_TESTS=1 python3 -m unittest discover -s tests -p "test*.py"
