@@ -111,7 +111,7 @@ class AfterIsSubsetTest(unittest.TestCase):
     def _check_lines_in_order(self, subrepo_name, file_path, before_lines, after_lines):
         """Verify after_lines appear in order within before_lines"""
         if not is_subsequence('\n'.join(before_lines), '\n'.join(after_lines)):
-            self.fail(f"{subrepo} AFTER has extra content in {file_path}")
+            self.fail(f"{subrepo_name} AFTER has extra content in {file_path}")
             # TODO(matt): show the offending line
 
     def _get_all_files(self, directory):
