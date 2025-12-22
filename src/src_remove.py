@@ -119,7 +119,11 @@ def main():
     if jsonfile:
         output = open(jsonfile).read()
     else:
-        output = subprocess.check_output(['tree_print', '--json', args.src_file])
+        # tree_print is in the repository root, not in src/
+        import os
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        tree_print_path = os.path.join(repo_root, "print-tree", "tree_print")
+        output = subprocess.check_output([tree_print_path, '--json', args.src_file])
     nodes = json.loads(output)
     chunks = []
     walk(nodes, chunks, args.skipname)

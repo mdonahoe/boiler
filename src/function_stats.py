@@ -24,13 +24,15 @@ def analyze_file(file_path):
     # Convert to absolute path to ensure it works from any working directory
     abs_file_path = str(Path(file_path).resolve())
 
+    # ast_analyzer.py is now in the same directory (src/)
+    ast_analyzer_path = Path(__file__).parent / 'ast_analyzer.py'
+
     try:
         result = subprocess.run(
-            ['python3', 'ast_analyzer.py', '--src-file', abs_file_path],
+            ['python3', str(ast_analyzer_path), '--src-file', abs_file_path],
             capture_output=True,
             text=True,
-            check=True,
-            cwd=Path(__file__).parent
+            check=True
         )
         output = result.stdout.strip()
     except subprocess.CalledProcessError as e:

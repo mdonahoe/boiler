@@ -26,7 +26,10 @@ def get_function_stats(files, only_declared=True):
     # Convert to absolute paths to ensure they work from the boiler directory
     abs_files = [str(Path(f).resolve()) for f in files]
 
-    cmd = ['python3', 'function_stats.py', '--format', 'json']
+    # function_stats.py is now in the same directory (src/)
+    function_stats_path = Path(__file__).parent / 'function_stats.py'
+
+    cmd = ['python3', str(function_stats_path), '--format', 'json']
     if only_declared:
         cmd.append('--only-declared')
     cmd.extend(abs_files)
@@ -36,8 +39,7 @@ def get_function_stats(files, only_declared=True):
             cmd,
             capture_output=True,
             text=True,
-            check=True,
-            cwd=Path(__file__).parent
+            check=True
         )
         stats = json.loads(result.stdout)
         return stats
@@ -143,14 +145,16 @@ def verify_function_removed(func_name, src_file):
     """
     abs_file_path = str(Path(src_file).resolve())
 
+    # ast_analyzer.py is now in the same directory (src/)
+    ast_analyzer_path = Path(__file__).parent / 'ast_analyzer.py'
+
     # First check using ast_analyzer for declarations and calls
     try:
         result = subprocess.run(
-            ['python3', 'ast_analyzer.py', '--src-file', abs_file_path],
+            ['python3', str(ast_analyzer_path), '--src-file', abs_file_path],
             capture_output=True,
             text=True,
-            check=True,
-            cwd=Path(__file__).parent
+            check=True
         )
         output = result.stdout.strip()
     except subprocess.CalledProcessError as e:
@@ -205,7 +209,10 @@ def remove_function(func_name, src_file, inplace=False):
     Returns:
         The modified source code (if not inplace) or None
     """
-    cmd = ['python3', 'src_remove.py', '--src-file', src_file]
+    # src_remove.py is now in the same directory (src/)
+    src_remove_path = Path(__file__).parent / 'src_remove.py'
+
+    cmd = ['python3', str(src_remove_path), '--src-file', src_file]
     if inplace:
         cmd.append('--inplace')
     cmd.append(func_name)
@@ -215,8 +222,7 @@ def remove_function(func_name, src_file, inplace=False):
             cmd,
             capture_output=True,
             text=True,
-            check=True,
-            cwd=Path(__file__).parent
+            check=True
         )
 
         # Verify the function was removed

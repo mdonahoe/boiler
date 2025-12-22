@@ -87,9 +87,14 @@ def main():
     args = parser.parse_args()
 
     # Run tree_print to get the AST as JSON
+    # tree_print is in the repository root, not in src/
+    import os
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    tree_print_path = os.path.join(repo_root, "print-tree", "tree_print")
+
     try:
         result = subprocess.run(
-            ['tree_print', '--json', args.src_file],
+            [tree_print_path, '--json', args.src_file],
             capture_output=True,
             text=True,
             check=True
@@ -100,7 +105,7 @@ def main():
         print(f"stderr: {e.stderr}", file=sys.stderr)
         sys.exit(1)
     except FileNotFoundError:
-        print("Error: tree_print command not found", file=sys.stderr)
+        print(f"Error: tree_print command not found at {tree_print_path}", file=sys.stderr)
         sys.exit(1)
 
     # Parse the JSON

@@ -382,6 +382,12 @@ def main() -> int:
         default=None,
         help="test all detectors on the given error file and show verbose output",
     )
+    parser.add_argument(
+        "--identify-removable",
+        nargs='+',
+        metavar='FILES',
+        help="identify functions that can be removed from the codebase",
+    )
 
     # Use parse_known_args to separate known and unknown arguments
     args, unknown_args = parser.parse_known_args()
@@ -416,7 +422,7 @@ def main() -> int:
         print("\n" + "=" * 80)
 
         register_all_handlers()
-        from pipeline.detectors.registry import get_detector_registry
+        from src.pipeline.detectors.registry import get_detector_registry
         registry = get_detector_registry()
 
         print(f"\nTesting {len(registry.list_detectors())} detectors:")
@@ -436,6 +442,18 @@ def main() -> int:
                 print(f"Error: {e}")
                 traceback.print_exc()
         return 0
+
+    # Handle identify-removable command
+    if args.identify_removable:
+        # Import the identify_removable module and call its main function
+        from src import identify_removable
+        # Override sys.argv to pass the files argument
+        original_argv = sys.argv
+        try:
+            sys.argv = ['identify_removable'] + args.identify_removable
+            return identify_removable.main()
+        finally:
+            sys.argv = original_argv
 
     # Store the remaining arguments as a single command string
     # TODO(matt): parse leading --dash-commands and complain because they are probs typos.
