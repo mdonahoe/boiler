@@ -608,7 +608,7 @@ func DeleteAllFilesHard() {
 		}
 	}
 
-	fmt.Println("=== All tracked files deleted ===\n")
+	fmt.Println("=== All tracked files deleted ===")
 }
 
 // ClearRandomFileSoft picks a random file and clears its content before starting the boiling session

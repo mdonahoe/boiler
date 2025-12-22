@@ -430,22 +430,13 @@ func (p *TestFailurePlanner) Plan(clues []*pipeline.ErrorClue, gitState *pipelin
 		if clue.ClueType == "test_failure" {
 			testFile := clue.Context["test_file"]
 			lineNumberStr := clue.Context["line_number"]
-			if pipeline.IsVerbose() {
-				fmt.Printf("[TestFailurePlanner] Processing test_failure: file=%s, line=%s\n", testFile, lineNumberStr)
-			}
 			if testFile != "" && lineNumberStr != "" {
 				lineNumber := 0
 				fmt.Sscanf(lineNumberStr, "%d", &lineNumber)
-				referencedFiles := extractFileReferences(testFile, lineNumber, gitState)
-				if pipeline.IsVerbose() {
-					fmt.Printf("[TestFailurePlanner] Found %d file references: %v\n", len(referencedFiles), referencedFiles)
-				}
+				referencedFiles := extractFileReferences(testFile, lineNumber)
 				for _, ref := range referencedFiles {
 					if found := findFileInDeleted(ref, gitState.DeletedFiles); found != "" {
 						if !seenTargets[found] {
-							if pipeline.IsVerbose() {
-								fmt.Printf("[TestFailurePlanner] Adding plan to restore %s (ref=%s)\n", found, ref)
-							}
 							plans = append(plans, &pipeline.RepairPlan{
 								PlanType:   "restore_file",
 								Priority:   0,
@@ -457,8 +448,6 @@ func (p *TestFailurePlanner) Plan(clues []*pipeline.ErrorClue, gitState *pipelin
 							})
 							seenTargets[found] = true
 						}
-					} else if pipeline.IsVerbose() {
-						fmt.Printf("[TestFailurePlanner] File %s not in deleted files\n", ref)
 					}
 				}
 			}
@@ -899,15 +888,11 @@ func findHeaderForType(typeName string, gitState *pipeline.GitState) string {
 
 // extractFileReferences reads the test file around the failure line and extracts
 // file references from patterns like command=["./dim", "example.c"]
-func extractFileReferences(testFile string, lineNumber int, gitState *pipeline.GitState) []string {
+func extractFileReferences(testFile string, lineNumber int) []string {
 	var referencedFiles []string
 
-	// Read the test file content
 	content, err := os.ReadFile(testFile)
 	if err != nil {
-		if pipeline.IsVerbose() {
-			fmt.Printf("[extractFileReferences] Error reading file %s: %v\n", testFile, err)
-		}
 		return nil
 	}
 
@@ -928,11 +913,6 @@ func extractFileReferences(testFile string, lineNumber int, gitState *pipeline.G
 
 	contextLines := lines[startLine:endLine]
 	contextText := strings.Join(contextLines, "\n")
-
-	if pipeline.IsVerbose() {
-		fmt.Printf("[extractFileReferences] File: %s, lineNumber: %d, lineIdx: %d, range: [%d:%d]\n",
-			testFile, lineNumber, lineIdx, startLine, endLine)
-	}
 
 	// File extensions to look for
 	fileExts := `py|txt|md|c|h|cpp|hpp|json|yaml|yml|sh`
@@ -968,10 +948,6 @@ func extractFileReferences(testFile string, lineNumber int, gitState *pipeline.G
 		if len(match) > 2 {
 			referencedFiles = append(referencedFiles, match[2])
 		}
-	}
-
-	if pipeline.IsVerbose() && len(referencedFiles) > 0 {
-		fmt.Printf("[extractFileReferences] Found %d file reference(s): %v\n", len(referencedFiles), referencedFiles)
 	}
 
 	return referencedFiles

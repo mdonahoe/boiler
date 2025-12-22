@@ -38,15 +38,9 @@ func TestExtractFileReferences(t *testing.T) {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
-	// Create a minimal GitState
-	gitState := &pipeline.GitState{
-		Ref:          "HEAD",
-		DeletedFiles: []string{"example.c"},
-	}
-
 	// Test extractFileReferences - line 17 is where assertIn is (simulating line 375)
 	// Actually our content is shorter, let's use line 8 (the command line)
-	refs := extractFileReferences(testFile, 8, gitState)
+	refs := extractFileReferences(testFile, 8)
 
 	// Should find example.c
 	found := false
@@ -74,12 +68,7 @@ func TestExtractFileReferencesFromAssertions(t *testing.T) {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
-	gitState := &pipeline.GitState{
-		Ref:          "HEAD",
-		DeletedFiles: []string{"config.json", "data.txt"},
-	}
-
-	refs := extractFileReferences(testFile, 2, gitState)
+	refs := extractFileReferences(testFile, 2)
 
 	// Should find config.json and data.txt
 	refSet := make(map[string]bool)
