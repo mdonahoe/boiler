@@ -9,12 +9,22 @@ import (
 	"github.com/mdonahoe/boiler/src/boil/pipeline"
 )
 
+// DetectorExample represents a test case for a detector.
+// Each detector defines examples next to its patterns for readability.
+type DetectorExample struct {
+	Name     string            // Human-readable name for the test case
+	Input    string            // Error text to match against
+	ClueType string            // Expected clue type
+	Context  map[string]string // Expected context values
+}
+
 // BaseDetector provides regex-based detection for most detectors
 //
 // Subclasses should define:
 // - name: detector name
 // - priority: execution priority (lower = higher priority, default 100)
 // - patterns: map of pattern names to compiled regexes
+// - examples: test cases for verification
 //
 // The Detect() method automatically:
 // 1. Combines stderr and stdout
@@ -24,15 +34,18 @@ type BaseDetector struct {
 	name     string
 	priority int
 	patterns map[string]*regexp.Regexp
+	examples []DetectorExample
 }
 
 // NewBaseDetector creates a new regex-based detector
 //
 // Args:
-//   name: Human-readable detector name
-//   priority: Execution priority (lower = higher priority)
-//   patterns: Map of pattern name to regex string (must use named groups)
-func NewBaseDetector(name string, priority int, patterns map[string]string) (*BaseDetector, error) {
+//
+//	name: Human-readable detector name
+//	priority: Execution priority (lower = higher priority)
+//	patterns: Map of pattern name to regex string (must use named groups)
+//	examples: Test cases for verification (defined alongside patterns)
+func NewBaseDetector(name string, priority int, patterns map[string]string, examples []DetectorExample) (*BaseDetector, error) {
 	compiled := make(map[string]*regexp.Regexp)
 	for patternName, pattern := range patterns {
 		re, err := regexp.Compile(pattern)
@@ -46,7 +59,13 @@ func NewBaseDetector(name string, priority int, patterns map[string]string) (*Ba
 		name:     name,
 		priority: priority,
 		patterns: compiled,
+		examples: examples,
 	}, nil
+}
+
+// Examples returns the test cases for this detector
+func (d *BaseDetector) Examples() []DetectorExample {
+	return d.examples
 }
 
 // Name returns the detector name
