@@ -34,7 +34,7 @@ class TestDetectorRegexEfficiency(unittest.TestCase):
                 continue
 
             # Import the module
-            module_name = f'pipeline.detectors.{module_info.name}'
+            module_name = f'src.pipeline.detectors.{module_info.name}'
             try:
                 module = importlib.import_module(module_name)
 

@@ -45,7 +45,7 @@ import typing as T
 
 # Add pipeline to path for imports
 sys.path.insert(0, os.path.dirname(__file__))
-from pipeline.utils import is_verbose
+from src.pipeline.utils import is_verbose
 
 
 # T0DO(matt): annotate global constatnts
@@ -217,8 +217,9 @@ def get_c_code_annotations(code_str) -> T.List[T.List[str]]:
 
     try:
         # Run tree_print to get AST as JSON
-        # print-tree is in the repository root, not in src/
-        repo_root = os.path.dirname(os.path.dirname(__file__))
+        # print-tree is in the repository root, not in src/ or src/tools/
+        # Since we're now in src/tools/, go up two directories to get to repo root
+        repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         tree_print_path = os.path.join(repo_root, "print-tree", "tree_print")
         result = subprocess.run(
             [tree_print_path, "--json", temp_filename],

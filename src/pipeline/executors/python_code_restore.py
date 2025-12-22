@@ -52,7 +52,7 @@ class PythonCodeRestoreExecutor(Executor):
             if git_toplevel not in sys.path:
                 sys.path.insert(0, git_toplevel)
 
-            from src_repair import repair
+            from src.tools.src_repair import repair
 
             # Check if file exists first
             if not os.path.exists(file_path):
@@ -69,7 +69,7 @@ class PythonCodeRestoreExecutor(Executor):
 
             # Check if the element is already properly defined in the current content
             # Use src_repair's get_labels to see if it's actually there as a code element
-            from src_repair import get_labels
+            from src.tools.src_repair import get_labels
             current_labels = get_labels(current_content)
 
             # Check if this element already exists as an import, class, or function

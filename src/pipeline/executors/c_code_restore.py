@@ -53,7 +53,7 @@ class CCodeRestoreExecutor(Executor):
             if git_toplevel not in sys.path:
                 sys.path.insert(0, git_toplevel)
 
-            from src_repair import repair, get_labels
+            from src.tools.src_repair import repair, get_labels
 
             # Check if file exists first
             if not os.path.exists(file_path):

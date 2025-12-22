@@ -7,7 +7,7 @@ import difflib
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from src.src_repair import filter_code, get_labels, LineAnnotator
+from src.tools.src_repair import filter_code, get_labels, LineAnnotator
 from src.pipeline.utils import is_verbose
 
 

@@ -514,7 +514,7 @@ def main() -> int:
     # Handle identify-removable command
     if args.identify_removable:
         # Import the identify_removable module and call its main function
-        from src import identify_removable
+        from src.tools import identify_removable
         # Override sys.argv to pass the files argument
         original_argv = sys.argv
         try:

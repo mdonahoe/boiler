@@ -3,7 +3,7 @@ import re
 import subprocess
 import typing as T
 
-from src import src_repair
+from src.tools import src_repair
 from src.session import ctx
 from src.git_ops import get_git_toplevel, get_deleted_files, git_checkout
 from src.helpers import run_command
