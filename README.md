@@ -2,9 +2,9 @@
 
 Automatically restore missing code from git history by iteratively running tests and fixing errors.
 
-## What is boil.py?
+## What is `boil`?
 
-When you delete code and tests fail, `boil.py` automatically restores only the code that's actually needed:
+When you delete code and tests fail, `boil` automatically restores only the code that's actually needed:
 
 1. Runs your test command
 2. Analyzes the error output using a pipeline of detectors
