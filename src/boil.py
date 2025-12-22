@@ -6,6 +6,7 @@ import shutil
 import sys
 import time
 import typing as T
+import random
 
 # Add the repository root to sys.path so we can import from src/
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -339,6 +340,56 @@ def abort_boiling() -> int:
         return 1
 
 
+def delete_all_files_hard() -> None:
+    """Delete all files in the repo except .git directory (hard mode)"""
+    print("=== HARD MODE: Deleting all files in the repo ===")
+
+    for item in os.listdir('.'):
+        if item == '.git':
+            continue
+
+        item_path = os.path.join('.', item)
+        if os.path.isfile(item_path):
+            print(f"Deleting file: {item}")
+            os.remove(item_path)
+        elif os.path.isdir(item_path):
+            print(f"Deleting directory: {item}")
+            shutil.rmtree(item_path)
+
+    print("=== All files deleted (except .git) ===\n")
+
+
+def clear_random_file_soft() -> None:
+    """Pick a random file and clear its content (soft mode)"""
+    print("=== SOFT MODE: Clearing content of a random file ===")
+
+    # Get all files in the repo (excluding .git)
+    all_files = []
+    for root, dirs, files in os.walk('.'):
+        # Skip .git directory
+        if '.git' in root:
+            continue
+        # Filter out .git from dirs to prevent walking into it
+        dirs[:] = [d for d in dirs if d != '.git']
+
+        for file in files:
+            all_files.append(os.path.join(root, file))
+
+    if not all_files:
+        print("No files found to clear!")
+        return
+
+    # Pick a random file
+    random_file = random.choice(all_files)
+    print(f"Selected file: {random_file}")
+
+    # Clear its content
+    with open(random_file, 'w') as f:
+        pass  # Just open in write mode to truncate
+
+    print(f"=== Cleared content of {random_file} ===\n")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Boil your code.")
     parser.add_argument("-n", type=int, help="number of interations")
@@ -394,6 +445,16 @@ def main() -> int:
         choices=['claude'],
         metavar='METHOD',
         help="invoke an AI assistant to fix boiler for unfixable errors (choices: claude)",
+    )
+    parser.add_argument(
+        "--hard",
+        action="store_true",
+        help="delete all files in the repo before starting the boiling session",
+    )
+    parser.add_argument(
+        "--soft",
+        action="store_true",
+        help="pick a random file and clear its content before starting the boiling session",
     )
 
     # Use parse_known_args to separate known and unknown arguments
@@ -484,6 +545,17 @@ def main() -> int:
     # Store the remaining arguments as a single command string
     # TODO(matt): parse leading --dash-commands and complain because they are probs typos.
     command = unknown_args
+
+    # Handle --hard and --soft modes (delete/clear files before starting session)
+    if args.hard and args.soft:
+        print("Error: Cannot use both --hard and --soft at the same time", file=sys.stderr)
+        return 1
+
+    if args.hard:
+        delete_all_files_hard()
+
+    if args.soft:
+        clear_random_file_soft()
 
     # set the global session
     new_session("foo", args.ref, 0, command)
