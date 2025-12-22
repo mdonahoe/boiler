@@ -36,7 +36,6 @@ So the `do_bar` method would not be written to disk unless the `class:Foo` and
 """
 
 import argparse
-import ast
 import os
 import re
 import subprocess
@@ -46,95 +45,6 @@ import typing as T
 # Add pipeline to path for imports
 sys.path.insert(0, os.path.dirname(__file__))
 from src.pipeline.utils import is_verbose
-
-
-# T0DO(matt): annotate global constatnts
-class LineAnnotator(ast.NodeVisitor):
-    """
-    Attempt to label every line of code.
-    Currently supports the following:
-    * class
-    * function
-    * decorator
-    * import / alias
-
-    Each line of code will have a list of labels.
-    """
-
-    def __init__(self, code: str) -> None:
-        self.code: T.List[str] = code.splitlines()  # Split code into individual lines
-        self.annotations: T.List[T.List[str]] = [[] for _ in range(len(self.code))]
-
-    def annotate(self) -> T.List[T.List[str]]:
-        tree = ast.parse("\n".join(self.code))
-        self.visit(tree)  # Visit each node in the AST
-        return self.annotations
-
-    def annotate_lines(self, node: T.Any, labels: T.List[str]) -> None:
-        start_line = node.lineno - 1
-        end_line = getattr(node, "end_lineno", node.lineno) - 1
-        for lineno in range(start_line, end_line + 1):
-            self.annotations[lineno].extend(labels)
-
-    def visit_Import(self, node: T.Any) -> None:
-        first = node.names[0]
-        labels = []
-        for name in node.names:
-            if name.asname is not None:
-                labels.append(f"import:{name.name}")
-                labels.append(f"alias:{name.asname}")
-            else:
-                labels.append(f"import:{name.name}")
-        self.annotate_lines(node, labels)
-        self.generic_visit(node)
-
-    def visit_ImportFrom(self, node: T.Any) -> None:
-        labels = []
-        for name in node.names:
-            if name.asname is not None:
-                labels.append(f"import:{name.name}")
-                labels.append(f"alias:{name.asname}")
-            else:
-                labels.append(f"import:{name.name}")
-        self.annotate_lines(node, labels)
-        self.generic_visit(node)
-
-    def get_decorator_name(self, n: T.Any) -> str:
-        if hasattr(n, "attr"):
-            # ast.Attribute
-            return self.get_decorator_name(n.value) + "." + n.attr
-        elif hasattr(n, "id"):
-            # ast.Name
-            return n.id
-        elif hasattr(n, "func"):
-            # ast.Call
-            return self.get_decorator_name(n.func)
-        else:
-            if is_verbose():
-                print("Unsupported decorator node")
-                print(
-                    ", ".join(
-                        f"n.{k} = {getattr(n, k)}" for k in dir(n) if not k.startswith("_")
-                    )
-                )
-            # import pdb; pdb.set_trace()
-            raise ValueError(n)
-
-    def visit_FunctionDef(self, node: T.Any) -> None:
-        self.annotate_lines(node, [f"function:{node.name}"])
-        for decorator in node.decorator_list:
-            name = self.get_decorator_name(decorator)
-            self.annotate_lines(
-                decorator, [f"function:{node.name}", f"decorator:{name}"]
-            )
-        self.generic_visit(node)
-
-    def visit_ClassDef(self, node: T.Any) -> None:
-        self.annotate_lines(node, [f"class:{node.name}"])
-        for decorator in node.decorator_list:
-            name = self.get_decorator_name(decorator)
-            self.annotate_lines(decorator, [f"class:{node.name}", f"decorator:{name}"])
-        self.generic_visit(node)
 
 
 def pattern_match(
@@ -150,8 +60,7 @@ def pattern_match(
 
 def _annotate(code: str, lang: str) -> T.List[T.List[str]]:
     if lang == "python":
-        annotator = LineAnnotator(code)
-        return annotator.annotate()
+        return get_python_code_annotations(code)
     if lang == "c":
         return get_c_code_annotations(code)
     return []
@@ -200,6 +109,258 @@ def get_codes(filename: str, commit: str) -> T.Tuple[str, str]:
             print(r)
         raise ValueError("failed to get repo code for {filename}")
     return index_code, git_code
+
+
+def get_python_code_annotations(code_str) -> T.List[T.List[str]]:
+    import json
+    import tempfile
+
+    # Initialize annotations list based on number of lines in code
+    lines = code_str.splitlines()
+    annotations = [[] for _ in range(len(lines))]
+
+    # Write code to temporary file
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+        f.write(code_str)
+        temp_filename = f.name
+
+    try:
+        # Run tree_print to get AST as JSON
+        repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        tree_print_path = os.path.join(repo_root, "print-tree", "tree_print")
+        result = subprocess.run(
+            [tree_print_path, "--json", temp_filename],
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode != 0:
+            if is_verbose():
+                print(f"tree_print failed: {result.stderr}")
+            return annotations
+
+        # Parse JSON output
+        ast_data = json.loads(result.stdout)
+
+        # Walk the AST and annotate lines
+        def walk_ast(node, parent_labels=None):
+            if parent_labels is None:
+                parent_labels = []
+
+            node_type = node.get("type", "")
+
+            # Handle import statements: import os, import bar as baz
+            if node_type == "import_statement":
+                # Find imported names and aliases
+                for child in node.get("children", []):
+                    if child.get("type") == "dotted_name":
+                        # Simple import: import os
+                        for subchild in child.get("children", []):
+                            if subchild.get("type") == "identifier":
+                                import_name = subchild.get("text", "")
+                                # Annotate all lines in this import statement
+                                start_line = node.get("start", {}).get("row", 0)
+                                end_line = node.get("end", {}).get("row", 0)
+                                for lineno in range(start_line, end_line + 1):
+                                    if 0 <= lineno < len(annotations):
+                                        annotations[lineno].append(f"import:{import_name}")
+                    elif child.get("type") == "aliased_import":
+                        # Aliased import: import bar as baz
+                        import_name = None
+                        alias_name = None
+                        for subchild in child.get("children", []):
+                            if subchild.get("type") == "dotted_name":
+                                # Get the original import name
+                                for subsubchild in subchild.get("children", []):
+                                    if subsubchild.get("type") == "identifier":
+                                        import_name = subsubchild.get("text", "")
+                            elif subchild.get("type") == "identifier":
+                                # This is the alias (comes after 'as')
+                                alias_name = subchild.get("text", "")
+
+                        # Annotate with both import and alias
+                        start_line = node.get("start", {}).get("row", 0)
+                        end_line = node.get("end", {}).get("row", 0)
+                        for lineno in range(start_line, end_line + 1):
+                            if 0 <= lineno < len(annotations):
+                                if import_name:
+                                    annotations[lineno].append(f"import:{import_name}")
+                                if alias_name:
+                                    annotations[lineno].append(f"alias:{alias_name}")
+
+            # Handle from...import statements: from typing import List, from pkg import mod as alias
+            elif node_type == "import_from_statement":
+                # Track if we've seen the "import" keyword
+                seen_import_keyword = False
+                import_labels = []
+
+                for child in node.get("children", []):
+                    if child.get("type") == "import":
+                        seen_import_keyword = True
+                        continue
+
+                    # Only process items after "import" keyword
+                    if not seen_import_keyword:
+                        continue
+
+                    # Handle simple imports: from pkg import name
+                    if child.get("type") == "dotted_name":
+                        for subchild in child.get("children", []):
+                            if subchild.get("type") == "identifier":
+                                import_labels.append(f"import:{subchild.get('text', '')}")
+
+                    # Handle aliased imports: from pkg import name as alias
+                    elif child.get("type") == "aliased_import":
+                        import_name = None
+                        alias_name = None
+                        for subchild in child.get("children", []):
+                            if subchild.get("type") == "dotted_name":
+                                # Get the imported name
+                                for subsubchild in subchild.get("children", []):
+                                    if subsubchild.get("type") == "identifier":
+                                        import_name = subsubchild.get("text", "")
+                            elif subchild.get("type") == "identifier":
+                                # This is the alias (comes after 'as')
+                                alias_name = subchild.get("text", "")
+
+                        if import_name:
+                            import_labels.append(f"import:{import_name}")
+                        if alias_name:
+                            import_labels.append(f"alias:{alias_name}")
+
+                # Annotate all lines
+                start_line = node.get("start", {}).get("row", 0)
+                end_line = node.get("end", {}).get("row", 0)
+                for lineno in range(start_line, end_line + 1):
+                    if 0 <= lineno < len(annotations):
+                        annotations[lineno].extend(import_labels)
+
+            # Handle class definitions
+            elif node_type == "class_definition":
+                class_name = None
+                # Find the class name
+                for child in node.get("children", []):
+                    if child.get("type") == "identifier":
+                        class_name = child.get("text", "")
+                        break
+
+                if class_name:
+                    # Annotate all lines in this class definition
+                    start_line = node.get("start", {}).get("row", 0)
+                    end_line = node.get("end", {}).get("row", 0)
+                    for lineno in range(start_line, end_line + 1):
+                        if 0 <= lineno < len(annotations):
+                            annotations[lineno].append(f"class:{class_name}")
+
+                    # Recursively walk with class context
+                    for child in node.get("children", []):
+                        walk_ast(child, parent_labels + [f"class:{class_name}"])
+                    return  # Don't walk children again
+
+            # Handle function definitions
+            elif node_type == "function_definition":
+                func_name = None
+                # Find the function name
+                for child in node.get("children", []):
+                    if child.get("type") == "identifier":
+                        func_name = child.get("text", "")
+                        break
+
+                if func_name:
+                    # Annotate all lines in this function definition
+                    start_line = node.get("start", {}).get("row", 0)
+                    end_line = node.get("end", {}).get("row", 0)
+                    for lineno in range(start_line, end_line + 1):
+                        if 0 <= lineno < len(annotations):
+                            annotations[lineno].append(f"function:{func_name}")
+
+            # Handle decorated definitions (decorators on classes/functions)
+            elif node_type == "decorated_definition":
+                # Find decorators and the definition
+                decorators = []
+                decorated_func_or_class = None
+                func_or_class_name = None
+                func_or_class_type = None
+
+                for child in node.get("children", []):
+                    if child.get("type") == "decorator":
+                        # Extract decorator name
+                        decorator_name = extract_decorator_name(child)
+                        if decorator_name:
+                            decorators.append(decorator_name)
+                    elif child.get("type") in ("function_definition", "class_definition"):
+                        decorated_func_or_class = child
+                        func_or_class_type = child.get("type")
+                        # Get the name of the function/class
+                        for subchild in child.get("children", []):
+                            if subchild.get("type") == "identifier":
+                                func_or_class_name = subchild.get("text", "")
+                                break
+
+                # Annotate decorator lines with both the decorator and the function/class
+                for decorator_node in [c for c in node.get("children", []) if c.get("type") == "decorator"]:
+                    decorator_name = extract_decorator_name(decorator_node)
+                    if decorator_name:
+                        start_line = decorator_node.get("start", {}).get("row", 0)
+                        end_line = decorator_node.get("end", {}).get("row", 0)
+                        for lineno in range(start_line, end_line + 1):
+                            if 0 <= lineno < len(annotations):
+                                # Add function:name or class:name label
+                                if func_or_class_name:
+                                    if func_or_class_type == "function_definition":
+                                        annotations[lineno].append(f"function:{func_or_class_name}")
+                                    elif func_or_class_type == "class_definition":
+                                        annotations[lineno].append(f"class:{func_or_class_name}")
+                                # Add decorator label
+                                annotations[lineno].append(f"decorator:{decorator_name}")
+
+                # Walk the decorated definition
+                if decorated_func_or_class:
+                    walk_ast(decorated_func_or_class, parent_labels)
+                return  # Don't walk children again
+
+            # Recursively walk children
+            for child in node.get("children", []):
+                walk_ast(child, parent_labels)
+
+        def extract_decorator_name(decorator_node):
+            """Extract the decorator name from a decorator node"""
+            # Look for identifier or attribute nodes
+            for child in decorator_node.get("children", []):
+                if child.get("type") == "identifier":
+                    return child.get("text", "")
+                elif child.get("type") == "attribute":
+                    # Handle @foo.bar style decorators
+                    parts = []
+                    extract_attribute_parts(child, parts)
+                    return ".".join(parts)
+                elif child.get("type") == "call":
+                    # Handle @decorator() style - extract the function name
+                    for subchild in child.get("children", []):
+                        if subchild.get("type") == "identifier":
+                            return subchild.get("text", "")
+                        elif subchild.get("type") == "attribute":
+                            parts = []
+                            extract_attribute_parts(subchild, parts)
+                            return ".".join(parts)
+            return None
+
+        def extract_attribute_parts(attr_node, parts):
+            """Recursively extract parts of an attribute (e.g., foo.bar.baz)"""
+            for child in attr_node.get("children", []):
+                if child.get("type") == "identifier":
+                    parts.append(child.get("text", ""))
+                elif child.get("type") == "attribute":
+                    extract_attribute_parts(child, parts)
+
+        # Start walking from root
+        walk_ast(ast_data)
+
+    finally:
+        # Clean up temporary file
+        os.unlink(temp_filename)
+
+    return annotations
 
 
 def get_c_code_annotations(code_str) -> T.List[T.List[str]]:

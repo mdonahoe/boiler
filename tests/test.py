@@ -7,7 +7,7 @@ import difflib
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from src.tools.src_repair import filter_code, get_labels, LineAnnotator
+from src.tools.src_repair import filter_code, get_labels, get_python_code_annotations
 from src.pipeline.utils import is_verbose
 
 
@@ -61,8 +61,7 @@ class PyRepairTest(unittest.TestCase):
         Ensure a complicated example has expected line annotations
         """
         code = EXAMPLE_PY
-        annotator = LineAnnotator(code)
-        annotations = annotator.annotate()
+        annotations = get_python_code_annotations(code)
         expected = [
             [],  # blank line
             ["import:some_package"],  # import
