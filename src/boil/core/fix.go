@@ -532,9 +532,46 @@ func DebugIterations(rangeStr string) int {
 
 // TestDetectors tests all detectors on the given error file
 func TestDetectors(errorFile string) int {
-	// TODO: Implement detector testing
-	fmt.Printf("TODO: TestDetectors(%s) not yet implemented\n", errorFile)
-	return 1
+	data, err := os.ReadFile(errorFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading file: %v\n", err)
+		return 1
+	}
+
+	errText := string(data)
+	fmt.Println(strings.Repeat("=", 80))
+	fmt.Println("TESTING ALL DETECTORS")
+	fmt.Println(strings.Repeat("=", 80))
+
+	registry := pipeline.GetDetectorRegistry()
+	detectorNames := registry.ListDetectors()
+	fmt.Printf("\nRegistered detectors: %d\n", len(detectorNames))
+	for i, name := range detectorNames {
+		fmt.Printf("  %d. %s\n", i+1, name)
+	}
+	fmt.Println()
+
+	// Run detection
+	clues, err := registry.DetectAll(errText, "")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Detection error: %v\n", err)
+		return 1
+	}
+
+	fmt.Printf("Detected %d clue(s):\n", len(clues))
+	for i, clue := range clues {
+		fmt.Printf("\n--- Clue %d ---\n", i+1)
+		fmt.Printf("Type: %s\n", clue.ClueType)
+		fmt.Printf("Confidence: %.2f\n", clue.Confidence)
+		fmt.Printf("Context: %v\n", clue.Context)
+		if len(clue.SourceLine) > 100 {
+			fmt.Printf("Source: %s...\n", clue.SourceLine[:100])
+		} else {
+			fmt.Printf("Source: %s\n", clue.SourceLine)
+		}
+	}
+
+	return 0
 }
 
 // IdentifyRemovable identifies functions that can be removed from the codebase

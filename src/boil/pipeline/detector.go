@@ -97,3 +97,8 @@ func isVerbose() bool {
 	verbose := strings.ToLower(os.Getenv("BOIL_VERBOSE"))
 	return verbose == "1" || verbose == "true" || verbose == "yes"
 }
+
+// IsVerbose is the public version of isVerbose
+func IsVerbose() bool {
+	return isVerbose()
+}

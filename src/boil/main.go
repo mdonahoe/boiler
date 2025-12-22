@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/mdonahoe/boiler/src/boil/core"
+	"github.com/mdonahoe/boiler/src/boil/handlers"
 )
 
 func main() {
@@ -29,6 +30,12 @@ func main() {
 
 	// Parse flags
 	flag.Parse()
+
+	// Register pipeline handlers early (needed for --test-detectors and --handle-error)
+	if err := handlers.RegisterAllHandlers(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error registering handlers: %v\n", err)
+		os.Exit(1)
+	}
 
 	// Handle special commands
 	if *abort {
@@ -87,10 +94,6 @@ func main() {
 
 	// Set the global session
 	core.NewSession("foo", *ref, 0, command)
-
-	// Register pipeline handlers
-	fmt.Println("[Pipeline] Registering pipeline handlers...")
-	// TODO: Call handlers.RegisterAllHandlers() when implemented
 
 	// Handle error mode
 	if *handleError != "" {
