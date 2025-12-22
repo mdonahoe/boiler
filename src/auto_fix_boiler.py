@@ -118,30 +118,44 @@ def invoke_claude_cli(prompt):
         return False
 
     print("Invoking Claude CLI...")
-    print(f"This may take a few minutes as Claude analyzes and fixes boiler...\n")
+    print(f"This may take a few minutes as Claude analyzes and fixes boiler...")
+    print("="*80)
+    print("CLAUDE'S RESPONSE")
+    print("="*80)
+    print()
 
     try:
         # Invoke claude by piping the prompt to stdin
-        # Use --print mode for non-interactive execution
-        result = subprocess.run(
+        # Stream output in real-time by reading line by line
+        process = subprocess.Popen(
             ["claude", "--print"],
-            input=prompt,
-            capture_output=True,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=600,  # 10 minute timeout
+            bufsize=1,  # Line buffered
             cwd=os.path.expanduser("~/boiler")  # Run from boiler directory
         )
 
-        print("="*80)
-        print("CLAUDE'S RESPONSE")
-        print("="*80)
-        print(result.stdout)
-        if result.stderr:
+        # Write prompt to stdin and close it
+        process.stdin.write(prompt)
+        process.stdin.close()
+
+        # Read and print stdout in real-time
+        for line in process.stdout:
+            print(line, end='', flush=True)
+
+        # Wait for process to complete and get stderr
+        process.wait(timeout=600)
+        stderr = process.stderr.read()
+
+        if stderr:
             print("\nSTDERR:")
-            print(result.stderr)
+            print(stderr)
+
         print("="*80)
 
-        return result.returncode == 0
+        return process.returncode == 0
     except subprocess.TimeoutExpired:
         print("ERROR: Claude timed out after 10 minutes")
         return False
