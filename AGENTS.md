@@ -1,200 +1,359 @@
-Use 'bd' for task tracking
+# Boiler User Guide and Contribution Guide
 
-# AI Agent Prompt for Improving Boiler
+## Table of Contents
+- [Using Boil](#using-boil)
+- [Contributing to Boiler](#contributing-to-boiler)
+- [AI Agent Guide](#ai-agent-guide-for-fixing-boiler)
 
-Use this prompt when asking an AI agent to analyze a target repo's `.boil` folder and fix boiler to handle those errors.
+---
 
-## Full Prompt
+## Using Boil
+
+**Boil** is an automated code restoration tool that iteratively runs your tests and fixes errors by restoring deleted or corrupted files from git history.
+
+### Quick Start
+
+```bash
+# Basic usage: run boil with your test command
+boil make test
+
+# Specify number of iterations
+boil -n 10 make test
+
+# Delete all files first (hard mode)
+boil --hard make test
+
+# Clear a random file first (soft mode)
+boil --soft make test
+```
+
+### Available Commands
+
+#### Running Boil
+- `boil <command>` - Run boil with your test command
+- `boil -n <iterations> <command>` - Limit number of repair iterations
+- `boil --hard <command>` - Delete all files before starting
+- `boil --soft <command>` - Clear one random file before starting
+
+#### Managing Sessions
+- `boil --abort` - Abort current session and restore to pre-boil state
+- `boil --finish` - Remove boiling session but keep current state
+- `boil --check` - Analyze current session and show statistics
+- `boil --debug-iterations <start>-<end>` - Debug specific iterations
+
+#### Utilities
+- `boil --identify-removable <files>` - Find unused functions that can be removed
+- `boil --fix=claude [repo]` - Invoke Claude AI to fix boiler for unfixable errors
+- `boil --test-detectors <error-file>` - Test all detectors on an error output
+- `boil --handle-error <error-file>` - Test pipeline on a specific error
+
+### How Boil Works
+
+1. **Iteration Loop**: Boil runs your test command and captures output
+2. **Error Detection**: Pipeline detectors analyze stderr/stdout for error patterns
+3. **Planning**: Planners generate repair plans (what files to restore, what code to add)
+4. **Execution**: Executors perform the repairs using git history
+5. **Repeat**: Loop until tests pass or iteration limit reached
+
+### Understanding .boil Directory
+
+When boil runs, it creates a `.boil/` directory with debugging information:
+- `iter*.pipeline.json` - Pipeline state for each iteration
+- `iter*.exit*.txt` - Command output for each iteration
+- JSON files contain detected clues, generated plans, and execution results
+
+Use `boil --check` to analyze this data and see what boiler is doing.
+
+---
+
+## Contributing to Boiler
+
+### Project Structure
 
 ```
-# Analyze .boil folder and improve boiler
+boiler/
+├── src/                      # Source code
+│   ├── boil.py              # Main entry point
+│   ├── pipeline/            # Error handling pipeline
+│   │   ├── detectors/       # Error pattern detectors
+│   │   ├── planners/        # Repair plan generators
+│   │   └── executors/       # Repair executors
+│   ├── legacy_handlers.py   # Legacy error handlers
+│   └── *_repair.py          # Code restoration utilities
+├── tests/                   # Test suite
+├── example_repos/           # Test repositories
+└── Makefile                 # Build and test commands
+```
 
-Analyze the debugging information in [TARGET_REPO]/.boil/ and improve boiler to handle those errors correctly.
+### Development Workflow
 
-## Steps
+1. **Set up development environment**
+```bash
+cd ~/boiler
+make check  # Fast checks (integrity + linting)
+make test   # Full test suite
+```
 
-1. **Analyze the errors**
-   - The user has likely run into an issue and is asking for your help to improve boiler until it can repair the target repo.
-   - Run `boil --check` from within the target repo to check the status of the current boiling session. This will give you a summary.
-   - For full details, read all JSON files in [TARGET_REPO]/.boil/ (especially iter*.pipeline.json)
-   - Look for errors where boiler was unable to handle a particular error, and see if you can write a new detector or planner to handle it.
-   - For each error type, understand:
-     - What the error looks like (the stderr/stdout pattern)
-     - What file needs to be fixed
-     - What the fix should be
-   - Use `boil --handle-error <path-to-err-text-file>` to test your new code on a particular error output.
-        For example: `boil --handle-error ~/.boil/iter1.exit1.txt`
-   - If there are a lot of iter files, see if boiler is stuck in an infinite loop and try to fix it.
-   - If boiling had succeeded, identify which error types are using legacy handlers (not detected by pipeline) and migrate them to pipeline format.
+2. **Make changes**
+   - Edit code in `src/`
+   - Add tests in `tests/`
+   - Follow existing patterns
 
-2. **Create pipeline components** (in ~/boiler)
-   - If no detector exists for this error:
-     - Create a detector in `pipeline/detectors/` that matches the error pattern
-     - Extract the relevant context (file path, error details, etc.)
-   - If the detector exists but planner doesn't:
-     - Create a planner in `pipeline/planners/` that generates repair plans
-   - If executor doesn't exist:
-     - Create an executor in `pipeline/executors/` that performs the fix
-   - Register all new components in `pipeline/handlers.py`
+3. **Test your changes**
+```bash
+make check  # Must pass
+make test   # All tests must pass
+```
 
-3. **Add tests**
-   - Create unit tests in `tests/` for the new detector/planner
-   - Tests should cover:
-     - Detection of the error pattern
-     - Planning for different file states
-     - Proper handling of edge cases
+4. **Commit**
+```bash
+git add <files>
+git commit -m "Description"
+git push
+```
 
-4. **Validate**
-   - Run `make check` in boiler - this is fast but not comprehensive.
-   - Run `make test` in boiler - all tests must pass
-   - Test on [TARGET_REPO]:
-     - Reset to pre-boil state: `boil --abort` (restores working directory and removes .boil)
-     - Run: `boil [test-command]` or `python3 ~/boiler/boil.py [test-command]`
-     - Verify it fixes the errors without infinite loops
-     - After testing, if the repo is now fixed, you can use `boil --abort` again to return to the broken state for another test iteration
+### Adding New Error Handlers
 
-5. **Document**
-   - Update `notes/` with what was added and why
-   - Update `README.md` if needed with new error types
+Boiler uses a pipeline architecture to handle errors. To add support for a new error type:
 
-## Tips for Detector/Planner Implementation
+#### 1. Create a Detector
 
-### CRITICAL: When Tests Fail During "make check"
+Detectors find error patterns in command output.
+
+```python
+# src/pipeline/detectors/my_error.py
+from src.pipeline.detectors.base import Detector
+
+class MyErrorDetector(Detector):
+    PATTERNS = {
+        "my_error_type": [
+            r"error: cannot find file '(?P<file>[^']+)'",
+        ]
+    }
+
+    EXAMPLES = [
+        (
+            "error: cannot find file 'foo.txt'",
+            {"clue_type": "my_error_type", "file": "foo.txt"}
+        )
+    ]
+```
+
+#### 2. Create a Planner
+
+Planners generate repair plans from detected clues.
+
+```python
+# src/pipeline/planners/my_error.py
+from src.pipeline.planners.base import Planner
+
+class MyErrorPlanner(Planner):
+    def can_handle(self, clue_type: str) -> bool:
+        return clue_type == "my_error_type"
+
+    def plan(self, clue: ErrorClue, git_state: GitState) -> List[RepairPlan]:
+        # Generate plan to restore missing file
+        return [RepairPlan(
+            action="restore_full",
+            target_file=clue.context["file"],
+            source_ref=git_state.ref
+        )]
+```
+
+#### 3. Register Components
+
+```python
+# src/pipeline/handlers.py
+def register_all_handlers():
+    # ... existing registrations ...
+    register_detector(MyErrorDetector())
+    register_planner(MyErrorPlanner())
+```
+
+#### 4. Add Tests
+
+```python
+# tests/test_my_error.py
+class TestMyErrorDetector(unittest.TestCase):
+    def test_detects_error(self):
+        detector = MyErrorDetector()
+        err = "error: cannot find file 'foo.txt'"
+        clues = detector.detect(err, "")
+        self.assertEqual(len(clues), 1)
+        self.assertEqual(clues[0].clue_type, "my_error_type")
+```
+
+### Critical Rules for Contributors
+
+#### Test Integrity
 
 **NEVER modify tests to make them pass. Fix your implementation instead.**
 
 If `make check` fails:
-1. **Read the error message carefully** - it tells you what's wrong
-2. **Fix the IMPLEMENTATION code** (detectors/planners/executors), NOT the test
-3. **Commit test changes separately** - if you need to update a test, commit it BEFORE making implementation changes
+1. Read the error message - it tells you what's wrong
+2. Fix the IMPLEMENTATION code, NOT the test
+3. Commit test changes separately BEFORE implementation changes
 
-Common test failures and what they mean:
-- `INTEGRITY CHECK FAILED: Test files have been modified` - You modified a test file. Revert it and fix your code instead.
-- `HARD-CODED LIBRARY KEYWORDS DETECTED IN PLANNERS` - You hard-coded library-specific logic (like `tree_sitter` or `TSLanguage`). Make your planner generic using git history instead.
-- `Detected inefficient regex patterns` - Your regex has multiple lazy quantifiers that cause exponential backtracking. Rewrite the pattern.
+Common failures:
+- `INTEGRITY CHECK FAILED` - You modified tests. Revert and fix code.
+- `HARD-CODED LIBRARY KEYWORDS` - Make your planner generic using git history
+- `Detected inefficient regex` - Rewrite pattern to avoid exponential backtracking
 
-**Why tests catch you trying to cheat:**
-- Tests have integrity checks that detect modifications
-- Tests scan for hard-coded library names
-- These safeguards prevent brittle, repo-specific code
+#### Writing Generic Planners
 
-### Critical: Always Validate Repairs
-**Every executor must verify that repairs actually modified files.** Capture file state before and after, and return failure if unchanged. Without this, false "successes" cause infinite loops.
-
-### Detector Best Practices
-1. **Filter out stdlib vs project code**: Maintain lists of known stdlib functions/constants to avoid attempting restoration of standard library symbols
-2. **Match compiler output carefully**: Handle both ASCII and Unicode quotes in error messages (GCC uses U+2018/U+2019 for smart quotes)
-3. **Look for include suggestions first**: Compiler hints like "include '<stdio.h>'" are reliable indicators of missing headers
-4. **Use generic patterns**: Don't hard-code library-specific strings. If you find yourself writing `if "tree_sitter" in ...`, you're doing it wrong.
-
-### Planner Best Practices
-
-**CRITICAL: Planners Must Be Generic**
-
-Your planner should work for ANY C library (tree-sitter, libpng, OpenSSL, custom code), not just one specific library.
+Planners must work for ANY codebase, not just specific libraries.
 
 **❌ BAD (Hard-coded):**
 ```python
 TYPE_TO_HEADER = {
-    "TSLanguage": "tree-sitter/lib/include/tree_sitter/api.h",
-    "TSParser": "tree-sitter/lib/include/tree_sitter/api.h",
+    "TSLanguage": "tree-sitter/lib/include/tree_sitter/api.h"
 }
 if type_name in TYPE_TO_HEADER:
     return TYPE_TO_HEADER[type_name]
 ```
-This only works for tree-sitter. Tests will catch this and fail.
 
-**✅ GOOD (Generic using git history):**
+**✅ GOOD (Generic):**
 ```python
-def find_header_for_type(type_name: str, git_state: GitState) -> str:
-    # 1. Search git history for this type name
-    result = subprocess.run(
-        ['git', 'grep', type_name, 'HEAD', '--', '*.h'],
-        capture_output=True, text=True
-    )
-
-    # 2. Parse which header files define this type
-    headers = parse_git_grep_output(result.stdout)
-
-    # 3. Check if those headers are corrupted/empty NOW
-    for header in headers:
-        if is_corrupted_or_empty(header):
-            return header
-
-    return None
-```
-This works for ANY library by asking git "where is this type defined?"
-
-**Generic Planner Strategy:**
-1. **Use git history as source of truth**: `git grep <type_name> HEAD -- '*.h'` finds where types are defined
-2. **Never hard-code library names**: No `"tree_sitter"`, `"TSLanguage"`, or specific paths
-3. **Infer from patterns**: If multiple types are missing from the same file, that file is likely corrupted
-4. **Check current state**: Compare git history (where type was defined) vs current file (is it empty/corrupted?)
-
-**Other Planner Best Practices:**
-1. **Prioritize by impact**: Modified files in root directory are likely compilation targets; use scoring system rather than hardcoded patterns
-2. **Only create plans for fixable issues**: Don't plan repairs for missing headers (src_repair can't add includes)
-3. **Avoid duplicates**: Track which symbols/files already have plans to prevent redundant repairs
-
-### Executor Best Practices
-1. **Verify changes happened**: Compare file content/hash before and after repair
-2. **Report specific failures**: "File unchanged" is more useful than generic errors
-3. **Let tools handle what they're designed for**: src_repair knows how to restore code; don't second-guess it with pre-checks
-
-### Understanding boil --abort
-This command resets the repository to its pre-boil state (the state when boil was first started), which is often a broken state with deleted files or errors. This is useful for:
-- Testing your fixes from a clean slate
-- Iterating on improvements (abort → make changes → test again)
-- After a successful boil run, if you want to test improvements without re-breaking the repo manually
+# Use git history to find where types are defined
+result = subprocess.run(
+    ['git', 'grep', type_name, 'HEAD', '--', '*.h'],
+    capture_output=True, text=True
+)
+headers = parse_git_grep_output(result.stdout)
 ```
 
-## Usage
+#### Session Completion Protocol
 
-Replace `[TARGET_REPO]` with the actual path:
+**When ending a work session**, you MUST:
 
-```
-# Analyze .boil folder and improve boiler
-
-Analyze the debugging information in /root/dim/.boil/ and improve boiler to handle those errors correctly.
-
-[rest of prompt above]
-```
-
-## Short One-Liner
-
-Users should use this when talking to an AI agent:
-
-```
-Follow ~/boiler/AGENTS.md and apply it to [TARGET_REPO]/.boil/
-```
-
-Example:
-```
-Follow ~/boiler/AGENTS.md and apply it to /root/dim/.boil/
-```
-
-## Landing the Plane (Session Completion)
-
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
-
-**MANDATORY WORKFLOW:**
-
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
+1. Create issues for remaining work
+2. Run `make check` and `make test` (if code changed)
+3. Close or update issues with `bd`
+4. **PUSH TO REMOTE** (MANDATORY):
    ```bash
    git pull --rebase
    bd sync
    git push
-   git status  # MUST show "up to date with origin"
+   git status  # Must show "up to date with origin"
    ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
 
-**CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
+Work is NOT complete until `git push` succeeds.
+
+### Using the Fix-with-Claude Script
+
+If boiler can't handle an error, you can invoke Claude AI to help:
+
+```bash
+# From the broken repo
+boil --fix=claude
+
+# Or specify the repo path
+boil --fix=claude /path/to/broken/repo
+```
+
+This analyzes `.boil/` debug output and asks Claude to add new detectors/planners.
+
+---
+
+## AI Agent Guide (For Fixing Boiler)
+
+This section is for AI agents (like Claude) that are helping improve boiler when it encounters unfixable errors.
+
+### Quick Reference
+
+```bash
+# Analyze current boiling session
+boil --check
+
+# Test a specific error
+boil --handle-error ~/.boil/iter1.exit1.txt
+
+# Run tests
+make check  # Fast
+make test   # Full suite
+
+# Reset to pre-boil state (for testing)
+boil --abort
+```
+
+### Understanding the Task
+
+When a user runs `boil --fix=claude`, they're asking you to:
+1. Analyze debugging information in `[repo]/.boil/`
+2. Understand what error boiler couldn't handle
+3. Add new detectors/planners in `~/boiler/src/pipeline/`
+4. Ensure changes work generically for ANY codebase
+
+### Analysis Steps
+
+1. **Check session status**
+```bash
+cd /path/to/broken/repo
+boil --check  # Summary
+ls .boil/     # See all debug files
+```
+
+2. **Read pipeline JSON files**
+   - `iter*.pipeline.json` - See what boiler tried to do
+   - Look for:
+     - Undetected errors (no clues found)
+     - Missing planners (clues but no plans)
+     - Failed executions
+     - Infinite loops (same error repeated)
+
+3. **Understand the error pattern**
+   - What does the error look like?
+   - What file needs fixing?
+   - What should the fix be?
+
+### Creating Pipeline Components
+
+Follow the [Adding New Error Handlers](#adding-new-error-handlers) section above.
+
+**Key principles:**
+- Detectors extract information from error text
+- Planners decide what to fix
+- Executors perform the fix
+- Everything must be generic (work for any codebase)
+
+### Testing Your Changes
+
+```bash
+# In ~/boiler
+make check  # Must pass
+make test   # All tests must pass
+
+# In the broken repo
+boil --abort  # Reset to broken state
+boil make test  # Try your fix
+
+# If it works but you want to test again
+boil --abort  # Returns to broken state
+```
+
+### Common Pitfalls
+
+1. **Hard-coding library names** - Use git history instead
+2. **Modifying tests** - Fix implementation, not tests
+3. **Not validating repairs** - Executors must verify changes happened
+4. **Assuming file contents** - Check git history for actual code
+5. **Skipping `make test`** - Fast checks miss edge cases
+
+### Session Completion
+
+When you're done:
+1. Ensure `make check` and `make test` pass
+2. Test on the broken repo (`boil --abort` then `boil make test`)
+3. Commit changes with clear messages
+4. **Push to remote** (see [Session Completion Protocol](#session-completion-protocol))
+
+**CRITICAL**: Work is NOT complete until `git push` succeeds.
+
+---
+
+## Additional Resources
+
+- `README.md` - Project overview and quick start
+- `tests/` - Examples of how to test components
+- `example_repos/` - Test cases for different error types
+- `.boil/` - Debug output from boiling sessions
