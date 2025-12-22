@@ -18,6 +18,26 @@ This is useful for:
 
 ## Installation
 
+### Option 1: System-wide installation (recommended)
+
+```bash
+make install
+```
+
+This installs `boil` and `tree_print` to `/usr/local/bin` (requires sudo/root access).
+
+To install to a different location:
+```bash
+make install PREFIX=/path/to/install
+```
+
+To uninstall:
+```bash
+make uninstall
+```
+
+### Option 2: Manual PATH setup
+
 Make sure the `boil` script is on your PATH
 
 Requirements:
