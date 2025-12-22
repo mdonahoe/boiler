@@ -42,7 +42,8 @@
       "Bash(go build:*)",
       "Bash(/home/bot/boiler/boil:*)",
       "Bash(bd create:*)",
-      "Bash(bd dep add:*)"
+      "Bash(bd dep add:*)",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": []

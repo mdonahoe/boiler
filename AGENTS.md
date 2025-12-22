@@ -68,7 +68,8 @@ Use `boil --check` to analyze this data and see what boiler is doing.
 
 ## Contributing to Boiler
 
-Use `bd list` to see the list of open issues.
+Use `bd ready` to see the list of open issues ready to be worked on.
+Use `bd create "title" -d "longer description"` to add issues for someone to do later.
 Run `bd quickstart` to learn more about `bd`
 
 ### Project Structure
