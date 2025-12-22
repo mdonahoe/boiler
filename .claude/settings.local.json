@@ -37,7 +37,12 @@
       "Bash(git ls-files:*)",
       "Bash(bd stats:*)",
       "Bash(/tmp/test-install/bin/boil:*)",
-      "Bash(/tmp/test-install/bin/tree_print:*)"
+      "Bash(/tmp/test-install/bin/tree_print:*)",
+      "Bash(wc:*)",
+      "Bash(go build:*)",
+      "Bash(/home/bot/boiler/boil:*)",
+      "Bash(bd create:*)",
+      "Bash(bd dep add:*)"
     ],
     "deny": [],
     "ask": []
