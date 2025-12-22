@@ -66,11 +66,17 @@ Use `boil --check` to analyze this data and see what boiler is doing.
 
 ---
 
-## Contributing to Boiler
+## Contributing to Boiler - Issue Tracking
 
-Use `bd ready` to see the list of open issues ready to be worked on.
-Use `bd create "title" -d "longer description"` to add issues for someone to do later.
-Run `bd quickstart` to learn more about `bd`
+This project uses **bd (beads)** for issue tracking.
+
+**Quick reference:**
+- `bd ready` - Find unblocked work
+- `bd create "Title" -d "longer description` - Create issue
+- `bd close <id>` - Complete work
+- `bd sync` - Sync with git (run at session end)
+
+For full workflow details: `bd prime`
 
 ### Project Structure
 

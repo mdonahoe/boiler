@@ -43,7 +43,12 @@
       "Bash(/home/bot/boiler/boil:*)",
       "Bash(bd create:*)",
       "Bash(bd dep add:*)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(bd blocked)",
+      "Bash(bd --help:*)",
+      "Bash(bd epic --help:*)",
+      "Bash(bd relate --help:*)",
+      "Bash(bd relate:*)"
     ],
     "deny": [],
     "ask": []
