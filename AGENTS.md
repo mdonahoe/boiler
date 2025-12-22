@@ -68,6 +68,9 @@ Use `boil --check` to analyze this data and see what boiler is doing.
 
 ## Contributing to Boiler
 
+Use `bd list` to see the list of open issues.
+Run `bd quickstart` to learn more about `bd`
+
 ### Project Structure
 
 ```
@@ -101,8 +104,8 @@ make test   # Full test suite
 
 3. **Test your changes**
 ```bash
-make check  # Must pass
-make test   # All tests must pass
+make check  # Must pass before you call `boil` again.
+make test   # All tests must pass before you commit, but it's ok to try `boil` something while these slower tests are broken.
 ```
 
 4. **Commit**
@@ -139,6 +142,8 @@ class MyErrorDetector(Detector):
     ]
 ```
 
+Do NOT add other methods or overrides. There are tests to prevent this.
+
 #### 2. Create a Planner
 
 Planners generate repair plans from detected clues.
@@ -159,6 +164,10 @@ class MyErrorPlanner(Planner):
             source_ref=git_state.ref
         )]
 ```
+
+Planners can read source files from the index or git and make restoration plans,
+but a planner should NOT modify the working directory on it's own.
+Rely on Executors for that.
 
 #### 3. Register Components
 
@@ -246,12 +255,9 @@ If boiler can't handle an error, you can invoke Claude AI to help:
 ```bash
 # From the broken repo
 boil --fix=claude
-
-# Or specify the repo path
-boil --fix=claude /path/to/broken/repo
 ```
 
-This analyzes `.boil/` debug output and asks Claude to add new detectors/planners.
+This analyzes `.boil/` debug output and asks Claude to add new detectors/planners to boiler.
 
 ---
 
