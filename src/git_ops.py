@@ -66,6 +66,28 @@ def git_checkout(file_path: str, ref: str = "HEAD") -> bool:
     return success
 
 
+def get_tracked_files() -> T.List[str]:
+    """Get list of all tracked files in the repository.
+
+    Returns paths relative to the current working directory.
+    """
+    result = subprocess.run(
+        ["git", "ls-files"],
+        capture_output=True,
+        text=True
+    )
+    if result.returncode != 0:
+        return []
+
+    files = [f for f in result.stdout.strip().split('\n') if f]
+    return files
+
+
+def git_reset_hard(commit: str) -> None:
+    """Reset the repository to a specific commit with --hard."""
+    subprocess.check_call(["git", "reset", "--hard", commit])
+
+
 def get_git_dir() -> str:
     """Get the .git directory path, works from any subdirectory of a git repo."""
     return subprocess.check_output(

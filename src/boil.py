@@ -317,7 +317,7 @@ def abort_boiling() -> int:
         print(f"Restoring to original commit: {original_commit}")
 
         # Reset to the original commit
-        subprocess.check_call(["git", "reset", "--hard", original_commit])
+        git_ops.git_reset_hard(original_commit)
 
         # Then apply the changes to the working directory that existed when user called boil.py
         subprocess.check_call(f"git show {boil_start_commit} | git apply --allow-empty", shell=True)
@@ -341,46 +341,37 @@ def abort_boiling() -> int:
 
 
 def delete_all_files_hard() -> None:
-    """Delete all files in the repo except .git directory (hard mode)"""
-    print("=== HARD MODE: Deleting all files in the repo ===")
+    """Delete all tracked files in the repo (hard mode)"""
+    print("=== HARD MODE: Deleting all tracked files in the repo ===")
 
-    for item in os.listdir('.'):
-        if item == '.git':
-            continue
+    tracked_files = git_ops.get_tracked_files()
+    if not tracked_files:
+        print("No tracked files found!")
+        return
 
-        item_path = os.path.join('.', item)
-        if os.path.isfile(item_path):
-            print(f"Deleting file: {item}")
-            os.remove(item_path)
-        elif os.path.isdir(item_path):
-            print(f"Deleting directory: {item}")
-            shutil.rmtree(item_path)
+    print(f"Found {len(tracked_files)} tracked files")
+    for file_path in tracked_files:
+        if os.path.isfile(file_path):
+            print(f"Deleting tracked file: {file_path}")
+            os.remove(file_path)
+        else:
+            print(f"Skipping non-existent file: {file_path}")
 
-    print("=== All files deleted (except .git) ===\n")
+    print("=== All tracked files deleted ===\n")
 
 
 def clear_random_file_soft() -> None:
-    """Pick a random file and clear its content (soft mode)"""
-    print("=== SOFT MODE: Clearing content of a random file ===")
+    """Pick a random tracked file and clear its content (soft mode)"""
+    print("=== SOFT MODE: Clearing content of a random tracked file ===")
 
-    # Get all files in the repo (excluding .git)
-    all_files = []
-    for root, dirs, files in os.walk('.'):
-        # Skip .git directory
-        if '.git' in root:
-            continue
-        # Filter out .git from dirs to prevent walking into it
-        dirs[:] = [d for d in dirs if d != '.git']
-
-        for file in files:
-            all_files.append(os.path.join(root, file))
-
-    if not all_files:
-        print("No files found to clear!")
+    # Get all tracked files in the repo
+    tracked_files = git_ops.get_tracked_files()
+    if not tracked_files:
+        print("No tracked files found to clear!")
         return
 
     # Pick a random file
-    random_file = random.choice(all_files)
+    random_file = random.choice(tracked_files)
     print(f"Selected file: {random_file}")
 
     # Clear its content
