@@ -62,6 +62,24 @@ class UnknownTypeNamePlanner(Planner):
                 print(f"[Planner:UnknownTypeNamePlanner] Could not find header for type '{type_name}'")
             return []
 
+        # Check if the header file is in partial_files (empty or nearly empty)
+        # If so, we should restore the header file itself, not add an include
+        header_is_partial = self._is_header_partial(header, git_state)
+        if header_is_partial:
+            if is_verbose():
+                print(f"[Planner:UnknownTypeNamePlanner] Header '{header}' is empty/partial, planning full restore")
+            return [
+                RepairPlan(
+                    plan_type="restore_file",
+                    priority=-1,  # Higher priority than include restoration - fix the source first
+                    target_file=header,
+                    action="restore_full",
+                    params={"ref": git_state.ref},
+                    reason=f"Header file '{header}' defining type '{type_name}' is empty/partial",
+                    clue_source=clue
+                )
+            ]
+
         # Normalize the header path to what would appear in #include directive
         # E.g., "tree-sitter/lib/include/tree_sitter/api.h" -> "tree_sitter/api.h"
         normalized_header = self._normalize_include_path(header)
@@ -98,6 +116,44 @@ class UnknownTypeNamePlanner(Planner):
                 clue_source=clue
             )
         ]
+
+    def _is_header_partial(self, header: str, git_state: GitState) -> bool:
+        """
+        Check if a header file is in partial_files (empty or nearly empty).
+
+        A header is considered partial if:
+        1. It's in the partial_files list with very few lines (especially 0)
+        2. It exists on disk but is empty or nearly empty compared to git
+        """
+        # Check partial_files list first
+        for partial in git_state.partial_files:
+            partial_file = partial.get("file", "")
+            line_ratio = partial.get("line_ratio", "")
+
+            # Match if the header path matches or ends with the partial file path
+            if partial_file == header or header.endswith("/" + partial_file) or partial_file.endswith("/" + header):
+                # Parse line ratio like "0/36" - if current lines is very low, it's partial
+                if "/" in line_ratio:
+                    try:
+                        current_lines = int(line_ratio.split("/")[0])
+                        # If the file has 0 or very few lines, it needs full restore
+                        if current_lines <= 2:
+                            return True
+                    except ValueError:
+                        pass
+
+        # Also check if the header exists but is empty/nearly empty on disk
+        if os.path.exists(header):
+            try:
+                with open(header, 'r') as f:
+                    content = f.read().strip()
+                    # If file is empty or just has a couple lines (e.g., just include guards)
+                    if len(content.split('\n')) <= 2:
+                        return True
+            except Exception:
+                pass
+
+        return False
 
     def _find_defining_header(self, type_name: str) -> T.Optional[str]:
         """
