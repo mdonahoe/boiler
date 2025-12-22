@@ -581,11 +581,143 @@ func IdentifyRemovable(files []string) int {
 	return 1
 }
 
-// AutoFixBoiler invokes an AI assistant to fix boiler for unfixable errors
+// AutoFixBoiler prints a prompt for Claude to fix boiler for unfixable errors
 func AutoFixBoiler(args []string) int {
-	// TODO: Implement or skip this feature
-	fmt.Println("TODO: AutoFixBoiler() not yet implemented")
-	return 1
+	// Get repo path from args or current directory
+	var repoPath string
+	if len(args) > 0 {
+		repoPath = args[0]
+		if !filepath.IsAbs(repoPath) {
+			absPath, err := filepath.Abs(repoPath)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error resolving path: %v\n", err)
+				return 1
+			}
+			repoPath = absPath
+		}
+	} else {
+		var err error
+		repoPath, err = os.Getwd()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error getting current directory: %v\n", err)
+			return 1
+		}
+	}
+
+	fmt.Fprintf(os.Stderr, "Checking boiler status in: %s\n\n", repoPath)
+
+	// Check if .boil directory exists
+	boilDir := filepath.Join(repoPath, ".boil")
+	if _, err := os.Stat(boilDir); os.IsNotExist(err) {
+		fmt.Fprintf(os.Stderr, "Status: No .boil directory found - boiler hasn't been run yet\n")
+		fmt.Fprintf(os.Stderr, "\nNothing to fix!\n")
+		return 0
+	}
+
+	// Find pipeline JSON files
+	entries, err := os.ReadDir(boilDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading .boil directory: %v\n", err)
+		return 1
+	}
+
+	var pipelineFiles []string
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), "iter") && strings.HasSuffix(entry.Name(), ".pipeline.json") {
+			pipelineFiles = append(pipelineFiles, entry.Name())
+		}
+	}
+
+	if len(pipelineFiles) == 0 {
+		fmt.Fprintf(os.Stderr, "Status: No pipeline iteration files found\n")
+		fmt.Fprintf(os.Stderr, "\nNothing to fix!\n")
+		return 0
+	}
+
+	// Sort to find latest (simple string sort works for iterN format)
+	for i := 0; i < len(pipelineFiles); i++ {
+		for j := i + 1; j < len(pipelineFiles); j++ {
+			// Extract iteration numbers for proper sorting
+			var iNum, jNum int
+			fmt.Sscanf(pipelineFiles[i], "iter%d", &iNum)
+			fmt.Sscanf(pipelineFiles[j], "iter%d", &jNum)
+			if jNum < iNum {
+				pipelineFiles[i], pipelineFiles[j] = pipelineFiles[j], pipelineFiles[i]
+			}
+		}
+	}
+
+	latestFile := filepath.Join(boilDir, pipelineFiles[len(pipelineFiles)-1])
+	data, err := os.ReadFile(latestFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading pipeline file: %v\n", err)
+		return 1
+	}
+
+	var pipelineData map[string]interface{}
+	if err := json.Unmarshal(data, &pipelineData); err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing pipeline JSON: %v\n", err)
+		return 1
+	}
+
+	// Check if boiler succeeded
+	if success, ok := pipelineData["success"].(bool); ok && success {
+		fmt.Fprintf(os.Stderr, "Status: Boiler succeeded - no fix needed\n")
+		fmt.Fprintf(os.Stderr, "\nNothing to fix!\n")
+		return 0
+	}
+
+	fmt.Fprintf(os.Stderr, "Status: Boiler FAILED - automatic fix needed\n\n")
+
+	// Get error summary by running boil --check
+	errorSummary := getErrorSummary(repoPath)
+
+	// Create and print prompt
+	prompt := createClaudePrompt(repoPath, errorSummary)
+	fmt.Println(prompt)
+
+	return 0
+}
+
+// getErrorSummary runs boil --check and captures output
+func getErrorSummary(repoPath string) string {
+	// Find the boil binary (use the one in PATH or build directory)
+	boilBinary := "boil"
+
+	cmd := exec.Command(boilBinary, "--check")
+	cmd.Dir = repoPath
+	output, _ := cmd.CombinedOutput()
+	return string(output)
+}
+
+// createClaudePrompt creates the prompt to send to Claude
+func createClaudePrompt(repoPath string, errorSummary string) string {
+	return fmt.Sprintf(`I need your help fixing boiler to handle errors in this repository.
+
+IMPORTANT SETUP:
+- You are working in TWO directories:
+  1. ~/boiler - The boiler codebase (where you'll make changes)
+  2. %s - The target repo with the .boil folder (where errors happened)
+- Start by reading ~/boiler/AGENTS.md for detailed instructions
+- Then analyze %s/.boil/ for error details
+
+CURRENT SITUATION:
+Boiler has failed to fix errors in %s
+
+Status from 'boil --check':
+%s
+
+YOUR TASK:
+Follow the instructions in ~/boiler/AGENTS.md and:
+1. Analyze the debugging information in %s/.boil/
+2. Understand what error pattern boiler couldn't handle
+3. Create new detectors/planners in ~/boiler/src/boil/ to handle this error
+4. Test your changes with 'make check' in ~/boiler
+5. Validate the fix works by running 'boil make test' in %s
+6. Commit your changes.
+
+Make boiler handle this error pattern generically for ANY repository, not just this specific case.
+`, repoPath, repoPath, repoPath, errorSummary, repoPath, repoPath)
 }
 
 // DeleteAllFilesHard deletes all files in the repo before starting the boiling session
