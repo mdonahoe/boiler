@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3:*)",
+      "Bash(echo:*)",
+      "Bash(make test:*)",
+      "Bash(make check:*)",
+      "Bash(BOIL_VERBOSE=1 python3:*)",
+      "Bash(tee:*)",
+      "Bash(xargs:*)",
+      "Bash(find:*)",
+      "Bash(cat:*)",
+      "Bash(./boil:*)",
+      "Bash(/root/boiler/boil:*)",
+      "Bash(make:*)",
+      "Bash(print-tree/tree_print:*)",
+      "Bash(chmod:*)",
+      "Bash(ls:*)",
+      "Bash(BOIL_VERBOSE=1 /root/boiler/boil make:*)",
+      "Bash(CHECK_MODE=1 python3:*)",
+      "Bash(bd ready:*)",
+      "Bash(bd show:*)",
+      "Bash(mkdir:*)",
+      "Bash(git mv boil.py pipeline legacy_handlers.py git_ops.py helpers.py session.py analyze_boil_logs.py src_repair.py src/)",
+      "Bash(grep:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(bd close:*)",
+      "Bash(bd sync:*)",
+      "Bash(git pull:*)",
+      "Bash(git push:*)",
+      "Bash(git fetch:*)",
+      "Bash(bd list:*)",
+      "Bash(bd update:*)",
+      "Bash(git mv:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
