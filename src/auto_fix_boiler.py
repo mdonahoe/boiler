@@ -72,9 +72,9 @@ def create_claude_prompt(repo_path, error_data, error_summary):
 
 IMPORTANT SETUP:
 - You are working in TWO directories:
-  1. /root/boiler - The boiler codebase (where you'll make changes)
+  1. ~/boiler - The boiler codebase (where you'll make changes)
   2. {repo_path} - The target repo with the .boil folder (where errors happened)
-- Start by reading /root/boiler/AGENTS.md for detailed instructions
+- Start by reading ~/boiler/AGENTS.md for detailed instructions
 - Then analyze {repo_path}/.boil/ for error details
 
 CURRENT SITUATION:
@@ -84,12 +84,13 @@ Status from 'boil --check':
 {error_summary}
 
 YOUR TASK:
-Follow the instructions in /root/boiler/AGENTS.md and:
+Follow the instructions in ~/boiler/AGENTS.md and:
 1. Analyze the debugging information in {repo_path}/.boil/
 2. Understand what error pattern boiler couldn't handle
-3. Create new detectors/planners in /root/boiler/pipeline/ to handle this error
-4. Test your changes with 'make check' and 'make test' in /root/boiler
+3. Create new detectors/planners in ~/boiler/src/pipeline/ to handle this error
+4. Test your changes with 'make check' ~/boiler
 5. Validate the fix works by running 'boil make test' in {repo_path}
+6. Commit your changes.
 
 Make boiler handle this error pattern generically for ANY repository, not just this specific case.
 """
