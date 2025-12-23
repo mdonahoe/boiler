@@ -47,15 +47,15 @@ func verifyClues(t *testing.T, clues []*pipeline.ErrorClue, ex DetectorExample) 
 	}
 }
 
-// TestAllDetectors runs all detector examples defined alongside their patterns.
+// TestAllDetectors runs all detector examples defined in JSON.
 // This ensures examples stay in sync with patterns and makes tests more readable.
 func TestAllDetectors(t *testing.T) {
-	for _, factory := range AllDetectorFactories() {
-		detector, err := factory()
-		if err != nil {
-			t.Fatalf("Failed to create detector: %v", err)
-		}
+	detectors, err := AllDetectorFactories()
+	if err != nil {
+		t.Fatalf("Failed to load detectors from JSON: %v", err)
+	}
 
+	for _, detector := range detectors {
 		t.Run(detector.Name(), func(t *testing.T) {
 			examples := detector.Examples()
 			if len(examples) == 0 {
@@ -73,5 +73,24 @@ func TestAllDetectors(t *testing.T) {
 				})
 			}
 		})
+	}
+}
+
+// TestLoadDetectorsFromJSON verifies that the JSON file can be loaded
+func TestLoadDetectorsFromJSON(t *testing.T) {
+	detectors, err := LoadDetectorsFromJSON()
+	if err != nil {
+		t.Fatalf("Failed to load detectors from JSON: %v", err)
+	}
+
+	if len(detectors) == 0 {
+		t.Errorf("Expected at least 1 detector, got 0")
+	}
+
+	// Verify each detector has a name
+	for _, d := range detectors {
+		if d.Name() == "" {
+			t.Errorf("Detector has empty name")
+		}
 	}
 }
