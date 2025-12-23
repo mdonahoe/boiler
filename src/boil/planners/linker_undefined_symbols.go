@@ -57,7 +57,7 @@ func (p *LinkerUndefinedSymbolsPlanner) Plan(clues []*pipeline.ErrorClue, gitSta
 		}
 	}
 
-	// Score deleted C files by how many symbols they contain
+	// Score deleted C files by how many symbols they DEFINE (not just use)
 	type fileScore struct {
 		file  string
 		score int
@@ -66,14 +66,15 @@ func (p *LinkerUndefinedSymbolsPlanner) Plan(clues []*pipeline.ErrorClue, gitSta
 
 	for _, deleted := range gitState.DeletedFiles {
 		if strings.HasSuffix(deleted, ".c") {
-			// Check git content for symbols
+			// Check git content for function definitions
 			content, err := getGitFileContent(deleted, gitState.Ref)
 			if err != nil {
 				continue
 			}
 			score := 0
 			for _, sym := range symbols {
-				if strings.Contains(content, sym) {
+				// Look for function definitions, not just usages
+				if containsFunctionDefinition(content, sym) {
 					score++
 				}
 			}
