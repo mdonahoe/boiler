@@ -27,7 +27,7 @@ int unused() {
     return 0;
 }
 
-int main(void) {
+int brain(void) {
     printf("hello from c\n");
     return 0;
 }
