@@ -38,10 +38,18 @@ make uninstall
 
 ### Option 2: Manual PATH setup
 
-Make sure the `boil` script is on your PATH
+Make sure the `boil` binary is on your PATH.
+
+### Option 3: Build from source
+
+```bash
+cd boiler
+make
+./boil --help
+```
 
 Requirements:
-- Python 3.x
+- Go 1.21+ (for building)
 - Git repository with history
 
 ## Basic Usage
@@ -74,7 +82,7 @@ boil --abort
 
 ## The Boiling Branch
 
-Boil.py creates a branch called `boiling` to track its progress:
+Boil creates a branch called `boiling` to track its progress:
 - Each fix attempt is a separate commit
 - Inspect history: `git log boiling`
 - Use `--abort` to clean up and restore original state
@@ -90,26 +98,30 @@ Boil.py creates a branch called `boiling` to track its progress:
 
 ## The Pipeline System
 
-Boil.py uses a three-stage pipeline for error analysis and repair:
+Boil uses a three-stage pipeline for error analysis and repair, implemented in Go with JSON and Starlark configuration:
 
-### Stage 1: Detection
-Detectors analyze error output to identify issues:
+### Stage 1: Detection (JSON)
+Detectors are defined in JSON files (`src/boil/detectors/definitions/*.json`) and match regex patterns against error output:
+- **FileNotFoundDetector**: Missing files (Python, shell, etc.)
 - **PermissionDeniedDetector**: Permission errors
 - **MakeMissingTargetDetector**: Missing make targets
-- **MissingPythonCodeDetector**: Missing Python classes/functions/imports
-- **FileNotFoundDetector**: Missing files (Python, shell, C compilation)
+- **CLinkErrorDetector**: C linker undefined symbols
+- **CImplicitDeclarationDetector**: Missing C function declarations
+- **PythonNameErrorDetector**: Missing Python names/imports
 
-### Stage 2: Planning
-Planners create repair strategies for each detected error:
-- **PermissionFixPlanner**: Restore files with wrong permissions
-- **MissingFilePlanner**: Restore deleted files
-- **MakeMissingTargetPlanner**: Restore files missing from make
-- **MissingPythonCodePlanner**: Restore missing code elements in existing files
+### Stage 2: Planning (Go + Starlark)
+Planners create repair strategies. Core planners are in Go (`src/boil/planners/*.go`), with plugin support via Starlark:
+- **MissingFilePlanner**: Restore deleted files from git
+- **PermissionFixPlanner**: Fix file permissions
+- **MakeMissingTargetPlanner**: Restore files for make targets
+- **LinkerUndefinedSymbolsPlanner**: Restore C functions for linker errors
+- **MissingCFunctionPlanner**: Add missing C function definitions
 
-### Stage 3: Execution
+### Stage 3: Execution (Go)
 Executors perform the repairs:
-- **GitRestoreExecutor**: Restore entire files from git
-- **PythonCodeRestoreExecutor**: Restore specific Python code elements using src_repair
+- **restore_full**: Restore entire files from git history
+- **restore_c_element**: Restore C code elements (functions, structs)
+- **restore_python_element**: Restore Python code elements (classes, functions)
 
 ## Examples
 
@@ -118,7 +130,7 @@ Executors perform the repairs:
 ```bash
 # Delete a function from a file
 # Tests fail: "class TestClass not found"
-# Boil.py detects the error, creates a plan, uses src_repair to restore just the class
+# Boil detects the error, creates a plan, restores just the class
 boil python3 test_suite.py
 ```
 
@@ -131,7 +143,7 @@ rm src/suspicious.py
 # See if tests pass
 boil python3 -m pytest
 
-# If boil.py doesn't restore it, it was dead code!
+# If boil doesn't restore it, it was dead code!
 ```
 
 ## Tips
@@ -154,6 +166,24 @@ A: This is normal. Each fix attempt is a separate commit.
 **Q: Can I boil non-Python code?**
 A: File-level restoration works on any language. Python code element restoration is Python-specific.
 
+## Plugin System
+
+Boil supports plugins for custom detectors and planners without modifying the core codebase. Plugins are loaded from `.boil/plugins/` in your repository:
+
+```
+your-repo/.boil/plugins/
+├── detectors/     # JSON detector definitions
+│   └── my_error.json
+└── planners/      # Starlark planner scripts
+    └── my_planner.star
+```
+
+**Detector plugins** (JSON): Define regex patterns to match error messages.
+
+**Planner plugins** (Starlark): Write repair logic with access to git operations (`git_show`, `git_grep`), file system (`read_file`, `file_exists`), and pattern matching (`regex_match`).
+
+See `AGENTS.md` for detailed plugin documentation.
+
 ## C Code Support
 
 Boiler can handle C compilation errors:
@@ -161,17 +191,14 @@ Boiler can handle C compilation errors:
 - **Implicit function declarations**: Detects missing project functions and creates forward declarations
 - **Undeclared identifiers**: Restores missing function definitions from git
 - **Linker undefined symbols**: Restores missing functions to the correct compilation target file
+- **Unknown type names**: Restores struct/typedef definitions from headers
 
 **Limitations**:
-- Missing includes (stdlib headers) are detected but not automatically fixed
-- Some errors (missing headers like `<fcntl.h>`, `<stdarg.h>`) are not (yet) fixed by src_repair
+- Missing stdlib includes (like `<fcntl.h>`) are detected but not automatically fixed
 - File validation ensures repairs actually modify files (prevents infinite loops)
-
-See `notes/c_error_handling_lessons.md` for detailed analysis.
 
 ## Known Issues
 
-1. Named globals aren't supported and always get restored
-2. Enum restoration makes __init__ functions appear
-3. Missing C headers are not automatically added (requires future planner/executor)
-4. Some stdlib functions may not be in the filtered list and will attempt restoration
+1. Named globals aren't fully supported in Python element restoration
+2. Missing C stdlib headers are not automatically added
+3. Some stdlib functions may trigger false restoration attempts
