@@ -3,20 +3,19 @@
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
 LIBDIR ?= $(PREFIX)/lib/boiler
-GOBIN := boil
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 
-all: print-tree/tree_print $(GOBIN)
+all: print-tree/tree_print boil
 
 print-tree/tree_print:
 	$(MAKE) -C print-tree tree_print
 
-$(GOBIN): src/boil/**/*.go
-	cd src/boil && go build -ldflags "-X main.Version=$(VERSION)" -o ../../$(GOBIN) .
+boil: src/boil/**/*.go
+	cd src/boil && go build -ldflags "-X main.Version=$(VERSION)" -o ../../boil .
 
 test: test-python test-go
 
-test-python:
+test-python: boil
 	CHECK_MODE=1 python3 -m unittest discover -s tests -p "test*.py"
 
 test-go:
@@ -24,7 +23,7 @@ test-go:
 
 check: check-python check-go
 
-check-python:
+check-python: boil
 	CHECK_MODE=1 SKIP_SLOW_TESTS=1 python3 -m unittest discover -s tests -p "test*.py"
 
 check-go:
@@ -43,7 +42,7 @@ install: all
 	# Install tree_print binary
 	install -m 755 print-tree/tree_print $(BINDIR)/tree_print
 	# Install Go boil binary (drop-in replacement for Python version)
-	install -m 755 $(GOBIN) $(BINDIR)/boil
+	install -m 755 boil $(BINDIR)/boil
 	@echo "Installation complete!"
 	@echo "boil (Go) and tree_print are now available in $(BINDIR)"
 
@@ -55,5 +54,5 @@ uninstall:
 	@echo "Uninstallation complete!"
 
 clean:
-	rm -f $(GOBIN)
+	rm -f boil
 	$(MAKE) -C print-tree clean
