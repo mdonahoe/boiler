@@ -1,0 +1,25 @@
+{
+  "name": "M4CannotOpenDetector",
+  "priority": 100,
+  "patterns": {
+    "missing_file_m4": "/usr/bin/m4:[^:]+:\\d+:\\s*cannot open [`'](?P<file_path>[^'`]+)[`']:\\s*No such file or directory"
+  },
+  "examples": [
+    {
+      "name": "missing_file_m4_basic",
+      "input": "/usr/bin/m4:configure.ac:746: cannot open `m4/fcntl-o.m4': No such file or directory",
+      "clue_type": "missing_file_m4",
+      "context": {
+        "file_path": "m4/fcntl-o.m4"
+      }
+    },
+    {
+      "name": "missing_file_m4_with_quotes",
+      "input": "/usr/bin/m4:configure.ac:734: cannot open 'm4/stat-time.m4': No such file or directory",
+      "clue_type": "missing_file_m4",
+      "context": {
+        "file_path": "m4/stat-time.m4"
+      }
+    }
+  ]
+}
