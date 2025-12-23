@@ -37,8 +37,22 @@ func (p *MissingDirectoryPlanner) Plan(clues []*pipeline.ErrorClue, gitState *pi
 		}
 
 		// Make path relative if absolute
+		originalFilePath := filePath
 		if filepath.IsAbs(filePath) {
-			filePath, _ = filepath.Rel(".", filePath)
+			rel, err := filepath.Rel(".", filePath)
+			if err == nil && rel != "" {
+				filePath = rel
+			}
+			// If Rel fails, filePath stays as the original absolute path
+		}
+
+		// If path is still absolute-ish (contains ../, starts with /, or Rel failed),
+		// try to find a matching path suffix from deleted files
+		if strings.Contains(filePath, "../") || strings.HasPrefix(filePath, "/") || (filepath.IsAbs(originalFilePath) && filePath == originalFilePath) {
+			filePath = findMatchingDirectoryPath(originalFilePath, gitState.DeletedFiles)
+			if filePath == "" {
+				continue
+			}
 		}
 
 		// Check if glob pattern

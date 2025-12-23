@@ -120,3 +120,53 @@ func containsSymbolDefinition(content, symbol string) bool {
 func containsFunctionDefinition(content, symbol string) bool {
 	return containsSymbolDefinition(content, symbol)
 }
+
+// findMatchingDirectoryPath finds a directory path in deleted files that matches
+// a suffix of the given absolute path. This handles cases where the error message
+// contains an absolute path from a different working directory than the git root.
+// For example, if absPath is "/root/boiler/example_repos/dim/before" and deleted
+// files include "example_repos/dim/before/Makefile", this returns "example_repos/dim/before".
+func findMatchingDirectoryPath(absPath string, deletedFiles []string) string {
+	// Clean the path and split into components
+	absPath = filepath.Clean(absPath)
+	parts := strings.Split(absPath, string(filepath.Separator))
+
+	// Try progressively shorter suffixes of the path
+	for i := 0; i < len(parts); i++ {
+		suffix := filepath.Join(parts[i:]...)
+		if suffix == "" {
+			continue
+		}
+		// Check if any deleted file starts with this suffix + /
+		for _, deleted := range deletedFiles {
+			if strings.HasPrefix(deleted, suffix+"/") {
+				return suffix
+			}
+		}
+	}
+	return ""
+}
+
+// findMatchingFilePath finds a file path in deleted files that matches
+// a suffix of the given absolute path. This handles cases where the error message
+// contains an absolute path from a different working directory than the git root.
+func findMatchingFilePath(absPath string, deletedFiles []string) string {
+	// Clean the path and split into components
+	absPath = filepath.Clean(absPath)
+	parts := strings.Split(absPath, string(filepath.Separator))
+
+	// Try progressively shorter suffixes of the path
+	for i := 0; i < len(parts); i++ {
+		suffix := filepath.Join(parts[i:]...)
+		if suffix == "" {
+			continue
+		}
+		// Check for exact match
+		for _, deleted := range deletedFiles {
+			if deleted == suffix {
+				return suffix
+			}
+		}
+	}
+	return ""
+}

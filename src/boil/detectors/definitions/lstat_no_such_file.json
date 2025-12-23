@@ -1,0 +1,25 @@
+{
+  "name": "LstatNoSuchFileDetector",
+  "priority": 100,
+  "patterns": {
+    "missing_file_lstat": "lstat\\s+(?P<file_path>[^:]+):\\s*no such file or directory"
+  },
+  "examples": [
+    {
+      "name": "missing_file_lstat_go_test",
+      "input": "hard_test.go:48: Failed to copy dim/before: lstat /root/boiler/example_repos/dim/before: no such file or directory",
+      "clue_type": "missing_file_lstat",
+      "context": {
+        "file_path": "/root/boiler/example_repos/dim/before"
+      }
+    },
+    {
+      "name": "missing_file_lstat_simple",
+      "input": "lstat /some/path/to/file.txt: no such file or directory",
+      "clue_type": "missing_file_lstat",
+      "context": {
+        "file_path": "/some/path/to/file.txt"
+      }
+    }
+  ]
+}
