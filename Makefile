@@ -16,10 +16,10 @@ boil: src/boil/**/*.go
 test: test-python test-go
 
 test-python: boil
-	CHECK_MODE=1 python3 -m unittest discover -s tests -p "test*.py"
+	CHECK_MODE=1 python3 -m unittest discover -s tests -p "test*.py" -v
 
 test-go:
-	go test ./src/boil/...
+	go test -v ./src/boil/...
 
 check: check-python check-go
 
