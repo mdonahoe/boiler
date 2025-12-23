@@ -9,6 +9,9 @@ import os
 import subprocess
 import shutil
 import tempfile
+import glob
+import json
+import time
 
 
 class BoilTestContext:
@@ -187,3 +190,123 @@ def copy_and_boil(
         if cleanup_callback:
             cleanup_callback()
         raise
+
+
+def run_boil_with_profiling(
+    src_dir,
+    test_command=["make", "test"],
+    boil_args=None,
+    verbose=True,
+    timeout=120
+):
+    """
+    Run copy_and_boil with profiling and detailed output.
+
+    This function is designed for profiling and debugging - it preserves
+    the temporary directory and prints detailed timing information using
+    boil --check.
+
+    Args:
+        src_dir: Path to the source directory to copy from
+        test_command: Command to run to test (default: ["make", "test"])
+        boil_args: Additional arguments to pass to boil (default: None)
+        verbose: If True, set BOIL_VERBOSE=1 (default: True)
+        timeout: Timeout for boil command in seconds (default: 120)
+
+    Returns:
+        tuple: (tmpdir, success) - Path to temp directory and whether boiling succeeded
+    """
+    env_vars = {}
+    if verbose:
+        env_vars['BOIL_VERBOSE'] = '1'
+
+    print(f"\n{'='*60}")
+    print("Running boil...")
+    print(f"{'='*60}\n")
+
+    start_time = time.time()
+
+    # Use context manager but preserve_tmpdir=True means no cleanup
+    with copy_and_boil(
+        src_dir=src_dir,
+        test_command=test_command,
+        boil_args=boil_args,
+        preserve_tmpdir=True,
+        verify_before=True,
+        delete_files=True,
+        timeout=timeout,
+        env_vars=env_vars
+    ) as result:
+        tmpdir = result['tmpdir']
+        boil_result = result['boil_result']
+        success = boil_result.returncode == 0
+
+        total_time = time.time() - start_time
+
+        print(f"\n{'='*60}")
+        print(f"Total test time: {total_time:.3f}s")
+        print(f"Exit code: {boil_result.returncode}")
+        print(f"{'='*60}\n")
+
+        # Run boil --check to analyze the session
+        boiler_dir = os.path.dirname(os.path.dirname(__file__))
+        boil_script = os.path.join(boiler_dir, "boil")
+        check_result = subprocess.run(
+            [boil_script, "--check"],
+            cwd=tmpdir,
+            capture_output=True,
+            text=True
+        )
+
+        if check_result.returncode == 0:
+            print(check_result.stdout)
+        else:
+            print(f"Warning: boil --check failed with exit code {check_result.returncode}")
+            if check_result.stderr:
+                print(f"Error: {check_result.stderr}")
+
+        print(f"\nTemp directory preserved at: {tmpdir}")
+        return tmpdir, success
+
+
+def analyze_boil_debug(boil_dir):
+    """
+    Analyze .boil/ debug output to extract used detectors, planners, and executors.
+
+    Args:
+        boil_dir: Path to the .boil directory
+
+    Returns:
+        dict with keys: 'detectors', 'planners', 'executors'
+              Each contains a list of unique clue_types/actions found
+    """
+    used_clue_types = set()
+    used_actions = set()
+
+    # Get all pipeline JSON files
+    json_files = glob.glob(os.path.join(boil_dir, "iter*.pipeline.json"))
+
+    # Process each JSON file
+    for json_file in json_files:
+        with open(json_file, 'r') as f:
+            data = json.load(f)
+
+        # Extract clue_types from clues_detected
+        for clue in data.get("clues_detected", []):
+            clue_type = clue.get("clue_type", "")
+            if clue_type:
+                used_clue_types.add(clue_type)
+
+        # Extract actions from plans
+        for plan in data.get("plans_generated", []) + data.get("plans_attempted", []):
+            action = plan.get("action", "")
+            if action:
+                used_actions.add(action)
+
+    # Return simplified structure - clue_types serve as detector identifiers
+    # and actions serve as executor identifiers
+    return {
+        'detectors': sorted(used_clue_types),
+        'planners': sorted(used_clue_types),  # planners handle clue types
+        'executors': sorted(used_actions)
+    }
