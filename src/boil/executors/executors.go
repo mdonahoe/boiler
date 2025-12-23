@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mdonahoe/boiler/src/boil/ast"
 	"github.com/mdonahoe/boiler/src/boil/pipeline"
 )
 
@@ -182,23 +183,27 @@ func (e *PythonCodeRestoreExecutor) Execute(plan *pipeline.RepairPlan) (*pipelin
 		}, nil
 	}
 
-	// Shell out to Python to use src_repair
-	pythonCode := fmt.Sprintf(`
-import sys
-sys.path.insert(0, %q)
-from src.tools.src_repair import repair
-repair(%q, %q, missing=%q, verbose=False)
-`, gitToplevel, filePath, ref, elementName)
+	// Capture file state before repair
+	beforeHash, _ := fileHash(filePath)
 
-	cmd := exec.Command("python3", "-c", pythonCode)
-	cmd.Dir = gitToplevel
-	output, err := cmd.CombinedOutput()
-	if err != nil {
+	// Use native Go ast.Repair
+	if err := ast.Repair(filePath, ref, elementName, false); err != nil {
 		return &pipeline.RepairResult{
 			Success:        false,
 			PlansAttempted: []*pipeline.RepairPlan{plan},
 			FilesModified:  []string{},
-			ErrorMessage:   fmt.Sprintf("Python src_repair failed: %s\n%s", err, string(output)),
+			ErrorMessage:   fmt.Sprintf("ast.Repair failed: %v", err),
+		}, nil
+	}
+
+	// Verify file actually changed
+	afterHash, _ := fileHash(filePath)
+	if beforeHash == afterHash {
+		return &pipeline.RepairResult{
+			Success:        false,
+			PlansAttempted: []*pipeline.RepairPlan{plan},
+			FilesModified:  []string{},
+			ErrorMessage:   fmt.Sprintf("Repair did not modify %s", filePath),
 		}, nil
 	}
 
@@ -266,29 +271,19 @@ func (e *CCodeRestoreExecutor) Execute(plan *pipeline.RepairPlan) (*pipeline.Rep
 	// Capture file state before repair
 	beforeHash, _ := fileHash(filePath)
 
-	// Format missing element pattern for src_repair
+	// Format missing element pattern for ast.Repair
 	missingPattern := elementName
 	if elementType == "include" {
 		missingPattern = fmt.Sprintf("include:%s", elementName)
 	}
 
-	// Shell out to Python to use src_repair
-	pythonCode := fmt.Sprintf(`
-import sys
-sys.path.insert(0, %q)
-from src.tools.src_repair import repair
-repair(%q, %q, missing=%q, verbose=False)
-`, gitToplevel, filePath, ref, missingPattern)
-
-	cmd := exec.Command("python3", "-c", pythonCode)
-	cmd.Dir = gitToplevel
-	output, err := cmd.CombinedOutput()
-	if err != nil {
+	// Use native Go ast.Repair
+	if err := ast.Repair(filePath, ref, missingPattern, false); err != nil {
 		return &pipeline.RepairResult{
 			Success:        false,
 			PlansAttempted: []*pipeline.RepairPlan{plan},
 			FilesModified:  []string{},
-			ErrorMessage:   fmt.Sprintf("Python src_repair failed: %s\n%s", err, string(output)),
+			ErrorMessage:   fmt.Sprintf("ast.Repair failed: %v", err),
 		}, nil
 	}
 
