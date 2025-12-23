@@ -2,8 +2,8 @@
   "name": "CUndeclaredIdentifierDetector",
   "priority": 100,
   "patterns": {
-    "missing_c_include": "(?P<file_path>[a-zA-Z0-9_./\\-]+\\.c):\\d+:\\d+:[^\\n]*undeclared.*note:.*is defined in header\\s+['']<(?P<suggested_include>[^>]+)>['']",
-    "missing_c_function": "(?P<file_path>[a-zA-Z0-9_./\\-]+\\.c):(?P<line_number>\\d+):\\d+:\\s+error:\\s+[''](?P<identifier>[^'']+)['']\\s+undeclared\\s+\\(first use"
+    "missing_c_include": "(?P<file_path>[a-zA-Z0-9_./\\-]+\\.c):\\d+:\\d+:[^\\n]*undeclared.*note:.*is defined in header\\s+[''‘’]<(?P<suggested_include>[^>]+)>[''‘’]",
+    "missing_c_function": "(?P<file_path>[a-zA-Z0-9_./\\-]+\\.c):(?P<line_number>\\d+):\\d+:\\s+error:\\s+[''‘’](?P<identifier>[^''‘’]+)[''‘’]\\s+undeclared\\s+\\(first use"
   },
   "examples": [
     {

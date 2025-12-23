@@ -2,7 +2,7 @@
   "name": "CUnknownTypeDetector",
   "priority": 100,
   "patterns": {
-    "unknown_type_name": "(?P<file_path>[a-zA-Z0-9_./\\-]+\\.c):(?P<line_number>\\d+):\\d+:\\s+error:\\s+unknown type name\\s+[''](?P<type_name>[^'']+)['']"
+    "unknown_type_name": "(?P<file_path>[a-zA-Z0-9_./\\-]+\\.c):(?P<line_number>\\d+):\\d+:\\s+error:\\s+unknown type name\\s+[''‘’](?P<type_name>[^''‘’]+)[''‘’]"
   },
   "examples": [
     {

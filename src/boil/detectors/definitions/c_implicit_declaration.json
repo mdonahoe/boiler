@@ -2,8 +2,8 @@
   "name": "CImplicitDeclarationDetector",
   "priority": 100,
   "patterns": {
-    "missing_c_include": "(?P<file_path>[a-zA-Z0-9_./\\-]+\\.c):\\d+:\\d+:\\s+(?:error|warning):\\s+implicit declaration of function\\s+[''](?P<function_name>[^'']+)[''].*?note:\\s+include\\s+['']<(?P<suggested_include>[^>]+)>['']",
-    "missing_c_function": "(?P<file_path>[a-zA-Z0-9_./\\-]+\\.c):(?P<line_number>\\d+):\\d+:\\s+(?:error|warning):\\s+implicit declaration of function\\s+[''](?P<function_name>[^'']+)['']"
+    "missing_c_include": "(?P<file_path>[a-zA-Z0-9_./\\-]+\\.c):\\d+:\\d+:\\s+(?:error|warning):\\s+implicit declaration of function\\s+[''‘’](?P<function_name>[^''‘’]+)[''‘’].*?note:\\s+include\\s+[''‘’]<(?P<suggested_include>[^>]+)>[''‘’]",
+    "missing_c_function": "(?P<file_path>[a-zA-Z0-9_./\\-]+\\.c):(?P<line_number>\\d+):\\d+:\\s+(?:error|warning):\\s+implicit declaration of function\\s+[''‘’](?P<function_name>[^''‘’]+)[''‘’]"
   },
   "examples": [
     {

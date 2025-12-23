@@ -2,8 +2,8 @@
   "name": "CSyntaxErrorDetector",
   "priority": 100,
   "patterns": {
-    "c_syntax_error_in_header": "(?P<file_path>[^\\s:]+\\.h):(?P<line_number>\\d+):\\d+:\\s+error:\\s+expected\\s+.+?\\s+before\\s+[''](?P<unexpected_token>[^'']+)['']",
-    "c_syntax_error_in_source": "(?P<file_path>[^\\s:]+\\.c):(?P<line_number>\\d+):\\d+:\\s+error:\\s+expected\\s+.+?\\s+before\\s+[''](?P<unexpected_token>[^'']+)['']"
+    "c_syntax_error_in_header": "(?P<file_path>[^\\s:]+\\.h):(?P<line_number>\\d+):\\d+:\\s+error:\\s+expected\\s+.+?\\s+before\\s+[''‘’](?P<unexpected_token>[^''‘’]+)[''‘’]",
+    "c_syntax_error_in_source": "(?P<file_path>[^\\s:]+\\.c):(?P<line_number>\\d+):\\d+:\\s+error:\\s+expected\\s+.+?\\s+before\\s+[''‘’](?P<unexpected_token>[^''‘’]+)[''‘’]"
   },
   "examples": [
     {
