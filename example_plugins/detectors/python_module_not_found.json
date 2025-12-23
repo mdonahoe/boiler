@@ -1,0 +1,21 @@
+{
+  "name": "PythonModuleNotFoundDetector",
+  "priority": 50,
+  "patterns": {
+    "module_not_found": "ModuleNotFoundError: No module named '(?P<module>[^']+)'"
+  },
+  "examples": [
+    {
+      "name": "module_not_found_src",
+      "input": "ModuleNotFoundError: No module named 'src'",
+      "clue_type": "module_not_found",
+      "context": {"module": "src"}
+    },
+    {
+      "name": "module_not_found_nested",
+      "input": "ModuleNotFoundError: No module named 'src.pipeline'",
+      "clue_type": "module_not_found",
+      "context": {"module": "src.pipeline"}
+    }
+  ]
+}
