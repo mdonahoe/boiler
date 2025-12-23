@@ -4,6 +4,7 @@
 - [Using Boil](#using-boil)
 - [Contributing to Boiler](#contributing-to-boiler)
 - [AI Agent Guide](#ai-agent-guide-for-fixing-boiler)
+- [Plugin System](#plugin-system)
 
 ---
 
@@ -364,9 +365,214 @@ When you're done:
 
 ---
 
+## Plugin System
+
+Boil supports plugins that let you add custom detectors and planners to a specific repository without modifying the boiler codebase. This is useful when AI agents need to handle repo-specific error patterns.
+
+### Plugin Location
+
+Plugins are loaded from `.boil/plugins/` in the current working directory:
+
+```
+your-repo/
+├── .boil/
+│   └── plugins/
+│       ├── detectors/     # JSON detector definitions
+│       │   └── my_error.json
+│       └── planners/      # Starlark planner scripts
+│           └── my_planner.star
+```
+
+### Detector Plugins (JSON)
+
+Detectors are data-driven and defined in JSON. They match error patterns and extract context.
+
+**Example:** `.boil/plugins/detectors/my_error.json`
+```json
+{
+  "name": "MyErrorDetector",
+  "priority": 100,
+  "patterns": {
+    "my_custom_error": "custom error: (?P<message>.+) in (?P<file>.+)"
+  },
+  "examples": [
+    {
+      "name": "my_custom_error",
+      "input": "custom error: something failed in foo.txt",
+      "clue_type": "my_custom_error",
+      "context": {"message": "something failed", "file": "foo.txt"}
+    }
+  ]
+}
+```
+
+**Fields:**
+- `name`: Detector name (for logging)
+- `priority`: Execution order (lower = earlier, default 100)
+- `patterns`: Map of clue_type to regex pattern (use named groups like `(?P<name>...)`)
+- `examples`: Test cases to verify the pattern works
+
+### Planner Plugins (Starlark)
+
+Planners contain logic and are written in Starlark (a Python-like language). They receive detected clues and generate repair plans.
+
+**Example:** `.boil/plugins/planners/my_planner.star`
+```python
+def name():
+    """Return the planner name."""
+    return "MyCustomPlanner"
+
+def can_handle(clue_type):
+    """Return True if this planner handles the given clue type."""
+    return clue_type == "my_custom_error"
+
+def plan(clues, git_state):
+    """Generate repair plans from clues.
+
+    Args:
+        clues: List of dicts with keys: clue_type, confidence, context, source_line
+        git_state: Dict with keys: ref, deleted_files, partial_files, git_toplevel
+
+    Returns:
+        List of plan dicts with keys: plan_type, priority, target_file, action, params, reason
+    """
+    plans = []
+    for clue in clues:
+        if clue["clue_type"] != "my_custom_error":
+            continue
+
+        file_path = clue["context"]["file"]
+
+        # Check if file was deleted
+        if file_path in git_state["deleted_files"]:
+            plans.append({
+                "plan_type": "restore_file",
+                "priority": 0,
+                "target_file": file_path,
+                "action": "restore_full",
+                "params": {"ref": git_state["ref"]},
+                "reason": "Restore " + file_path + " for: " + clue["context"]["message"],
+            })
+
+    return plans
+```
+
+### Available Built-in Functions
+
+Starlark planners have access to these built-in functions:
+
+#### Git Operations
+```python
+git_show(path, ref="HEAD")     # Read file content from git history
+                                # Returns: str or None if not found
+
+git_grep(pattern, ref="HEAD")  # Search git history for pattern
+                                # Returns: [(file, line_num, content), ...]
+```
+
+#### File System (read-only)
+```python
+file_exists(path)              # Check if file exists in working dir
+                                # Returns: bool
+
+read_file(path)                # Read file from working dir
+                                # Returns: str or None if not found
+
+list_dir(path)                 # List directory contents
+                                # Returns: [filename, ...]
+```
+
+#### Pattern Matching
+```python
+regex_match(pattern, text)     # Match regex with named groups
+                                # Returns: {"full": str, "groups": {name: value}} or None
+
+regex_find_all(pattern, text)  # Find all matches
+                                # Returns: [{"full": str, "groups": {...}}, ...]
+```
+
+#### Path Utilities
+```python
+path_join(*parts)              # Join path components
+path_basename(path)            # Get filename from path
+path_dirname(path)             # Get directory from path
+path_ext(path)                 # Get file extension (e.g., ".c")
+```
+
+#### Debugging
+```python
+log(message)                   # Print message (when BOIL_VERBOSE=1)
+```
+
+### Example: Complex Planner
+
+Here's a more complete example that searches git history:
+
+```python
+def name():
+    return "MissingSymbolPlanner"
+
+def can_handle(clue_type):
+    return clue_type == "undefined_symbol"
+
+def plan(clues, git_state):
+    plans = []
+
+    for clue in clues:
+        if clue["clue_type"] != "undefined_symbol":
+            continue
+
+        symbol = clue["context"]["symbol"]
+
+        # Search git history for where this symbol is defined
+        matches = git_grep(symbol + r"\s*\(", git_state["ref"])
+
+        for file, line, content in matches:
+            # Check if this file was deleted
+            if file in git_state["deleted_files"]:
+                # Read the file to verify it contains the definition
+                file_content = git_show(file, git_state["ref"])
+                if file_content and contains_definition(file_content, symbol):
+                    plans.append({
+                        "plan_type": "restore_file",
+                        "priority": 0,
+                        "target_file": file,
+                        "action": "restore_full",
+                        "params": {"ref": git_state["ref"]},
+                        "reason": "Restore " + file + " (defines " + symbol + ")",
+                    })
+                    break  # Only restore one file per symbol
+
+    return plans
+
+def contains_definition(content, symbol):
+    """Check if content contains a function definition for symbol."""
+    match = regex_match(symbol + r"\s*\([^)]*\)\s*\{", content)
+    return match != None
+```
+
+### Disabling Plugins
+
+To temporarily disable a plugin, prefix the filename with underscore:
+- `_my_detector.json` - disabled
+- `_my_planner.star` - disabled
+
+### Testing Plugins
+
+Test your plugins by running boil with verbose output:
+
+```bash
+BOIL_VERBOSE=1 boil make test
+```
+
+This will show which plugins are loaded and what clues/plans they generate.
+
+---
+
 ## Additional Resources
 
 - `README.md` - Project overview and quick start
 - `tests/` - Examples of how to test components
 - `example_repos/` - Test cases for different error types
 - `.boil/` - Debug output from boiling sessions
+- `docs/plugin-system-plan.md` - Detailed plugin system design
