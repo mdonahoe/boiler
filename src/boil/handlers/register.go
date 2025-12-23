@@ -18,7 +18,9 @@ func RegisterAllHandlers() error {
 	}
 
 	// Register planners
-	planners.RegisterAllPlanners()
+	if err := planners.RegisterAllPlanners(); err != nil {
+		return fmt.Errorf("failed to register planners: %w", err)
+	}
 
 	// Register executors
 	executors.RegisterAllExecutors()

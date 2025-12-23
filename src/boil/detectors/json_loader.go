@@ -5,6 +5,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 
@@ -102,6 +103,90 @@ func createDetectorFromDefinition(def DetectorDefinition) (*JSONDetector, error)
 // RegisterJSONDetectors loads and registers all JSON-defined detectors
 func RegisterJSONDetectors() error {
 	detectors, err := LoadDetectorsFromJSON()
+	if err != nil {
+		return err
+	}
+
+	registry := pipeline.GetDetectorRegistry()
+	for _, d := range detectors {
+		registry.Register(d)
+	}
+
+	return nil
+}
+
+// LoadDetectorPlugins loads detector JSON files from .boil/plugins/detectors/
+// in the current working directory. This allows repos to define custom detectors.
+// Returns an empty slice if the plugins directory doesn't exist.
+func LoadDetectorPlugins() ([]pipeline.Detector, error) {
+	pluginsDir := ".boil/plugins/detectors"
+
+	// Check if plugins directory exists
+	info, err := os.Stat(pluginsDir)
+	if os.IsNotExist(err) {
+		return nil, nil // No plugins directory - not an error
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to stat plugins directory: %w", err)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("%s is not a directory", pluginsDir)
+	}
+
+	// Read directory entries
+	entries, err := os.ReadDir(pluginsDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read plugins directory: %w", err)
+	}
+
+	// Sort for consistent ordering
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Name() < entries[j].Name()
+	})
+
+	var detectors []pipeline.Detector
+	for _, entry := range entries {
+		// Skip directories and non-JSON files
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+			continue
+		}
+
+		// Skip files starting with underscore (disabled plugins)
+		if entry.Name()[0] == '_' {
+			continue
+		}
+
+		filePath := filepath.Join(pluginsDir, entry.Name())
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			// Log error but continue with other plugins
+			if pipeline.IsVerbose() {
+				fmt.Printf("[Plugin] Error reading %s: %v\n", entry.Name(), err)
+			}
+			continue
+		}
+
+		detector, err := LoadDetectorFromJSONBytes(data)
+		if err != nil {
+			// Log error but continue with other plugins
+			if pipeline.IsVerbose() {
+				fmt.Printf("[Plugin] Error loading %s: %v\n", entry.Name(), err)
+			}
+			continue
+		}
+
+		if pipeline.IsVerbose() {
+			fmt.Printf("[Plugin] Loaded detector: %s\n", detector.Name())
+		}
+		detectors = append(detectors, detector)
+	}
+
+	return detectors, nil
+}
+
+// RegisterDetectorPlugins loads and registers detector plugins from .boil/plugins/detectors/
+func RegisterDetectorPlugins() error {
+	detectors, err := LoadDetectorPlugins()
 	if err != nil {
 		return err
 	}

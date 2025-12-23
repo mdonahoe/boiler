@@ -5,9 +5,20 @@ import (
 	"github.com/mdonahoe/boiler/src/boil/pipeline"
 )
 
-// RegisterAllDetectors registers all detectors from JSON with the global registry
+// RegisterAllDetectors registers all detectors from JSON with the global registry,
+// including both embedded detectors and plugins from .boil/plugins/detectors/
 func RegisterAllDetectors() error {
-	return RegisterJSONDetectors()
+	// Register embedded JSON detectors
+	if err := RegisterJSONDetectors(); err != nil {
+		return err
+	}
+
+	// Register detector plugins from .boil/plugins/detectors/
+	if err := RegisterDetectorPlugins(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // AllDetectorFactories returns factories for all detectors, used by tests
