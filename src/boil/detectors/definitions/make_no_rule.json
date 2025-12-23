@@ -12,7 +12,7 @@
       "context": {"target": "test"}
     },
     {
-      "name": "make_no_rule_with_level",
+      "name": "make_no_rule",
       "input": "make[2]: *** No rule to make target 'build'.  Stop.",
       "clue_type": "make_no_rule",
       "context": {"target": "build"}

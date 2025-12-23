@@ -94,3 +94,21 @@ func TestLoadDetectorsFromJSON(t *testing.T) {
 		}
 	}
 }
+
+// TestExampleNamesMatchClueTypes verifies that each example's Name field
+// matches its ClueType field (the pattern key it tests).
+func TestExampleNamesMatchClueTypes(t *testing.T) {
+	detectors, err := AllDetectorFactories()
+	if err != nil {
+		t.Fatalf("Failed to load detectors from JSON: %v", err)
+	}
+
+	for _, detector := range detectors {
+		for _, ex := range detector.Examples() {
+			if ex.Name != ex.ClueType {
+				t.Errorf("%s: example name %q does not match clue_type %q",
+					detector.Name(), ex.Name, ex.ClueType)
+			}
+		}
+	}
+}
