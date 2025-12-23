@@ -11,8 +11,12 @@ import (
 	"github.com/mdonahoe/boiler/src/boil/handlers"
 )
 
+// Version is set at build time via -ldflags
+var Version = "dev"
+
 func main() {
 	// Define flags
+	version := flag.Bool("version", false, "print version and exit")
 	n := flag.Int("n", 0, "number of iterations")
 	maxIterations := n // Alias for clarity
 	ref := flag.String("ref", "HEAD", "a working commit")
@@ -30,6 +34,12 @@ func main() {
 
 	// Parse flags
 	flag.Parse()
+
+	// Handle version first (before any other initialization)
+	if *version {
+		fmt.Printf("boil version %s\n", Version)
+		os.Exit(0)
+	}
 
 	// Register pipeline handlers early (needed for --test-detectors and --handle-error)
 	if err := handlers.RegisterAllHandlers(); err != nil {

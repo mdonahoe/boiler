@@ -4,6 +4,7 @@ PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
 LIBDIR ?= $(PREFIX)/lib/boiler
 GOBIN := boil
+VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 
 all: print-tree/tree_print $(GOBIN)
 
@@ -11,7 +12,7 @@ print-tree/tree_print:
 	$(MAKE) -C print-tree tree_print
 
 $(GOBIN): src/boil/**/*.go
-	cd src/boil && go build -o ../../$(GOBIN) .
+	cd src/boil && go build -ldflags "-X main.Version=$(VERSION)" -o ../../$(GOBIN) .
 
 test:
 	CHECK_MODE=1 python3 -m unittest discover -s tests -p "test*.py"
