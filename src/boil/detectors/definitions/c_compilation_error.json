@@ -6,16 +6,20 @@
   },
   "examples": [
     {
-      "name": "fatal_error_header",
+      "name": "missing_file_header",
       "input": "/tmp/ex_bar.c:82:10: fatal error: ex.h: No such file or directory",
       "clue_type": "missing_file",
-      "context": {"file_path": "ex.h"}
+      "context": {
+        "file_path": "ex.h"
+      }
     },
     {
-      "name": "fatal_error_relative_path",
+      "name": "missing_file_path",
       "input": "lib/src/node.c:2:10: fatal error: ./point.h: No such file or directory",
       "clue_type": "missing_file",
-      "context": {"file_path": "point.h"}
+      "context": {
+        "file_path": "point.h"
+      }
     }
   ]
 }

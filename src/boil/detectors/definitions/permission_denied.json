@@ -7,16 +7,20 @@
   },
   "examples": [
     {
-      "name": "python_permission_denied",
+      "name": "py_permission_denied_denied",
       "input": "Permission denied: '/etc/passwd'",
       "clue_type": "py_permission_denied",
-      "context": {"file_path": "/etc/passwd"}
+      "context": {
+        "file_path": "/etc/passwd"
+      }
     },
     {
-      "name": "shell_permission_denied",
+      "name": "sh_permission_denied_denied",
       "input": "bash: /root/script.sh: Permission denied",
       "clue_type": "sh_permission_denied",
-      "context": {"file_path": "/root/script.sh"}
+      "context": {
+        "file_path": "/root/script.sh"
+      }
     }
   ]
 }

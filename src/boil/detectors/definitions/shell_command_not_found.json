@@ -7,16 +7,20 @@
   },
   "examples": [
     {
-      "name": "shell_no_such_file",
+      "name": "missing_file_file",
       "input": "bash: line 5: ./run.sh: No such file or directory",
       "clue_type": "missing_file",
-      "context": {"file_path": "run.sh"}
+      "context": {
+        "file_path": "run.sh"
+      }
     },
     {
-      "name": "shell_not_found",
+      "name": "missing_file_not_found_found",
       "input": "sh: 1: ./script: not found",
       "clue_type": "missing_file_not_found",
-      "context": {"file_path": "script"}
+      "context": {
+        "file_path": "script"
+      }
     }
   ]
 }

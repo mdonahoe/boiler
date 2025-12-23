@@ -7,7 +7,7 @@
   },
   "examples": [
     {
-      "name": "syntax_error_header",
+      "name": "c_syntax_error_in_header_header",
       "input": "include/api.h:15:1: error: expected ';' before 'typedef'",
       "clue_type": "c_syntax_error_in_header",
       "context": {
@@ -17,7 +17,7 @@
       }
     },
     {
-      "name": "syntax_error_source",
+      "name": "c_syntax_error_in_source_source",
       "input": "main.c:42:5: error: expected declaration before 'return'",
       "clue_type": "c_syntax_error_in_source",
       "context": {

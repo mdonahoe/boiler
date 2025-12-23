@@ -6,16 +6,20 @@
   },
   "examples": [
     {
-      "name": "cat_missing_makefile",
+      "name": "missing_file_makefile",
       "input": "cat: Makefile.in: No such file or directory",
       "clue_type": "missing_file",
-      "context": {"file_path": "Makefile.in"}
+      "context": {
+        "file_path": "Makefile.in"
+      }
     },
     {
-      "name": "cat_missing_config",
+      "name": "missing_file_config",
       "input": "cat: config.txt: No such file or directory",
       "clue_type": "missing_file",
-      "context": {"file_path": "config.txt"}
+      "context": {
+        "file_path": "config.txt"
+      }
     }
   ]
 }

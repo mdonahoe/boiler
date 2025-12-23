@@ -6,10 +6,12 @@
   },
   "examples": [
     {
-      "name": "shell_cannot_open",
+      "name": "missing_file_open",
       "input": "sh: 1: cannot open config.sh: No such file",
       "clue_type": "missing_file",
-      "context": {"file_path": "config.sh"}
+      "context": {
+        "file_path": "config.sh"
+      }
     }
   ]
 }

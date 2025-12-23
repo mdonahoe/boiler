@@ -7,7 +7,7 @@
   },
   "examples": [
     {
-      "name": "implicit_declaration_with_note",
+      "name": "missing_c_include_note",
       "input": "main.c:10:5: warning: implicit declaration of function 'printf' [-Wimplicit-function-declaration] note: include '<stdio.h>'",
       "clue_type": "missing_c_include",
       "context": {
@@ -17,7 +17,7 @@
       }
     },
     {
-      "name": "implicit_declaration_simple",
+      "name": "missing_c_function_simple",
       "input": "test.c:42:8: error: implicit declaration of function 'custom_func'",
       "clue_type": "missing_c_function",
       "context": {

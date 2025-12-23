@@ -6,10 +6,12 @@
   },
   "examples": [
     {
-      "name": "diff_missing_file",
+      "name": "missing_file_file",
       "input": "diff: expected.txt: No such file or directory",
       "clue_type": "missing_file",
-      "context": {"file_path": "expected.txt"}
+      "context": {
+        "file_path": "expected.txt"
+      }
     }
   ]
 }

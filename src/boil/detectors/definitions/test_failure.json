@@ -9,7 +9,7 @@
   },
   "examples": [
     {
-      "name": "python_test_failure",
+      "name": "test_failure_failure",
       "input": "File \"/path/to/test_dim.py\", line 235, in test_open_readme",
       "clue_type": "test_failure",
       "context": {
@@ -19,10 +19,12 @@
       }
     },
     {
-      "name": "assertion_with_filename",
+      "name": "test_assertion_with_filename_filename",
       "input": "AssertionError: 'hello_world.txt' not found",
       "clue_type": "test_assertion_with_filename",
-      "context": {"suspected_file": "hello_world.txt"}
+      "context": {
+        "suspected_file": "hello_world.txt"
+      }
     },
     {
       "name": "c_test_failure",
@@ -39,7 +41,9 @@
       "name": "test_docstring_with_missing_file",
       "input": "Test that dim can open README.md and display its first line.\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/tmp/test_dim.py\", line 235, in test_open_readme\n    self.assertIn(\"dim\", result.output)\nAssertionError: 'dim' not found in 'fopen: No such file or directory'",
       "clue_type": "test_docstring_with_missing_file",
-      "context": {"suspected_file": "README.md"}
+      "context": {
+        "suspected_file": "README.md"
+      }
     }
   ]
 }

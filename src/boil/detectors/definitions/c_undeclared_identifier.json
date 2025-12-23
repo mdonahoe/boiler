@@ -7,7 +7,7 @@
   },
   "examples": [
     {
-      "name": "undeclared_with_header_note",
+      "name": "missing_c_include_note",
       "input": "main.c:5:12: 'NULL' undeclared here (not in a function); note: 'NULL' is defined in header '<stddef.h>'",
       "clue_type": "missing_c_include",
       "context": {
@@ -16,7 +16,7 @@
       }
     },
     {
-      "name": "undeclared_first_use",
+      "name": "missing_c_function_use",
       "input": "test.c:20:10: error: 'my_var' undeclared (first use",
       "clue_type": "missing_c_function",
       "context": {

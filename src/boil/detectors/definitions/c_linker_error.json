@@ -7,22 +7,28 @@
   },
   "examples": [
     {
-      "name": "undefined_reference_backtick",
+      "name": "linker_undefined_symbols_backtick",
       "input": "undefined reference to `ts_parser_new'",
       "clue_type": "linker_undefined_symbols",
-      "context": {"symbol": "ts_parser_new"}
+      "context": {
+        "symbol": "ts_parser_new"
+      }
     },
     {
-      "name": "undefined_reference_quote",
+      "name": "linker_undefined_symbols_quote",
       "input": "tree_print.c:(.text+0x137): undefined reference to 'ts_node_start_byte'",
       "clue_type": "linker_undefined_symbols",
-      "context": {"symbol": "ts_node_start_byte"}
+      "context": {
+        "symbol": "ts_node_start_byte"
+      }
     },
     {
-      "name": "ld_cannot_find",
+      "name": "missing_file_find",
       "input": "/usr/bin/ld: cannot find exrecover.o: No such file or directory",
       "clue_type": "missing_file",
-      "context": {"file_path": "exrecover.o"}
+      "context": {
+        "file_path": "exrecover.o"
+      }
     }
   ]
 }

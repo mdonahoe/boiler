@@ -6,16 +6,20 @@
   },
   "examples": [
     {
-      "name": "cannot_open_single_quotes",
+      "name": "missing_file_quotes",
       "input": "Error: Cannot open file 'config.json'",
       "clue_type": "missing_file",
-      "context": {"file_path": "config.json"}
+      "context": {
+        "file_path": "config.json"
+      }
     },
     {
-      "name": "cannot_open_double_quotes",
+      "name": "missing_file_quotes",
       "input": "error Cannot open file \"main.py\"",
       "clue_type": "missing_file",
-      "context": {"file_path": "main.py"}
+      "context": {
+        "file_path": "main.py"
+      }
     }
   ]
 }

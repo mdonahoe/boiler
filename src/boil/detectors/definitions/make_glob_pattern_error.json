@@ -6,10 +6,12 @@
   },
   "examples": [
     {
-      "name": "make_glob_missing",
+      "name": "missing_file_missing",
       "input": "make: *** Makefile.inc: No such file or directory.  Stop.",
       "clue_type": "missing_file",
-      "context": {"file_path": "Makefile.inc"}
+      "context": {
+        "file_path": "Makefile.inc"
+      }
     }
   ]
 }

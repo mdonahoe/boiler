@@ -7,16 +7,20 @@
   },
   "examples": [
     {
-      "name": "python_file_not_found",
+      "name": "missing_file_found",
       "input": "FileNotFoundError: [Errno 2] No such file or directory: './test.sh'",
       "clue_type": "missing_file",
-      "context": {"file_path": "./test.sh"}
+      "context": {
+        "file_path": "./test.sh"
+      }
     },
     {
-      "name": "python_file_not_found_simple",
+      "name": "missing_file_simple_simple",
       "input": "FileNotFoundError: ./configure",
       "clue_type": "missing_file_simple",
-      "context": {"file_path": "./configure"}
+      "context": {
+        "file_path": "./configure"
+      }
     }
   ]
 }

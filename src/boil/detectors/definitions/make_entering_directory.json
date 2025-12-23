@@ -6,16 +6,20 @@
   },
   "examples": [
     {
-      "name": "make_entering_simple",
+      "name": "make_enter_directory_simple",
       "input": "make: Entering directory '/home/user/project'",
       "clue_type": "make_enter_directory",
-      "context": {"directory": "/home/user/project"}
+      "context": {
+        "directory": "/home/user/project"
+      }
     },
     {
-      "name": "make_entering_with_level",
+      "name": "make_enter_directory_level",
       "input": "make[1]: Entering directory '/tmp/build'",
       "clue_type": "make_enter_directory",
-      "context": {"directory": "/tmp/build"}
+      "context": {
+        "directory": "/tmp/build"
+      }
     }
   ]
 }

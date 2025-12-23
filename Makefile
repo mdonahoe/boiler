@@ -1,4 +1,4 @@
-.PHONY: all test check install uninstall clean
+.PHONY: all test test-python test-go check check-python check-go quick install uninstall clean
 
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
@@ -14,11 +14,21 @@ print-tree/tree_print:
 $(GOBIN): src/boil/**/*.go
 	cd src/boil && go build -ldflags "-X main.Version=$(VERSION)" -o ../../$(GOBIN) .
 
-test:
+test: test-python test-go
+
+test-python:
 	CHECK_MODE=1 python3 -m unittest discover -s tests -p "test*.py"
 
-check:
+test-go:
+	go test ./src/boil/...
+
+check: check-python check-go
+
+check-python:
 	CHECK_MODE=1 SKIP_SLOW_TESTS=1 python3 -m unittest discover -s tests -p "test*.py"
+
+check-go:
+	go test ./src/boil/...
 
 quick:
 	SKIP_SLOW_TESTS=1 python3 -m unittest discover -s tests -p "test*.py"
