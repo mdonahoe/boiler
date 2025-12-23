@@ -56,43 +56,67 @@ func getGitFileContent(file, ref string) (string, error) {
 	return string(output), nil
 }
 
-// containsFunctionDefinition checks if a C file contains a function definition
-// (not just a call) for the given symbol. Function definitions in C look like:
-//   ReturnType function_name(params) {
-// while function calls look like:
-//   result = function_name(args);
-func containsFunctionDefinition(content, symbol string) bool {
+// containsSymbolDefinition checks if a C file contains a definition (not just
+// a usage) for the given symbol. This handles both:
+//   1. Function definitions: ReturnType symbol(params) {
+//   2. Global variable definitions: Type symbol = value; or Type (*symbol)(...) = value;
+func containsSymbolDefinition(content, symbol string) bool {
 	lines := strings.Split(content, "\n")
 	for i, line := range lines {
-		// Skip lines that look like function calls (have = before the symbol)
-		eqIdx := strings.Index(line, "=")
 		symIdx := strings.Index(line, symbol)
 		if symIdx == -1 {
 			continue
 		}
-		// If there's an = before the symbol on the same line, it's likely a call
+
+		// Make sure it's a word boundary (not part of another identifier)
+		if symIdx > 0 {
+			prevChar := line[symIdx-1]
+			if (prevChar >= 'a' && prevChar <= 'z') || (prevChar >= 'A' && prevChar <= 'Z') || prevChar == '_' {
+				continue
+			}
+		}
+		if symIdx+len(symbol) < len(line) {
+			nextChar := line[symIdx+len(symbol)]
+			// Allow ( for functions, ) for function pointers like (*symbol), and space/= for variables
+			if (nextChar >= 'a' && nextChar <= 'z') || (nextChar >= 'A' && nextChar <= 'Z') || nextChar == '_' {
+				continue
+			}
+		}
+
+		eqIdx := strings.Index(line, "=")
+
+		// Case 1: = appears AFTER the symbol - likely a variable/function pointer definition
+		// e.g., "void *(*ts_current_malloc)(size_t) = ts_malloc_default;"
+		if eqIdx != -1 && eqIdx > symIdx {
+			return true
+		}
+
+		// Case 2: = appears BEFORE the symbol - likely a function call assignment, skip
 		if eqIdx != -1 && eqIdx < symIdx {
 			continue
 		}
-		// Check if symbol is followed by ( - could be definition or call
+
+		// Case 3: No = on line, check if it's a function definition
 		afterSym := line[symIdx+len(symbol):]
-		if !strings.HasPrefix(strings.TrimSpace(afterSym), "(") {
-			continue
-		}
-		// Look for { on this line or the next few lines (function definition)
-		// Function definitions have { after the parameter list
-		for j := i; j < len(lines) && j < i+5; j++ {
-			checkLine := lines[j]
-			if strings.Contains(checkLine, "{") {
-				// Make sure it's not inside a string or comment
-				// Simple check: { appears and it's likely a function body start
-				return true
-			}
-			// If we hit a semicolon, it's a declaration or call, not definition
-			if strings.Contains(checkLine, ";") && j > i {
-				break
+		trimmed := strings.TrimSpace(afterSym)
+		if strings.HasPrefix(trimmed, "(") {
+			// Look for { on this line or the next few lines (function definition)
+			for j := i; j < len(lines) && j < i+5; j++ {
+				checkLine := lines[j]
+				if strings.Contains(checkLine, "{") {
+					return true
+				}
+				// If we hit a semicolon on a later line, it's a declaration, not definition
+				if strings.Contains(checkLine, ";") && j > i {
+					break
+				}
 			}
 		}
 	}
 	return false
+}
+
+// containsFunctionDefinition is an alias for containsSymbolDefinition for backwards compatibility
+func containsFunctionDefinition(content, symbol string) bool {
+	return containsSymbolDefinition(content, symbol)
 }
