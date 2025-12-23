@@ -131,7 +131,7 @@ func Fix(command []string, numIterations int, allowLegacy bool) (bool, error) {
 		// Skipping for now since we're not implementing legacy handlers
 
 		if message == "" {
-			message = "failed to handle this type of error"
+			message = "pipeline did not produce a fix for this error"
 			exit = true
 		}
 
@@ -802,6 +802,6 @@ func HandleErrorFile(errorFile string, ref string) int {
 		return 0
 	}
 
-	fmt.Fprintln(os.Stderr, "failed to handle this type of error")
+	fmt.Fprintln(os.Stderr, "womp womp")
 	return 1
 }
