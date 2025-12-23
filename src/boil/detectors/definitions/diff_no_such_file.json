@@ -1,0 +1,15 @@
+{
+  "name": "DiffNoSuchFileDetector",
+  "priority": 100,
+  "patterns": {
+    "missing_file": "diff:\\s*(?P<file_path>[^\\s:]+):\\s*No such file or directory"
+  },
+  "examples": [
+    {
+      "name": "diff_missing_file",
+      "input": "diff: expected.txt: No such file or directory",
+      "clue_type": "missing_file",
+      "context": {"file_path": "expected.txt"}
+    }
+  ]
+}

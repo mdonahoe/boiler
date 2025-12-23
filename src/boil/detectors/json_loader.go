@@ -5,18 +5,20 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
+	"sort"
 
 	"github.com/mdonahoe/boiler/src/boil/pipeline"
 )
 
-//go:embed detectors.json
-var detectorsJSON embed.FS
+//go:embed definitions/*.json
+var detectorsFS embed.FS
 
 // DetectorDefinition represents a detector defined in JSON
 type DetectorDefinition struct {
-	Name     string              `json:"name"`
-	Priority int                 `json:"priority"`
-	Patterns map[string]string   `json:"patterns"`
+	Name     string               `json:"name"`
+	Priority int                  `json:"priority"`
+	Patterns map[string]string    `json:"patterns"`
 	Examples []DetectorExampleDef `json:"examples"`
 }
 
@@ -28,43 +30,52 @@ type DetectorExampleDef struct {
 	Context  map[string]string `json:"context"`
 }
 
-// DetectorsFile represents the JSON file structure
-type DetectorsFile struct {
-	Detectors []DetectorDefinition `json:"detectors"`
-}
-
 // JSONDetector wraps a BaseDetector loaded from JSON
 type JSONDetector struct {
 	*BaseDetector
 }
 
-// LoadDetectorsFromJSON loads all detectors from the embedded JSON file
+// LoadDetectorsFromJSON loads all detectors from the embedded JSON files in definitions/
 func LoadDetectorsFromJSON() ([]pipeline.Detector, error) {
-	data, err := detectorsJSON.ReadFile("detectors.json")
+	entries, err := detectorsFS.ReadDir("definitions")
 	if err != nil {
-		return nil, fmt.Errorf("failed to read embedded detectors.json: %w", err)
+		return nil, fmt.Errorf("failed to read definitions directory: %w", err)
 	}
 
-	return LoadDetectorsFromJSONBytes(data)
-}
-
-// LoadDetectorsFromJSONBytes loads detectors from JSON bytes
-func LoadDetectorsFromJSONBytes(data []byte) ([]pipeline.Detector, error) {
-	var file DetectorsFile
-	if err := json.Unmarshal(data, &file); err != nil {
-		return nil, fmt.Errorf("failed to parse detectors JSON: %w", err)
-	}
+	// Sort entries for consistent ordering
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Name() < entries[j].Name()
+	})
 
 	var detectors []pipeline.Detector
-	for _, def := range file.Detectors {
-		detector, err := createDetectorFromDefinition(def)
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+			continue
+		}
+
+		data, err := detectorsFS.ReadFile(filepath.Join("definitions", entry.Name()))
 		if err != nil {
-			return nil, fmt.Errorf("failed to create detector %s: %w", def.Name, err)
+			return nil, fmt.Errorf("failed to read %s: %w", entry.Name(), err)
+		}
+
+		detector, err := LoadDetectorFromJSONBytes(data)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load detector from %s: %w", entry.Name(), err)
 		}
 		detectors = append(detectors, detector)
 	}
 
 	return detectors, nil
+}
+
+// LoadDetectorFromJSONBytes loads a single detector from JSON bytes
+func LoadDetectorFromJSONBytes(data []byte) (pipeline.Detector, error) {
+	var def DetectorDefinition
+	if err := json.Unmarshal(data, &def); err != nil {
+		return nil, fmt.Errorf("failed to parse detector JSON: %w", err)
+	}
+
+	return createDetectorFromDefinition(def)
 }
 
 // createDetectorFromDefinition creates a BaseDetector from a JSON definition

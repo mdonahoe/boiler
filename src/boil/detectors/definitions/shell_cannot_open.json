@@ -1,0 +1,15 @@
+{
+  "name": "ShellCannotOpenDetector",
+  "priority": 100,
+  "patterns": {
+    "missing_file": "sh:\\s*\\d+:\\s*cannot open\\s+(?P<file_path>[^\\s:]+):\\s*No such file"
+  },
+  "examples": [
+    {
+      "name": "shell_cannot_open",
+      "input": "sh: 1: cannot open config.sh: No such file",
+      "clue_type": "missing_file",
+      "context": {"file_path": "config.sh"}
+    }
+  ]
+}

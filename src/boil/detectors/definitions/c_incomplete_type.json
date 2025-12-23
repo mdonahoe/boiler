@@ -1,0 +1,27 @@
+{
+  "name": "CIncompleteTypeDetector",
+  "priority": 100,
+  "patterns": {
+    "missing_c_include": "(?P<file_path>[a-zA-Z0-9_./\\-]+\\.c):\\d+:\\d+:[^\\n]*error:[^\\n]*(?:has incomplete type|storage size).*struct\\s+(?P<struct_name>termios|winsize|stat|tm|sigaction|dirent)"
+  },
+  "examples": [
+    {
+      "name": "incomplete_type_termios",
+      "input": "term.c:15:3: error: variable has incomplete type 'struct termios'",
+      "clue_type": "missing_c_include",
+      "context": {
+        "file_path": "term.c",
+        "struct_name": "termios"
+      }
+    },
+    {
+      "name": "storage_size_winsize",
+      "input": "window.c:8:12: error: storage size of 'ws' isn't known struct winsize",
+      "clue_type": "missing_c_include",
+      "context": {
+        "file_path": "window.c",
+        "struct_name": "winsize"
+      }
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "name": "CatNoSuchFileDetector",
+  "priority": 100,
+  "patterns": {
+    "missing_file": "cat:\\s*(?P<file_path>[^\\s:]+):\\s*No such file or directory"
+  },
+  "examples": [
+    {
+      "name": "cat_missing_makefile",
+      "input": "cat: Makefile.in: No such file or directory",
+      "clue_type": "missing_file",
+      "context": {"file_path": "Makefile.in"}
+    },
+    {
+      "name": "cat_missing_config",
+      "input": "cat: config.txt: No such file or directory",
+      "clue_type": "missing_file",
+      "context": {"file_path": "config.txt"}
+    }
+  ]
+}

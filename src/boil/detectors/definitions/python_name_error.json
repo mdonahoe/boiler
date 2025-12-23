@@ -1,0 +1,19 @@
+{
+  "name": "PythonNameErrorDetector",
+  "priority": 100,
+  "patterns": {
+    "python_name_error": "File \"(?P<file_path>[^\"]+\\.py)\", line (?P<line_number>\\d+),.*?NameError: (?:global )?name '(?P<undefined_name>\\w+)' is not defined"
+  },
+  "examples": [
+    {
+      "name": "python_name_error",
+      "input": "File \"test.py\", line 10, in main NameError: name 'undefined_var' is not defined",
+      "clue_type": "python_name_error",
+      "context": {
+        "file_path": "test.py",
+        "line_number": "10",
+        "undefined_name": "undefined_var"
+      }
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "name": "MakeEnteringDirectoryDetector",
+  "priority": 100,
+  "patterns": {
+    "make_enter_directory": "make(?:\\[\\d+\\])?: Entering directory '(?P<directory>[^']+)'"
+  },
+  "examples": [
+    {
+      "name": "make_entering_simple",
+      "input": "make: Entering directory '/home/user/project'",
+      "clue_type": "make_enter_directory",
+      "context": {"directory": "/home/user/project"}
+    },
+    {
+      "name": "make_entering_with_level",
+      "input": "make[1]: Entering directory '/tmp/build'",
+      "clue_type": "make_enter_directory",
+      "context": {"directory": "/tmp/build"}
+    }
+  ]
+}

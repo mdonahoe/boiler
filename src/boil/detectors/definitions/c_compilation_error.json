@@ -1,0 +1,21 @@
+{
+  "name": "CCompilationErrorDetector",
+  "priority": 100,
+  "patterns": {
+    "missing_file": "fatal error:\\s+\\.?/?(?P<file_path>[^\\s:]+):\\s+No such file or directory"
+  },
+  "examples": [
+    {
+      "name": "fatal_error_header",
+      "input": "/tmp/ex_bar.c:82:10: fatal error: ex.h: No such file or directory",
+      "clue_type": "missing_file",
+      "context": {"file_path": "ex.h"}
+    },
+    {
+      "name": "fatal_error_relative_path",
+      "input": "lib/src/node.c:2:10: fatal error: ./point.h: No such file or directory",
+      "clue_type": "missing_file",
+      "context": {"file_path": "point.h"}
+    }
+  ]
+}

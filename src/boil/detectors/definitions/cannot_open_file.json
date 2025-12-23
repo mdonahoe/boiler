@@ -1,0 +1,21 @@
+{
+  "name": "CannotOpenFileDetector",
+  "priority": 100,
+  "patterns": {
+    "missing_file": "[Ee]rror:?\\s+Cannot open file\\s+['\"](?P<file_path>[^'\"]+)['\"]"
+  },
+  "examples": [
+    {
+      "name": "cannot_open_single_quotes",
+      "input": "Error: Cannot open file 'config.json'",
+      "clue_type": "missing_file",
+      "context": {"file_path": "config.json"}
+    },
+    {
+      "name": "cannot_open_double_quotes",
+      "input": "error Cannot open file \"main.py\"",
+      "clue_type": "missing_file",
+      "context": {"file_path": "main.py"}
+    }
+  ]
+}

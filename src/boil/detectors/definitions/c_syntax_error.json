@@ -1,0 +1,30 @@
+{
+  "name": "CSyntaxErrorDetector",
+  "priority": 100,
+  "patterns": {
+    "c_syntax_error_in_header": "(?P<file_path>[^\\s:]+\\.h):(?P<line_number>\\d+):\\d+:\\s+error:\\s+expected\\s+.+?\\s+before\\s+[''](?P<unexpected_token>[^'']+)['']",
+    "c_syntax_error_in_source": "(?P<file_path>[^\\s:]+\\.c):(?P<line_number>\\d+):\\d+:\\s+error:\\s+expected\\s+.+?\\s+before\\s+[''](?P<unexpected_token>[^'']+)['']"
+  },
+  "examples": [
+    {
+      "name": "syntax_error_header",
+      "input": "include/api.h:15:1: error: expected ';' before 'typedef'",
+      "clue_type": "c_syntax_error_in_header",
+      "context": {
+        "file_path": "include/api.h",
+        "line_number": "15",
+        "unexpected_token": "typedef"
+      }
+    },
+    {
+      "name": "syntax_error_source",
+      "input": "main.c:42:5: error: expected declaration before 'return'",
+      "clue_type": "c_syntax_error_in_source",
+      "context": {
+        "file_path": "main.c",
+        "line_number": "42",
+        "unexpected_token": "return"
+      }
+    }
+  ]
+}

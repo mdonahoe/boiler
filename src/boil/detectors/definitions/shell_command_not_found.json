@@ -1,0 +1,22 @@
+{
+  "name": "ShellCommandNotFoundDetector",
+  "priority": 100,
+  "patterns": {
+    "missing_file": ":\\s*line\\s+\\d+:\\s*\\.?/?(?P<file_path>[^\\s:]+):\\s*No such file or directory",
+    "missing_file_not_found": ":\\s*\\d+:\\s*\\.?/?(?P<file_path>[^\\s:]+):\\s*not found"
+  },
+  "examples": [
+    {
+      "name": "shell_no_such_file",
+      "input": "bash: line 5: ./run.sh: No such file or directory",
+      "clue_type": "missing_file",
+      "context": {"file_path": "run.sh"}
+    },
+    {
+      "name": "shell_not_found",
+      "input": "sh: 1: ./script: not found",
+      "clue_type": "missing_file_not_found",
+      "context": {"file_path": "script"}
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "name": "CLinkerErrorDetector",
+  "priority": 100,
+  "patterns": {
+    "linker_undefined_symbols": "undefined reference to [`'](?P<symbol>[^'`]+)[`']",
+    "missing_file": "/usr/bin/ld:.*?cannot find\\s+(?P<file_path>[^\\s:]+):\\s+No such file or directory"
+  },
+  "examples": [
+    {
+      "name": "undefined_reference_backtick",
+      "input": "undefined reference to `ts_parser_new'",
+      "clue_type": "linker_undefined_symbols",
+      "context": {"symbol": "ts_parser_new"}
+    },
+    {
+      "name": "undefined_reference_quote",
+      "input": "tree_print.c:(.text+0x137): undefined reference to 'ts_node_start_byte'",
+      "clue_type": "linker_undefined_symbols",
+      "context": {"symbol": "ts_node_start_byte"}
+    },
+    {
+      "name": "ld_cannot_find",
+      "input": "/usr/bin/ld: cannot find exrecover.o: No such file or directory",
+      "clue_type": "missing_file",
+      "context": {"file_path": "exrecover.o"}
+    }
+  ]
+}

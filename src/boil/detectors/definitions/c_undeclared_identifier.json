@@ -1,0 +1,29 @@
+{
+  "name": "CUndeclaredIdentifierDetector",
+  "priority": 100,
+  "patterns": {
+    "missing_c_include": "(?P<file_path>[a-zA-Z0-9_./\\-]+\\.c):\\d+:\\d+:[^\\n]*undeclared.*note:.*is defined in header\\s+['']<(?P<suggested_include>[^>]+)>['']",
+    "missing_c_function": "(?P<file_path>[a-zA-Z0-9_./\\-]+\\.c):(?P<line_number>\\d+):\\d+:\\s+error:\\s+[''](?P<identifier>[^'']+)['']\\s+undeclared\\s+\\(first use"
+  },
+  "examples": [
+    {
+      "name": "undeclared_with_header_note",
+      "input": "main.c:5:12: 'NULL' undeclared here (not in a function); note: 'NULL' is defined in header '<stddef.h>'",
+      "clue_type": "missing_c_include",
+      "context": {
+        "file_path": "main.c",
+        "suggested_include": "stddef.h"
+      }
+    },
+    {
+      "name": "undeclared_first_use",
+      "input": "test.c:20:10: error: 'my_var' undeclared (first use",
+      "clue_type": "missing_c_function",
+      "context": {
+        "file_path": "test.c",
+        "line_number": "20",
+        "identifier": "my_var"
+      }
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "name": "CImplicitDeclarationDetector",
+  "priority": 100,
+  "patterns": {
+    "missing_c_include": "(?P<file_path>[a-zA-Z0-9_./\\-]+\\.c):\\d+:\\d+:\\s+(?:error|warning):\\s+implicit declaration of function\\s+[''](?P<function_name>[^'']+)[''].*?note:\\s+include\\s+['']<(?P<suggested_include>[^>]+)>['']",
+    "missing_c_function": "(?P<file_path>[a-zA-Z0-9_./\\-]+\\.c):(?P<line_number>\\d+):\\d+:\\s+(?:error|warning):\\s+implicit declaration of function\\s+[''](?P<function_name>[^'']+)['']"
+  },
+  "examples": [
+    {
+      "name": "implicit_declaration_with_note",
+      "input": "main.c:10:5: warning: implicit declaration of function 'printf' [-Wimplicit-function-declaration] note: include '<stdio.h>'",
+      "clue_type": "missing_c_include",
+      "context": {
+        "file_path": "main.c",
+        "function_name": "printf",
+        "suggested_include": "stdio.h"
+      }
+    },
+    {
+      "name": "implicit_declaration_simple",
+      "input": "test.c:42:8: error: implicit declaration of function 'custom_func'",
+      "clue_type": "missing_c_function",
+      "context": {
+        "file_path": "test.c",
+        "line_number": "42",
+        "function_name": "custom_func"
+      }
+    }
+  ]
+}

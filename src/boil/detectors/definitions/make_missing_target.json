@@ -1,0 +1,18 @@
+{
+  "name": "MakeMissingTargetDetector",
+  "priority": 100,
+  "patterns": {
+    "make_missing_target": "No rule to make target '(?P<target>[^']+)', needed by '(?P<needed_by>[^']+)'"
+  },
+  "examples": [
+    {
+      "name": "make_missing_target",
+      "input": "No rule to make target 'utils.o', needed by 'main'",
+      "clue_type": "make_missing_target",
+      "context": {
+        "target": "utils.o",
+        "needed_by": "main"
+      }
+    }
+  ]
+}

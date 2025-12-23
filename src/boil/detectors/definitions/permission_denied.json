@@ -1,0 +1,22 @@
+{
+  "name": "PermissionDeniedDetector",
+  "priority": 100,
+  "patterns": {
+    "py_permission_denied": "Permission denied:\\s*['\"]?(?P<file_path>[^'\"]+)['\"]?",
+    "sh_permission_denied": ":\\s*(?P<file_path>[^:]+):\\s*Permission denied"
+  },
+  "examples": [
+    {
+      "name": "python_permission_denied",
+      "input": "Permission denied: '/etc/passwd'",
+      "clue_type": "py_permission_denied",
+      "context": {"file_path": "/etc/passwd"}
+    },
+    {
+      "name": "shell_permission_denied",
+      "input": "bash: /root/script.sh: Permission denied",
+      "clue_type": "sh_permission_denied",
+      "context": {"file_path": "/root/script.sh"}
+    }
+  ]
+}
