@@ -246,24 +246,236 @@ This gives AI agents a familiar Python-ish syntax while keeping boil as a single
 
 ## Built-in Functions for Starlark Planners
 
-Provide these as Starlark built-ins:
+Starlark is sandboxed - no filesystem/network access by default. We expose these built-ins:
+
+### Core API
 
 ```python
-# Git operations
-git_grep(pattern, ref="HEAD")  -> [(file, line_num, content), ...]
-git_show(path, ref="HEAD")     -> str
-git_log(path, n=10)            -> [commit_info, ...]
+# Git operations (read-only, safe)
+git_show(path, ref="HEAD")     # Read file content from git history
+git_grep(pattern, ref="HEAD")  # Search git history, returns [(file, line, content), ...]
 
-# File operations
-read_file(path)                -> str or None
-file_exists(path)              -> bool
-list_dir(path)                 -> [filename, ...]
+# Working directory (read-only)
+file_exists(path)              # Check if file exists in working dir
+read_file(path)                # Read file from working dir (or None if missing)
+list_dir(path)                 # List directory contents
 
 # Utility
-regex_match(pattern, text)     -> {groups...} or None
-path_join(*parts)              -> str
-path_basename(path)            -> str
-path_dirname(path)             -> str
+regex_match(pattern, text)     # Returns {"groups": {...}} or None
+regex_find_all(pattern, text)  # Returns [{"groups": {...}}, ...]
+path_join(*parts)              # Join path components
+path_basename(path)            # Get filename from path
+path_dirname(path)             # Get directory from path
+path_ext(path)                 # Get extension (e.g., ".c")
+
+# Logging (for debugging)
+log(message)                   # Print to verbose output
+```
+
+### Go Implementation
+
+```go
+// src/boil/planners/starlark_builtins.go
+package planners
+
+import (
+    "fmt"
+    "os"
+    "os/exec"
+    "path/filepath"
+    "regexp"
+    "strings"
+
+    "go.starlark.net/starlark"
+    "go.starlark.net/starlarkstruct"
+)
+
+// MakeBuiltins creates the predeclared built-in functions for Starlark planners
+func MakeBuiltins(gitRef string) starlark.StringDict {
+    return starlark.StringDict{
+        "git_show":       starlark.NewBuiltin("git_show", gitShowBuiltin(gitRef)),
+        "git_grep":       starlark.NewBuiltin("git_grep", gitGrepBuiltin(gitRef)),
+        "file_exists":    starlark.NewBuiltin("file_exists", fileExistsBuiltin),
+        "read_file":      starlark.NewBuiltin("read_file", readFileBuiltin),
+        "list_dir":       starlark.NewBuiltin("list_dir", listDirBuiltin),
+        "regex_match":    starlark.NewBuiltin("regex_match", regexMatchBuiltin),
+        "regex_find_all": starlark.NewBuiltin("regex_find_all", regexFindAllBuiltin),
+        "path_join":      starlark.NewBuiltin("path_join", pathJoinBuiltin),
+        "path_basename":  starlark.NewBuiltin("path_basename", pathBasenameBuiltin),
+        "path_dirname":   starlark.NewBuiltin("path_dirname", pathDirnameBuiltin),
+        "path_ext":       starlark.NewBuiltin("path_ext", pathExtBuiltin),
+        "log":            starlark.NewBuiltin("log", logBuiltin),
+    }
+}
+
+// git_show(path, ref="HEAD") -> str or None
+func gitShowBuiltin(defaultRef string) func(*starlark.Thread, *starlark.Builtin, starlark.Tuple, []starlark.Tuple) (starlark.Value, error) {
+    return func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+        var path string
+        ref := defaultRef
+        if err := starlark.UnpackArgs(b.Name(), args, kwargs, "path", &path, "ref?", &ref); err != nil {
+            return nil, err
+        }
+
+        cmd := exec.Command("git", "show", fmt.Sprintf("%s:%s", ref, path))
+        output, err := cmd.Output()
+        if err != nil {
+            return starlark.None, nil // File not found in git
+        }
+        return starlark.String(output), nil
+    }
+}
+
+// git_grep(pattern, ref="HEAD") -> [(file, line_num, content), ...]
+func gitGrepBuiltin(defaultRef string) func(*starlark.Thread, *starlark.Builtin, starlark.Tuple, []starlark.Tuple) (starlark.Value, error) {
+    return func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+        var pattern string
+        ref := defaultRef
+        if err := starlark.UnpackArgs(b.Name(), args, kwargs, "pattern", &pattern, "ref?", &ref); err != nil {
+            return nil, err
+        }
+
+        cmd := exec.Command("git", "grep", "-n", pattern, ref)
+        output, _ := cmd.Output() // Ignore error (no matches = empty)
+
+        var results []starlark.Value
+        for _, line := range strings.Split(string(output), "\n") {
+            if line == "" {
+                continue
+            }
+            // Format: ref:file:linenum:content
+            parts := strings.SplitN(line, ":", 4)
+            if len(parts) >= 4 {
+                lineNum, _ := strconv.Atoi(parts[2])
+                results = append(results, starlark.Tuple{
+                    starlark.String(parts[1]),        // file
+                    starlark.MakeInt(lineNum),        // line_num
+                    starlark.String(parts[3]),        // content
+                })
+            }
+        }
+        return starlark.NewList(results), nil
+    }
+}
+
+// file_exists(path) -> bool
+func fileExistsBuiltin(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+    var path string
+    if err := starlark.UnpackArgs(b.Name(), args, kwargs, "path", &path); err != nil {
+        return nil, err
+    }
+    _, err := os.Stat(path)
+    return starlark.Bool(err == nil), nil
+}
+
+// read_file(path) -> str or None
+func readFileBuiltin(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+    var path string
+    if err := starlark.UnpackArgs(b.Name(), args, kwargs, "path", &path); err != nil {
+        return nil, err
+    }
+    content, err := os.ReadFile(path)
+    if err != nil {
+        return starlark.None, nil
+    }
+    return starlark.String(content), nil
+}
+
+// regex_match(pattern, text) -> {"groups": {...}} or None
+func regexMatchBuiltin(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+    var pattern, text string
+    if err := starlark.UnpackArgs(b.Name(), args, kwargs, "pattern", &pattern, "text", &text); err != nil {
+        return nil, err
+    }
+
+    re, err := regexp.Compile(pattern)
+    if err != nil {
+        return nil, fmt.Errorf("invalid regex: %v", err)
+    }
+
+    match := re.FindStringSubmatch(text)
+    if match == nil {
+        return starlark.None, nil
+    }
+
+    // Build groups dict from named captures
+    groups := starlark.NewDict(len(re.SubexpNames()))
+    for i, name := range re.SubexpNames() {
+        if name != "" && i < len(match) {
+            groups.SetKey(starlark.String(name), starlark.String(match[i]))
+        }
+    }
+
+    return starlarkstruct.FromStringDict(starlark.String("match"), starlark.StringDict{
+        "groups": groups,
+        "full":   starlark.String(match[0]),
+    }), nil
+}
+```
+
+### Example: Complex Planner in Starlark
+
+```python
+# .boil/plugins/planners/linker_symbols.star
+# Handles linker undefined symbol errors by finding which deleted file defines them
+
+def name():
+    return "LinkerSymbolsPlugin"
+
+def can_handle(clue_type):
+    return clue_type == "linker_undefined_symbols"
+
+def plan(clues, git_state):
+    # Collect all undefined symbols
+    symbols = []
+    for clue in clues:
+        if clue["clue_type"] == "linker_undefined_symbols":
+            sym = clue["context"].get("symbol", "")
+            if sym:
+                symbols.append(sym)
+
+    if not symbols:
+        return []
+
+    # Score each deleted .c file by how many symbols it defines
+    scores = []
+    for deleted in git_state["deleted_files"]:
+        if not deleted.endswith(".c"):
+            continue
+
+        content = git_show(deleted, git_state["ref"])
+        if not content:
+            continue
+
+        score = 0
+        for sym in symbols:
+            if contains_definition(content, sym):
+                score += 1
+
+        if score > 0:
+            scores.append({"file": deleted, "score": score})
+
+    if not scores:
+        return []
+
+    # Sort by score descending, restore highest
+    scores = sorted(scores, key=lambda x: -x["score"])
+    best = scores[0]
+
+    return [{
+        "plan_type": "restore_file",
+        "priority": 0,
+        "target_file": best["file"],
+        "action": "restore_full",
+        "params": {"ref": git_state["ref"]},
+        "reason": "Restore %s (defines %d symbols)" % (best["file"], best["score"]),
+    }]
+
+def contains_definition(content, symbol):
+    """Check if content contains a function/variable definition for symbol."""
+    # Simple heuristic: symbol followed by ( and later {
+    pattern = symbol + r"\s*\([^)]*\)\s*\{"
+    return regex_match(pattern, content) != None
 ```
 
 ## Testing Plan
