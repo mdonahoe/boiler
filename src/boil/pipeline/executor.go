@@ -59,18 +59,16 @@ func (r *ExecutorRegistry) ExecutePlans(plans []*RepairPlan) (*RepairResult, err
 		// Find executor that can handle this action
 		executor := r.findExecutor(plan.Action)
 		if executor == nil {
-			if verbose {
-				fmt.Printf("[Executor] No executor found for action: %s\n", plan.Action)
-			}
+			// Always log when no executor found - this is likely a bug
+			fmt.Printf("[Executor] No executor found for action: %s (target: %s)\n", plan.Action, plan.TargetFile)
 			continue
 		}
 
 		// Validate plan
 		isValid, errorMsg := executor.ValidatePlan(plan)
 		if !isValid {
-			if verbose {
-				fmt.Printf("[Executor:%s] Plan validation failed: %s\n", executor.Name(), errorMsg)
-			}
+			// Always log validation failures - helps debug permission issues etc.
+			fmt.Printf("[Executor:%s] Plan validation failed for %s: %s\n", executor.Name(), plan.TargetFile, errorMsg)
 			continue
 		}
 
@@ -81,9 +79,8 @@ func (r *ExecutorRegistry) ExecutePlans(plans []*RepairPlan) (*RepairResult, err
 
 		result, err := executor.Execute(plan)
 		if err != nil {
-			if verbose {
-				fmt.Printf("[Executor:%s] Exception: %v\n", executor.Name(), err)
-			}
+			// Always log execution errors
+			fmt.Printf("[Executor:%s] Execution error for %s: %v\n", executor.Name(), plan.TargetFile, err)
 			// Continue with next plan
 			continue
 		}
@@ -101,9 +98,8 @@ func (r *ExecutorRegistry) ExecutePlans(plans []*RepairPlan) (*RepairResult, err
 			}, nil
 		}
 
-		if verbose {
-			fmt.Printf("[Executor:%s] Failed: %s\n", executor.Name(), result.ErrorMessage)
-		}
+		// Always log execution failures - helps debug permission issues etc.
+		fmt.Printf("[Executor:%s] Failed for %s: %s\n", executor.Name(), plan.TargetFile, result.ErrorMessage)
 	}
 
 	// All plans failed
