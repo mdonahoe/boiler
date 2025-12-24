@@ -416,10 +416,6 @@ def run_with_pty(command, input_tokens, delay_ms=10, timeout=5.0, rows=24, cols=
         exit_code=exit_code
     )
 
-def unused_method():
-    "this can be deleted"
-    pass
-
 def main():
     parser = argparse.ArgumentParser(
         description='Test interactive TTY programs non-interactively',
