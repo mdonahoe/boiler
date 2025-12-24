@@ -27,16 +27,16 @@ uname -v = #71-Ubuntu SMP PREEMPT_DYNAMIC Tue Jul 22 16:52:38 UTC 2025
 /usr/bin/oslevel       = unknown
 /bin/universe          = unknown
 
-PATH: /root/go/bin/
-PATH: /root/.local/bin/
-PATH: /root/.nvm/versions/node/v24.11.1/bin/
-PATH: /root/.cargo/bin/
+PATH: /home/bot/.local/bin/
 PATH: /usr/local/sbin/
 PATH: /usr/local/bin/
 PATH: /usr/sbin/
 PATH: /usr/bin/
 PATH: /sbin/
 PATH: /bin/
+PATH: /usr/games/
+PATH: /usr/local/games/
+PATH: /snap/bin/
 
 
 ## ----------- ##
@@ -1047,8 +1047,8 @@ configure:8580: $? = 0
 configure:8580: result: yes
 configure:8580: checking for fpurge
 configure:8580: gcc -o conftest -g -O2   conftest.c  >&5
-/usr/bin/ld: /tmp/cc9N2F6Z.o: in function `main':
-/root/boiler/example_repos/bash/before/conftest.c:110:(.text.startup+0xb): undefined reference to `fpurge'
+/usr/bin/ld: /tmp/ccJ3zNrP.o: in function `main':
+/home/bot/boiler/example_repos/bash/before/conftest.c:110:(.text.startup+0xb): undefined reference to `fpurge'
 collect2: error: ld returned 1 exit status
 configure:8580: $? = 1
 configure: failed program was:
@@ -2214,8 +2214,8 @@ configure:12750: checking for Solaris 11.4 locale system
 configure:12785: result: no
 configure:12798: checking for getlocalename_l
 configure:12798: gcc -o conftest -g -O2   conftest.c  >&5
-/usr/bin/ld: /tmp/ccI3s9VB.o: in function `main':
-/root/boiler/example_repos/bash/before/conftest.c:154:(.text.startup+0xb): undefined reference to `getlocalename_l'
+/usr/bin/ld: /tmp/ccofZPcK.o: in function `main':
+/home/bot/boiler/example_repos/bash/before/conftest.c:154:(.text.startup+0xb): undefined reference to `getlocalename_l'
 collect2: error: ld returned 1 exit status
 configure:12798: $? = 1
 configure: failed program was:
@@ -4896,8 +4896,8 @@ configure:15159: $? = 0
 configure:15170: result: yes
 configure:15222: checking for __setostype
 configure:15222: gcc -o conftest -g -O2   conftest.c  >&5
-/usr/bin/ld: /tmp/cc3Vizyl.o: in function `main':
-/root/boiler/example_repos/bash/before/conftest.c:223:(.text.startup+0xb): undefined reference to `__setostype'
+/usr/bin/ld: /tmp/cc47wCBk.o: in function `main':
+/home/bot/boiler/example_repos/bash/before/conftest.c:223:(.text.startup+0xb): undefined reference to `__setostype'
 collect2: error: ld returned 1 exit status
 configure:15222: $? = 1
 configure: failed program was:
@@ -5216,8 +5216,8 @@ configure:15362: $? = 0
 configure:15362: result: yes
 configure:15368: checking for setdtablesize
 configure:15368: gcc -o conftest -g -O2   conftest.c  >&5
-/usr/bin/ld: /tmp/ccTzViIg.o: in function `main':
-/root/boiler/example_repos/bash/before/conftest.c:245:(.text.startup+0xb): undefined reference to `setdtablesize'
+/usr/bin/ld: /tmp/ccAanrNL.o: in function `main':
+/home/bot/boiler/example_repos/bash/before/conftest.c:245:(.text.startup+0xb): undefined reference to `setdtablesize'
 collect2: error: ld returned 1 exit status
 configure:15368: $? = 1
 configure: failed program was:
@@ -5626,8 +5626,8 @@ configure:15588: $? = 0
 configure:15588: result: yes
 configure:15594: checking for tcgetwinsize
 configure:15594: gcc -o conftest -g -O2   conftest.c  >&5
-/usr/bin/ld: /tmp/cclI5Rc9.o: in function `main':
-/root/boiler/example_repos/bash/before/conftest.c:280:(.text.startup+0xb): undefined reference to `tcgetwinsize'
+/usr/bin/ld: /tmp/ccnllELi.o: in function `main':
+/home/bot/boiler/example_repos/bash/before/conftest.c:280:(.text.startup+0xb): undefined reference to `tcgetwinsize'
 collect2: error: ld returned 1 exit status
 configure:15594: $? = 1
 configure: failed program was:
@@ -5917,8 +5917,8 @@ configure: failed program was:
 configure:15594: result: no
 configure:15600: checking for tcsetwinsize
 configure:15600: gcc -o conftest -g -O2   conftest.c  >&5
-/usr/bin/ld: /tmp/ccydsQII.o: in function `main':
-/root/boiler/example_repos/bash/before/conftest.c:280:(.text.startup+0xb): undefined reference to `tcsetwinsize'
+/usr/bin/ld: /tmp/cc1krl4T.o: in function `main':
+/home/bot/boiler/example_repos/bash/before/conftest.c:280:(.text.startup+0xb): undefined reference to `tcsetwinsize'
 collect2: error: ld returned 1 exit status
 configure:15600: $? = 1
 configure: failed program was:
@@ -6323,8 +6323,8 @@ configure:15735: $? = 0
 configure:15735: result: yes
 configure:15741: checking for shm_mkstemp
 configure:15741: gcc -o conftest -g -O2   conftest.c  >&5
-/usr/bin/ld: /tmp/ccZvqCr4.o: in function `main':
-/root/boiler/example_repos/bash/before/conftest.c:301:(.text.startup+0xb): undefined reference to `shm_mkstemp'
+/usr/bin/ld: /tmp/ccMqEw11.o: in function `main':
+/home/bot/boiler/example_repos/bash/before/conftest.c:301:(.text.startup+0xb): undefined reference to `shm_mkstemp'
 collect2: error: ld returned 1 exit status
 configure:15741: $? = 1
 configure: failed program was:
@@ -7177,8 +7177,8 @@ configure:16648: $? = 0
 configure:16648: result: yes
 configure:16654: checking for locale_charset
 configure:16654: gcc -o conftest -g -O2   conftest.c  >&5
-/usr/bin/ld: /tmp/ccnGrgFB.o: in function `main':
-/root/boiler/example_repos/bash/before/conftest.c:347:(.text.startup+0xb): undefined reference to `locale_charset'
+/usr/bin/ld: /tmp/cc5wFnQU.o: in function `main':
+/home/bot/boiler/example_repos/bash/before/conftest.c:347:(.text.startup+0xb): undefined reference to `locale_charset'
 collect2: error: ld returned 1 exit status
 configure:16654: $? = 1
 configure: failed program was:
@@ -7934,8 +7934,8 @@ configure:16737: $? = 0
 configure:16737: result: yes
 configure:16744: checking for mbscasecmp
 configure:16744: gcc -o conftest -g -O2   conftest.c  >&5
-/usr/bin/ld: /tmp/ccdTRqX5.o: in function `main':
-/root/boiler/example_repos/bash/before/conftest.c:356:(.text.startup+0xb): undefined reference to `mbscasecmp'
+/usr/bin/ld: /tmp/cc8Tr0lJ.o: in function `main':
+/home/bot/boiler/example_repos/bash/before/conftest.c:356:(.text.startup+0xb): undefined reference to `mbscasecmp'
 collect2: error: ld returned 1 exit status
 configure:16744: $? = 1
 configure: failed program was:
@@ -8301,8 +8301,8 @@ configure: failed program was:
 configure:16744: result: no
 configure:16751: checking for mbscmp
 configure:16751: gcc -o conftest -g -O2   conftest.c  >&5
-/usr/bin/ld: /tmp/ccymE9gS.o: in function `main':
-/root/boiler/example_repos/bash/before/conftest.c:356:(.text.startup+0xb): undefined reference to `mbscmp'
+/usr/bin/ld: /tmp/ccW2roxB.o: in function `main':
+/home/bot/boiler/example_repos/bash/before/conftest.c:356:(.text.startup+0xb): undefined reference to `mbscmp'
 collect2: error: ld returned 1 exit status
 configure:16751: $? = 1
 configure: failed program was:
@@ -8668,8 +8668,8 @@ configure: failed program was:
 configure:16751: result: no
 configure:16758: checking for mbsncmp
 configure:16758: gcc -o conftest -g -O2   conftest.c  >&5
-/usr/bin/ld: /tmp/ccL2T2lu.o: in function `main':
-/root/boiler/example_repos/bash/before/conftest.c:356:(.text.startup+0xb): undefined reference to `mbsncmp'
+/usr/bin/ld: /tmp/ccRD2ccX.o: in function `main':
+/home/bot/boiler/example_repos/bash/before/conftest.c:356:(.text.startup+0xb): undefined reference to `mbsncmp'
 collect2: error: ld returned 1 exit status
 configure:16758: $? = 1
 configure: failed program was:
@@ -9043,8 +9043,8 @@ configure:16772: $? = 0
 configure:16772: result: yes
 configure:16780: checking for mbschr
 configure:16780: gcc -o conftest -g -O2   conftest.c  >&5
-/usr/bin/ld: /tmp/ccjz2UGx.o: in function `main':
-/root/boiler/example_repos/bash/before/conftest.c:358:(.text.startup+0xb): undefined reference to `mbschr'
+/usr/bin/ld: /tmp/cctaj2by.o: in function `main':
+/home/bot/boiler/example_repos/bash/before/conftest.c:358:(.text.startup+0xb): undefined reference to `mbschr'
 collect2: error: ld returned 1 exit status
 configure:16780: $? = 1
 configure: failed program was:
@@ -15674,9 +15674,9 @@ configure: failed program was:
 configure:18969: result: no
 configure:18986: checking for sys_siglist in system C library
 configure:19019: gcc -o conftest -g -O2   conftest.c -ldl  >&5
-/usr/bin/ld: /tmp/ccOMYkDB.o: warning: relocation against `sys_siglist' in read-only section `.text.startup'
-/usr/bin/ld: /tmp/ccOMYkDB.o: in function `main':
-/root/boiler/example_repos/bash/before/conftest.c:389:(.text.startup+0xf): undefined reference to `sys_siglist'
+/usr/bin/ld: /tmp/ccjgbxte.o: warning: relocation against `sys_siglist' in read-only section `.text.startup'
+/usr/bin/ld: /tmp/ccjgbxte.o: in function `main':
+/home/bot/boiler/example_repos/bash/before/conftest.c:389:(.text.startup+0xf): undefined reference to `sys_siglist'
 /usr/bin/ld: warning: creating DT_TEXTREL in a PIE
 collect2: error: ld returned 1 exit status
 configure:19019: $? = 1
@@ -16473,9 +16473,9 @@ configure: failed program was:
 configure:19068: result: no
 configure:19076: checking for _sys_siglist in system C library
 configure:19109: gcc -o conftest -g -O2   conftest.c -ldl  >&5
-/usr/bin/ld: /tmp/ccJ947oE.o: warning: relocation against `_sys_siglist' in read-only section `.text.startup'
-/usr/bin/ld: /tmp/ccJ947oE.o: in function `main':
-/root/boiler/example_repos/bash/before/conftest.c:389:(.text.startup+0xf): undefined reference to `_sys_siglist'
+/usr/bin/ld: /tmp/ccu35dkO.o: warning: relocation against `_sys_siglist' in read-only section `.text.startup'
+/usr/bin/ld: /tmp/ccu35dkO.o: in function `main':
+/home/bot/boiler/example_repos/bash/before/conftest.c:389:(.text.startup+0xf): undefined reference to `_sys_siglist'
 /usr/bin/ld: warning: creating DT_TEXTREL in a PIE
 collect2: error: ld returned 1 exit status
 configure:19109: $? = 1
@@ -22750,8 +22750,8 @@ configure: failed program was:
 configure:21906: result: no
 configure:22020: checking for tgetent
 configure:22020: gcc -o conftest -g -O2   conftest.c -ldl  >&5
-/usr/bin/ld: /tmp/ccMXTWZf.o: in function `main':
-/root/boiler/example_repos/bash/before/conftest.c:454:(.text.startup+0xb): undefined reference to `tgetent'
+/usr/bin/ld: /tmp/ccd3XAlZ.o: in function `main':
+/home/bot/boiler/example_repos/bash/before/conftest.c:454:(.text.startup+0xb): undefined reference to `tgetent'
 collect2: error: ld returned 1 exit status
 configure:22020: $? = 1
 configure: failed program was:
@@ -23263,7 +23263,9 @@ config.status:1387: creating examples/loadables/perl/Makefile
 config.status:1387: creating support/bash.pc
 config.status:1387: creating support/bashbug.sh
 config.status:1387: creating config.h
+config.status:1568: config.h is unchanged
 config.status:1387: creating buildconf.h
+config.status:1568: buildconf.h is unchanged
 config.status:1582: executing po-directories commands
 config.status:1582: executing stamp-h commands
 
@@ -23760,7 +23762,7 @@ AR='ar'
 ARFLAGS='cr'
 ARRAY_O='array.o'
 BASHVERS='5.3'
-BUILD_DIR='/root/boiler/example_repos/bash/before'
+BUILD_DIR='/home/bot/boiler/example_repos/bash/before'
 BUILD_INCLUDED_LIBINTL='yes'
 CATOBJEXT='.gmo'
 CC='gcc'
@@ -23934,7 +23936,7 @@ htmldir='${docdir}'
 incdir=''
 includedir='${prefix}/include'
 infodir='${datarootdir}/info'
-install_sh='${SHELL} /root/boiler/example_repos/bash/before/support/install-sh'
+install_sh='${SHELL} /home/bot/boiler/example_repos/bash/before/support/install-sh'
 libdir='${exec_prefix}/lib'
 libexecdir='${exec_prefix}/libexec'
 loadablesdir='${libdir}/bash'

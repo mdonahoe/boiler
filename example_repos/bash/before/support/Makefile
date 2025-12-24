@@ -30,7 +30,7 @@
 topdir = ..
 srcdir = .
 
-BUILD_DIR = /root/boiler/example_repos/bash/before
+BUILD_DIR = /home/bot/boiler/example_repos/bash/before
 
 RM	= rm -f
 SHELL	= /bin/sh

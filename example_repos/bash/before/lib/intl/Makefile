@@ -22,7 +22,7 @@ SHELL = /bin/sh
 
 srcdir = .
 top_srcdir = ../..
-top_builddir = /root/boiler/example_repos/bash/before
+top_builddir = /home/bot/boiler/example_repos/bash/before
 
 
 prefix = /usr/local

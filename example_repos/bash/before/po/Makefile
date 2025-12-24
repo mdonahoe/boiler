@@ -19,7 +19,7 @@ top_srcdir = ..
 
 
 topdir = ..
-BUILD_DIR = /root/boiler/example_repos/bash/before
+BUILD_DIR = /home/bot/boiler/example_repos/bash/before
 
 prefix = /usr/local
 exec_prefix = ${prefix}

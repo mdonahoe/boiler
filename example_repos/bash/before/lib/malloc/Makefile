@@ -18,7 +18,7 @@
 srcdir = .
 
 topdir = ../..
-BUILD_DIR = /root/boiler/example_repos/bash/before
+BUILD_DIR = /home/bot/boiler/example_repos/bash/before
 
 INSTALL = /usr/bin/install -c
 INSTALL_PROGRAM = ${INSTALL}

@@ -62,8 +62,8 @@ htmldir = ${docdir}
 DESTDIR =
 
 topdir = .
-BUILD_DIR = /root/boiler/example_repos/bash/before
-top_builddir = /root/boiler/example_repos/bash/before
+BUILD_DIR = /home/bot/boiler/example_repos/bash/before
+top_builddir = /home/bot/boiler/example_repos/bash/before
 srcdir = .
 
 
@@ -89,7 +89,7 @@ INSTALL_DATA = ${INSTALL} -m 644
 INSTALLMODE= -m 0755
 INSTALLMODE2 = -m 0555
 
-install_sh = ${SHELL} /root/boiler/example_repos/bash/before/support/install-sh
+install_sh = ${SHELL} /home/bot/boiler/example_repos/bash/before/support/install-sh
 
 CTAGS = ctags
 CTAGSFLAGS = -x
@@ -1076,8 +1076,14 @@ printenv$(EXEEXT):	$(SUPPORT_SRC)printenv.c
 xcase$(EXEEXT):	$(SUPPORT_SRC)xcase.c
 	@$(CC_FOR_BUILD) $(CCFLAGS_FOR_BUILD) ${LDFLAGS_FOR_BUILD} -o $@ $(SUPPORT_SRC)xcase.c ${LIBS_FOR_BUILD}
 
-test: .made
-	python3 testty.py --run "./bash" --input "echo 'hello world'[enter][sleep:100][ctrl-D]"
+test: $(Program) testty.py
+	python3 testty.py --run "./bash --norc --noprofile" --input "echo 'hello world'[enter][sleep:100][ctrl-D]" | grep -q "hello world"
+
+tests check:	force $(Program) $(TESTS_SUPPORT)
+	@-test -d tests || mkdir tests
+	@cp $(TESTS_SUPPORT) tests
+	@( cd $(srcdir)/tests && \
+		BUILD_DIR=$(BUILD_DIR) PATH=$(BUILD_DIR)/tests:$$PATH THIS_SH=$(THIS_SH) $(SHELL) ${TESTSCRIPT} )
 
 symlinks:
 	$(SHELL) $(SUPPORT_SRC)fixlinks -s $(srcdir)

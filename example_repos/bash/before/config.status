@@ -430,7 +430,7 @@ Copyright (C) 2021 Free Software Foundation, Inc.
 This config.status script is free software; the Free Software Foundation
 gives unlimited permission to copy, distribute and modify it."
 
-ac_pwd='/root/boiler/example_repos/bash/before'
+ac_pwd='/home/bot/boiler/example_repos/bash/before'
 srcdir='.'
 INSTALL='/usr/bin/install -c'
 MKDIR_P='/usr/bin/mkdir -p'
@@ -642,7 +642,7 @@ S["RELSTATUS"]="release"
 S["BASHVERS"]="5.3"
 S["headersdir"]="$(includedir)/$(PACKAGE_NAME)"
 S["loadablesdir"]="${libdir}/bash"
-S["BUILD_DIR"]="/root/boiler/example_repos/bash/before"
+S["BUILD_DIR"]="/home/bot/boiler/example_repos/bash/before"
 S["incdir"]=""
 S["PROFILE_FLAGS"]=""
 S["SHOBJ_STATUS"]="supported"
@@ -726,7 +726,7 @@ S["SIZE"]="size"
 S["MAKE_SHELL"]="/bin/sh"
 S["INSTALL_STRIP_PROGRAM"]="$(install_sh) -c -s"
 S["STRIP"]="strip"
-S["install_sh"]="${SHELL} /root/boiler/example_repos/bash/before/support/install-sh"
+S["install_sh"]="${SHELL} /home/bot/boiler/example_repos/bash/before/support/install-sh"
 S["SET_MAKE"]=""
 S["YFLAGS"]=""
 S["YACC"]="yacc"

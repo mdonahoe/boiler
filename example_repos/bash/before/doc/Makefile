@@ -58,7 +58,7 @@ man3dir = $(mandir)/$(manpfx)3
 
 INSTALL = /usr/bin/install -c
 INSTALL_DATA = ${INSTALL} -m 644
-BUILD_DIR = /root/boiler/example_repos/bash/before
+BUILD_DIR = /home/bot/boiler/example_repos/bash/before
 
 SUPPORT_SRCDIR = $(topdir)/support
 
