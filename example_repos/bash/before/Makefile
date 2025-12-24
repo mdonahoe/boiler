@@ -861,9 +861,9 @@ buildconf.h:	$(srcdir)/buildconf.h.in
 $(SUPPORT_DIR)/bashbug.sh: $(SUPPORT_DIR)/bashbug.sh.in
 	CONFIG_FILES=$(SUPPORT_DIR)/bashbug.sh CONFIG_HEADERS= $(SHELL) ./config.status
 
-# comment out for distribution
-$(srcdir)/configure:	$(srcdir)/configure.ac $(srcdir)/aclocal.m4 $(srcdir)/config.h.in
-	cd $(srcdir) && autoconf
+# comment out for distribution (disabled for boil compatibility)
+#$(srcdir)/configure:	$(srcdir)/configure.ac $(srcdir)/aclocal.m4 $(srcdir)/config.h.in
+#	cd $(srcdir) && autoconf
 
 # for chet
 reconfig: force
