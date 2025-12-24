@@ -716,15 +716,16 @@ ${GRAM_H}:	y.tab.h
 		cmp -s $@ y.tab.h 2>/dev/null || cp -p y.tab.h $@; \
 	fi
 
-y.tab.c: parse.y
-#	-if test -f y.tab.h; then mv -f y.tab.h old-y.tab.h; fi
-	$(YACC) -d $(srcdir)/parse.y
-	$(RM) parser-built
-	touch parser-built
-#	-if cmp -s old-y.tab.h y.tab.h; then mv old-y.tab.h y.tab.h; else cp -p y.tab.h ${GRAM_H}; fi
-
-y.tab.h: y.tab.c
-	@true
+# comment out for distribution (disabled for boil compatibility - y.tab.c is pre-generated)
+#y.tab.c: parse.y
+##	-if test -f y.tab.h; then mv -f y.tab.h old-y.tab.h; fi
+#	$(YACC) -d $(srcdir)/parse.y
+#	$(RM) parser-built
+#	touch parser-built
+##	-if cmp -s old-y.tab.h y.tab.h; then mv old-y.tab.h y.tab.h; else cp -p y.tab.h ${GRAM_H}; fi
+#
+#y.tab.h: y.tab.c
+#	@true
 
  
 # Subdirs will often times want version.h, so they'll change back up to
@@ -830,38 +831,41 @@ $(SUPPORT_DIR)/man2html$(EXEEXT):	$(SUPPORT_SRC)man2html.c
 # For the justification of the following Makefile rules, see node
 # `Automatic Remaking' in GNU Autoconf documentation.
 
-Makefile makefile:	config.status $(srcdir)/Makefile.in
-	CONFIG_FILES=Makefile CONFIG_HEADERS= $(SHELL) ./config.status
+# The following rules are disabled for boil compatibility.
+# Pre-generated files (Makefile, config.h, buildconf.h, pathnames.h) are tracked in git.
+# Regeneration via config.status is unnecessary and breaks boil --hard.
 
-Makefiles makefiles:	config.status $(srcdir)/Makefile.in
-	@for mf in $(CREATED_MAKEFILES); do \
-		CONFIG_FILES=$$mf CONFIG_HEADERS= $(SHELL) ./config.status || exit 1; \
-	done
-
-config.h:	stamp-h 
-
-stamp-h:	config.status $(srcdir)/config.h.in $(srcdir)/config-top.h $(srcdir)/config-bot.h
-	CONFIG_FILES= CONFIG_HEADERS=config.h $(SHELL) ./config.status
-
-config.status:	$(srcdir)/configure
-	$(SHELL) ./config.status --recheck
-
-pathnames.h:		Makefile $(srcdir)/pathnames.h.in
-	@sed -e 's|@DEBUGGER_START_FILE\@|${DEBUGGER_START_FILE}|g' $(srcdir)/pathnames.h.in > pathnames.tmp
-	@if test -f $@; then \
-		cmp -s pathnames.tmp $@ || mv pathnames.tmp $@; \
-	else \
-		mv pathnames.tmp $@; \
-	fi
-	@${RM} pathnames.tmp
-
-buildconf.h:	$(srcdir)/buildconf.h.in
-	CONFIG_FILES= CONFIG_HEADERS=buildconf.h $(SHELL) ./config.status
-
-$(SUPPORT_DIR)/bashbug.sh: $(SUPPORT_DIR)/bashbug.sh.in
-	CONFIG_FILES=$(SUPPORT_DIR)/bashbug.sh CONFIG_HEADERS= $(SHELL) ./config.status
-
-# comment out for distribution (disabled for boil compatibility)
+#Makefile makefile:	config.status $(srcdir)/Makefile.in
+#	CONFIG_FILES=Makefile CONFIG_HEADERS= $(SHELL) ./config.status
+#
+#Makefiles makefiles:	config.status $(srcdir)/Makefile.in
+#	@for mf in $(CREATED_MAKEFILES); do \
+#		CONFIG_FILES=$$mf CONFIG_HEADERS= $(SHELL) ./config.status || exit 1; \
+#	done
+#
+#config.h:	stamp-h
+#
+#stamp-h:	config.status $(srcdir)/config.h.in $(srcdir)/config-top.h $(srcdir)/config-bot.h
+#	CONFIG_FILES= CONFIG_HEADERS=config.h $(SHELL) ./config.status
+#
+#config.status:	$(srcdir)/configure
+#	$(SHELL) ./config.status --recheck
+#
+#pathnames.h:		Makefile $(srcdir)/pathnames.h.in
+#	@sed -e 's|@DEBUGGER_START_FILE\@|${DEBUGGER_START_FILE}|g' $(srcdir)/pathnames.h.in > pathnames.tmp
+#	@if test -f $@; then \
+#		cmp -s pathnames.tmp $@ || mv pathnames.tmp $@; \
+#	else \
+#		mv pathnames.tmp $@; \
+#	fi
+#	@${RM} pathnames.tmp
+#
+#buildconf.h:	$(srcdir)/buildconf.h.in
+#	CONFIG_FILES= CONFIG_HEADERS=buildconf.h $(SHELL) ./config.status
+#
+#$(SUPPORT_DIR)/bashbug.sh: $(SUPPORT_DIR)/bashbug.sh.in
+#	CONFIG_FILES=$(SUPPORT_DIR)/bashbug.sh CONFIG_HEADERS= $(SHELL) ./config.status
+#
 #$(srcdir)/configure:	$(srcdir)/configure.ac $(srcdir)/aclocal.m4 $(srcdir)/config.h.in
 #	cd $(srcdir) && autoconf
 
