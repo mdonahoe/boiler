@@ -11,6 +11,21 @@ import (
 
 // findFileInDeleted looks for a file in the list of deleted files
 func findFileInDeleted(filename string, deletedFiles []string) string {
+	// If it's an absolute path, try to match via suffix matching
+	if filepath.IsAbs(filename) {
+		if found := findMatchingFilePath(filename, deletedFiles); found != "" {
+			return found
+		}
+		// Also try basename matching for absolute paths
+		basename := filepath.Base(filename)
+		for _, deleted := range deletedFiles {
+			if filepath.Base(deleted) == basename {
+				return deleted
+			}
+		}
+		return ""
+	}
+
 	// Exact match first
 	for _, deleted := range deletedFiles {
 		if deleted == filename {

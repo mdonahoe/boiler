@@ -331,11 +331,38 @@ func resolveGitPath(filePath, gitToplevel string) string {
 		return filePath
 	}
 
-	// For relative paths, assume they're already git-root-relative.
-	// Planners always generate git-relative paths, and the file may be
-	// deleted (which is the whole point of boiler), so we can't check
-	// if it exists. Just return it as-is.
-	return filePath
+	// For relative paths, we need to check if the path exists in git as-is first.
+	// This handles paths that are already git-root-relative (from planners).
+	// If not found, try interpreting the path as cwd-relative.
+	cmd := exec.Command("git", "cat-file", "-e", fmt.Sprintf("HEAD:%s", filePath))
+	cmd.Dir = gitToplevel
+	if err := cmd.Run(); err == nil {
+		// Path exists in git as-is
+		return filePath
+	}
+
+	// Path not found as-is. Try interpreting as cwd-relative.
+	// If we're running from a subdirectory (e.g., example_repos/bash/before),
+	// a path like "./support/mkversion.sh" needs to be translated to
+	// "example_repos/bash/before/support/mkversion.sh" for git.
+	cwd, err := os.Getwd()
+	if err != nil {
+		// Can't get cwd, just return as-is
+		return filePath
+	}
+
+	// Make the path absolute by joining with cwd
+	absPath := filepath.Join(cwd, filePath)
+	absPath = filepath.Clean(absPath)
+
+	// Now make it relative to git root
+	rel, err := filepath.Rel(gitToplevel, absPath)
+	if err != nil {
+		// Can't make it relative, return as-is
+		return filePath
+	}
+
+	return rel
 }
 
 func fileExists(path string) bool {
