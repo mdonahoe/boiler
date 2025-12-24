@@ -65,6 +65,6 @@ The `unused()` function and extra includes are removed in `after/`.
 
 1. Create `example_repos/myrepo/before/` with complete working code
 2. Ensure `make test` compiles the project and runs tests on the built binary
-3. Create `example_repos/myrepo/after/` by copying `before/` and removing unnecessary code
+3. Create `example_repos/myrepo/after/` by copying `before/` after it was successfully boiled
 4. Verify `make test` still passes in `after/`
 5. Add test case in `tests/test_example_repos.py`
