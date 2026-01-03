@@ -319,8 +319,9 @@ func GetUncommittedChanges() ([]string, error) {
 		}
 	}
 
-	// Get unstaged modifications to tracked files (excluding deletions)
-	cmd = exec.Command("git", "diff", "--name-status")
+	// Get unstaged modifications that ADD lines (not just deletions)
+	// Use --numstat to see lines added vs removed
+	cmd = exec.Command("git", "diff", "--numstat")
 	out, err = cmd.Output()
 	if err != nil {
 		return changes, nil
@@ -330,18 +331,19 @@ func GetUncommittedChanges() ([]string, error) {
 			continue
 		}
 		parts := strings.Fields(line)
-		if len(parts) >= 2 {
-			status := parts[0]
-			filePath := parts[1]
-			// Only report modifications, not deletions
+		if len(parts) >= 3 {
+			added := parts[0]
+			// parts[1] is removed
+			filePath := parts[2]
+			// Only report if lines were ADDED (not just removed)
 			// Deletions are OK because the content is tracked in git
-			if status == "M" && !isBuildArtifact(filePath) {
+			if added != "0" && added != "-" && !isBuildArtifact(filePath) {
 				changes = append(changes, filePath+" (modified)")
 			}
 		}
 	}
 
-	// Get staged changes (both new files and modifications)
+	// Get staged new files (A status)
 	cmd = exec.Command("git", "diff", "--cached", "--name-status", "HEAD")
 	out, err = cmd.Output()
 	if err != nil {
@@ -360,16 +362,44 @@ func GetUncommittedChanges() ([]string, error) {
 		if len(parts) >= 2 {
 			status := parts[0]
 			filePath := parts[1]
-			if !isBuildArtifact(filePath) {
-				switch status {
-				case "A":
-					changes = append(changes, filePath+" (staged new file)")
-				case "M":
+			if status == "A" && !isBuildArtifact(filePath) {
+				changes = append(changes, filePath+" (staged new file)")
+			}
+			// D (deletions) are OK - they're tracked in git already
+			// M (modifications) handled below with numstat
+		}
+	}
+
+	// Get staged modifications that ADD lines (not just deletions)
+	cmd = exec.Command("git", "diff", "--cached", "--numstat", "HEAD")
+	out, err = cmd.Output()
+	if err != nil {
+		cmd = exec.Command("git", "diff", "--cached", "--numstat")
+		out, err = cmd.Output()
+		if err != nil {
+			return changes, nil
+		}
+	}
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if line == "" {
+			continue
+		}
+		parts := strings.Fields(line)
+		if len(parts) >= 3 {
+			added := parts[0]
+			filePath := parts[2]
+			// Only report if lines were ADDED (not just removed)
+			if added != "0" && added != "-" && !isBuildArtifact(filePath) {
+				// Check if this is a new file (already reported above)
+				isNewFile := false
+				checkCmd := exec.Command("git", "diff", "--cached", "--name-status", "HEAD", "--", filePath)
+				if checkOut, err := checkCmd.Output(); err == nil {
+					if strings.HasPrefix(strings.TrimSpace(string(checkOut)), "A") {
+						isNewFile = true
+					}
+				}
+				if !isNewFile {
 					changes = append(changes, filePath+" (staged modification)")
-				case "D":
-					// Deletions are OK - they're tracked in git already
-				default:
-					changes = append(changes, filePath+" (staged)")
 				}
 			}
 		}
