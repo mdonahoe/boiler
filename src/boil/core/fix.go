@@ -33,8 +33,8 @@ func Fix(command []string, numIterations int, allowLegacy bool) (bool, error) {
 		for _, f := range uncommitted {
 			fmt.Fprintf(os.Stderr, "  - %s\n", f)
 		}
-		fmt.Fprintln(os.Stderr, "\nNew code (added files or added lines) cannot be restored from git history.")
-		fmt.Fprintln(os.Stderr, "Deletions are allowed since deleted content exists in git history.")
+		fmt.Fprintln(os.Stderr, "\nWhile deletions are allowed since deleted content exists in git history,")
+		fmt.Fprintln(os.Stderr, "new code (added files or added lines) may be deleted during boiling, losing your changes.")
 		fmt.Fprintln(os.Stderr, "\nPlease commit or stash these additions before running boil.")
 		return false, fmt.Errorf("uncommitted additions detected")
 	}
