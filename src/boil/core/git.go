@@ -299,6 +299,95 @@ func SaveChanges(parent, message, branchName string) (string, error) {
 	return commit, nil
 }
 
+// GetUnmergedAdditions returns files that would be lost by boiling:
+// - Untracked files (not in git at all)
+// - Staged new files (git add'd but not committed)
+// These are "additions" because they don't exist in git history and can't be restored.
+func GetUnmergedAdditions() ([]string, error) {
+	var additions []string
+
+	// Get untracked files (excluding .boil directory)
+	cmd := exec.Command("git", "ls-files", "--others", "--exclude-standard")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if line != "" && !isBuildArtifact(line) {
+			additions = append(additions, line)
+		}
+	}
+
+	// Get staged new files (files that are added but not in HEAD)
+	// git diff --cached --name-status shows staged changes
+	// "A" status means a new file was added
+	cmd = exec.Command("git", "diff", "--cached", "--name-status", "HEAD")
+	out, err = cmd.Output()
+	if err != nil {
+		// If HEAD doesn't exist (empty repo), try without HEAD
+		cmd = exec.Command("git", "diff", "--cached", "--name-status")
+		out, err = cmd.Output()
+		if err != nil {
+			return additions, nil // Return what we have
+		}
+	}
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if line == "" {
+			continue
+		}
+		parts := strings.Fields(line)
+		if len(parts) >= 2 && parts[0] == "A" {
+			filePath := parts[1]
+			if !isBuildArtifact(filePath) {
+				additions = append(additions, filePath+" (staged)")
+			}
+		}
+	}
+
+	return additions, nil
+}
+
+// isBuildArtifact returns true if the file is likely a build artifact
+// that doesn't need protection from being lost.
+func isBuildArtifact(path string) bool {
+	// .boil directory
+	if strings.HasPrefix(path, ".boil/") || path == ".boil" {
+		return true
+	}
+
+	// Python bytecode cache
+	if strings.Contains(path, "__pycache__/") || strings.HasSuffix(path, ".pyc") || strings.HasSuffix(path, ".pyo") {
+		return true
+	}
+
+	// Object files
+	if strings.HasSuffix(path, ".o") || strings.HasSuffix(path, ".obj") {
+		return true
+	}
+
+	// Common compiled/build outputs (no extension in root directory)
+	// Check if corresponding source file exists in git history
+	base := filepath.Base(path)
+	dir := filepath.Dir(path)
+	if !strings.Contains(base, ".") && (dir == "." || dir == "") {
+		// File has no extension and is in root - check for source file in git
+		sourceExts := []string{".c", ".go", ".rs", ".cpp", ".cc"}
+		for _, ext := range sourceExts {
+			// Check if source exists in working dir
+			if _, err := os.Stat(path + ext); err == nil {
+				return true
+			}
+			// Check if source exists in git history
+			cmd := exec.Command("git", "ls-files", path+ext)
+			if out, err := cmd.Output(); err == nil && strings.TrimSpace(string(out)) != "" {
+				return true // Has corresponding source file in git, likely compiled binary
+			}
+		}
+	}
+
+	return false
+}
+
 // HasChanges checks if there are uncommitted changes
 func HasChanges() (bool, error) {
 	gitDir, err := GetGitDir()

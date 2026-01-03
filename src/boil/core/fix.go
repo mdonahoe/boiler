@@ -21,6 +21,22 @@ func Fix(command []string, numIterations int, allowLegacy bool) (bool, error) {
 		return false, fmt.Errorf("no command provided")
 	}
 
+	// Check for unmerged additions (new files not in git history)
+	// These would be lost during boiling since we restore from git history
+	additions, err := GetUnmergedAdditions()
+	if err != nil {
+		return false, fmt.Errorf("failed to check for unmerged additions: %v", err)
+	}
+	if len(additions) > 0 {
+		fmt.Fprintln(os.Stderr, "Error: Repository has unmerged additions that would be lost by boiling:")
+		for _, f := range additions {
+			fmt.Fprintf(os.Stderr, "  - %s\n", f)
+		}
+		fmt.Fprintln(os.Stderr, "\nThese files don't exist in git history and cannot be restored.")
+		fmt.Fprintln(os.Stderr, "Please commit or remove these files before running boil.")
+		return false, fmt.Errorf("unmerged additions detected")
+	}
+
 	ref := Ctx().GitRef
 
 	// Check if boiling branch is stale or needs creation
