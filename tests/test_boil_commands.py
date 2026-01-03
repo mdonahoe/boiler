@@ -270,8 +270,8 @@ class TestBoilFinish(unittest.TestCase):
             )
 
 
-class TestBoilUnmergedAdditions(unittest.TestCase):
-    """Test that boil refuses to run when there are unmerged additions"""
+class TestBoilUncommittedChanges(unittest.TestCase):
+    """Test that boil refuses to run when there are uncommitted changes"""
 
     def test_boil_refuses_with_untracked_files(self):
         """boil should refuse to run when there are untracked files"""
@@ -306,13 +306,53 @@ class TestBoilUnmergedAdditions(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0,
                               "boil should fail when there are untracked files")
 
-            # Should mention unmerged additions in the error message
+            # Should mention uncommitted changes in the error message
             combined_output = result.stdout + result.stderr
-            self.assertIn("unmerged", combined_output.lower(),
-                         f"Error should mention unmerged additions. Output: {combined_output}")
+            self.assertIn("uncommitted", combined_output.lower(),
+                         f"Error should mention uncommitted changes. Output: {combined_output}")
 
-    def test_boil_refuses_with_staged_new_file(self):
-        """boil should refuse to run when there are staged but uncommitted new files"""
+    def test_boil_refuses_with_modified_files(self):
+        """boil should refuse to run when there are modified but uncommitted files"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Initialize a git repo
+            subprocess.run(["git", "init"], cwd=tmpdir, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@example.com"],
+                         cwd=tmpdir, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.name", "Test User"],
+                         cwd=tmpdir, check=True, capture_output=True)
+
+            # Create and commit a file
+            with open(os.path.join(tmpdir, "myfile.txt"), "w") as f:
+                f.write("original content")
+            subprocess.run(["git", "add", "myfile.txt"], cwd=tmpdir, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "Initial commit"],
+                         cwd=tmpdir, check=True, capture_output=True)
+
+            # Modify the file (add a new line)
+            with open(os.path.join(tmpdir, "myfile.txt"), "a") as f:
+                f.write("\nnew line that would be lost")
+
+            # Try to run boil - it should fail
+            result = subprocess.run(
+                ["boil", "echo", "test"],
+                cwd=tmpdir,
+                capture_output=True,
+                text=True
+            )
+
+            # Should fail
+            self.assertNotEqual(result.returncode, 0,
+                              "boil should fail when there are modified files")
+
+            # Should mention uncommitted changes and the file
+            combined_output = result.stdout + result.stderr
+            self.assertIn("uncommitted", combined_output.lower(),
+                         f"Error should mention uncommitted changes. Output: {combined_output}")
+            self.assertIn("myfile.txt", combined_output,
+                         f"Error should mention the modified file. Output: {combined_output}")
+
+    def test_boil_refuses_with_staged_changes(self):
+        """boil should refuse to run when there are staged but uncommitted changes"""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Initialize a git repo
             subprocess.run(["git", "init"], cwd=tmpdir, check=True, capture_output=True)
@@ -345,13 +385,13 @@ class TestBoilUnmergedAdditions(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0,
                               "boil should fail when there are staged new files")
 
-            # Should mention unmerged additions in the error message
+            # Should mention uncommitted changes in the error message
             combined_output = result.stdout + result.stderr
-            self.assertIn("unmerged", combined_output.lower(),
-                         f"Error should mention unmerged additions. Output: {combined_output}")
+            self.assertIn("uncommitted", combined_output.lower(),
+                         f"Error should mention uncommitted changes. Output: {combined_output}")
 
-    def test_boil_allows_modified_files(self):
-        """boil should allow running when there are only modified files (not new additions)"""
+    def test_boil_allows_deletions(self):
+        """boil should allow running when there are only deletions (tracked in git)"""
         boiler_dir = os.path.dirname(os.path.dirname(__file__))
         example_dir = os.path.join(boiler_dir, "example_repos", "simple", "before")
 
@@ -384,8 +424,8 @@ class TestBoilUnmergedAdditions(unittest.TestCase):
             if os.path.exists(makefile_path):
                 os.remove(makefile_path)
 
-            # Try to run boil - it should NOT fail due to unmerged additions
-            # (it may fail for other reasons like missing Makefile, but not due to unmerged additions)
+            # Try to run boil - it should NOT fail due to uncommitted changes
+            # (deletions are OK because they're tracked in git)
             result = subprocess.run(
                 ["boil", "make", "test"],
                 cwd=tmpdir,
@@ -394,10 +434,10 @@ class TestBoilUnmergedAdditions(unittest.TestCase):
                 timeout=60
             )
 
-            # Should not fail due to unmerged additions
+            # Should not fail due to uncommitted changes
             combined_output = result.stdout + result.stderr
-            self.assertNotIn("unmerged additions", combined_output.lower(),
-                           f"Should not fail due to unmerged additions. Output: {combined_output}")
+            self.assertNotIn("uncommitted changes", combined_output.lower(),
+                           f"Should not fail due to uncommitted changes. Output: {combined_output}")
 
 
 if __name__ == "__main__":
