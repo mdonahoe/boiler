@@ -15,6 +15,28 @@ import (
 	"github.com/mdonahoe/boiler/src/boil/pipeline"
 )
 
+// CleanBoilSession removes session files from .boil/ but preserves plugins/
+func CleanBoilSession() {
+	entries, err := os.ReadDir(".boil")
+	if err != nil {
+		return
+	}
+
+	for _, entry := range entries {
+		name := entry.Name()
+		// Remove iteration files and boil.index, but preserve plugins/
+		if strings.HasPrefix(name, "iter") || name == "boil.index" {
+			os.RemoveAll(filepath.Join(".boil", name))
+		}
+	}
+
+	// Remove .boil directory only if empty (no plugins remaining)
+	remaining, _ := os.ReadDir(".boil")
+	if len(remaining) == 0 {
+		os.Remove(".boil")
+	}
+}
+
 // Fix repeatedly runs a command, repairing files until it is fixed
 func Fix(command []string, numIterations int, allowLegacy bool) (bool, error) {
 	if len(command) == 0 {
@@ -58,7 +80,7 @@ func Fix(command []string, numIterations int, allowLegacy bool) (bool, error) {
 		fmt.Println("existing boiling session is stale. Deleting")
 		exec.Command("git", "branch", "-D", BoilingBranch).Run()
 		exec.Command("git", "branch", BoilingBranch).Run()
-		os.RemoveAll(".boil")
+		CleanBoilSession()
 		action = "start"
 	} else if ancestorCheck == 128 {
 		// Branch doesn't exist
@@ -271,10 +293,10 @@ func AbortBoiling() int {
 	fmt.Println("Successfully aborted boiling session.")
 	fmt.Println("Working directory has been restored to pre-boiling state.")
 
-	// Clean up .boil directory
+	// Clean up .boil session files (preserves plugins/)
 	if info, err := os.Stat(".boil"); err == nil && info.IsDir() {
-		fmt.Println("Removing .boil directory...")
-		os.RemoveAll(".boil")
+		fmt.Println("Cleaning up .boil session files...")
+		CleanBoilSession()
 	}
 
 	return 0
@@ -288,10 +310,10 @@ func FinishBoiling() int {
 		fmt.Printf("Branch '%s' does not exist, nothing to delete\n", BoilingBranch)
 	}
 
-	// Clean up .boil directory
+	// Clean up .boil session files (preserves plugins/)
 	if info, err := os.Stat(".boil"); err == nil && info.IsDir() {
-		fmt.Println("Removing .boil directory...")
-		os.RemoveAll(".boil")
+		fmt.Println("Cleaning up .boil session files...")
+		CleanBoilSession()
 	}
 
 	return 0
