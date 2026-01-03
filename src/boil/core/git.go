@@ -299,14 +299,15 @@ func SaveChanges(parent, message, branchName string) (string, error) {
 	return commit, nil
 }
 
-// GetUnmergedAdditions returns files that would be lost by boiling:
+// GetUncommittedChanges returns files with uncommitted changes that would be lost by boiling:
 // - Untracked files (not in git at all)
-// - Staged new files (git add'd but not committed)
-// These are "additions" because they don't exist in git history and can't be restored.
-func GetUnmergedAdditions() ([]string, error) {
-	var additions []string
+// - Modified files (tracked files with unstaged changes)
+// - Staged changes (any staged but uncommitted changes)
+// All of these contain "new code" that doesn't exist in git history and can't be restored.
+func GetUncommittedChanges() ([]string, error) {
+	var changes []string
 
-	// Get untracked files (excluding .boil directory)
+	// Get untracked files (excluding .boil directory and build artifacts)
 	cmd := exec.Command("git", "ls-files", "--others", "--exclude-standard")
 	out, err := cmd.Output()
 	if err != nil {
@@ -314,13 +315,33 @@ func GetUnmergedAdditions() ([]string, error) {
 	}
 	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
 		if line != "" && !isBuildArtifact(line) {
-			additions = append(additions, line)
+			changes = append(changes, line+" (untracked)")
 		}
 	}
 
-	// Get staged new files (files that are added but not in HEAD)
-	// git diff --cached --name-status shows staged changes
-	// "A" status means a new file was added
+	// Get unstaged modifications to tracked files (excluding deletions)
+	cmd = exec.Command("git", "diff", "--name-status")
+	out, err = cmd.Output()
+	if err != nil {
+		return changes, nil
+	}
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if line == "" {
+			continue
+		}
+		parts := strings.Fields(line)
+		if len(parts) >= 2 {
+			status := parts[0]
+			filePath := parts[1]
+			// Only report modifications, not deletions
+			// Deletions are OK because the content is tracked in git
+			if status == "M" && !isBuildArtifact(filePath) {
+				changes = append(changes, filePath+" (modified)")
+			}
+		}
+	}
+
+	// Get staged changes (both new files and modifications)
 	cmd = exec.Command("git", "diff", "--cached", "--name-status", "HEAD")
 	out, err = cmd.Output()
 	if err != nil {
@@ -328,7 +349,7 @@ func GetUnmergedAdditions() ([]string, error) {
 		cmd = exec.Command("git", "diff", "--cached", "--name-status")
 		out, err = cmd.Output()
 		if err != nil {
-			return additions, nil // Return what we have
+			return changes, nil
 		}
 	}
 	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
@@ -336,15 +357,25 @@ func GetUnmergedAdditions() ([]string, error) {
 			continue
 		}
 		parts := strings.Fields(line)
-		if len(parts) >= 2 && parts[0] == "A" {
+		if len(parts) >= 2 {
+			status := parts[0]
 			filePath := parts[1]
 			if !isBuildArtifact(filePath) {
-				additions = append(additions, filePath+" (staged)")
+				switch status {
+				case "A":
+					changes = append(changes, filePath+" (staged new file)")
+				case "M":
+					changes = append(changes, filePath+" (staged modification)")
+				case "D":
+					// Deletions are OK - they're tracked in git already
+				default:
+					changes = append(changes, filePath+" (staged)")
+				}
 			}
 		}
 	}
 
-	return additions, nil
+	return changes, nil
 }
 
 // isBuildArtifact returns true if the file is likely a build artifact
