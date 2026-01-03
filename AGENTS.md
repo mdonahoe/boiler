@@ -75,7 +75,7 @@ This project uses **bd (beads)** for issue tracking.
 - `bd ready` - Find unblocked work
 - `bd create "Title" -d "longer description` - Create issue
 - `bd close <id>` - Complete work
-- `bd sync` - Sync with git (run at session end)
+- `bd sync` - Sync with git (run at session end). You may not have permissions to push to github. That is ok.
 
 For full workflow details: `bd prime`
 
@@ -120,7 +120,6 @@ make test   # All tests must pass before you commit, but it's ok to try `boil` s
 ```bash
 git add <files>
 git commit -m "Description"
-git push
 ```
 
 ### Adding New Error Handlers
@@ -246,15 +245,7 @@ headers = parse_git_grep_output(result.stdout)
 1. Create issues for remaining work
 2. Run `make check` and `make test` (if code changed)
 3. Close or update issues with `bd`
-4. **PUSH TO REMOTE** (MANDATORY):
-   ```bash
-   git pull --rebase
-   bd sync
-   git push
-   git status  # Must show "up to date with origin"
-   ```
 
-Work is NOT complete until `git push` succeeds.
 
 ### Using the Fix-with-Claude Script
 
@@ -359,9 +350,7 @@ When you're done:
 1. Ensure `make check` and `make test` pass
 2. Test on the broken repo (`boil --abort` then `boil make test`)
 3. Commit changes with clear messages
-4. **Push to remote** (see [Session Completion Protocol](#session-completion-protocol))
 
-**CRITICAL**: Work is NOT complete until `git push` succeeds.
 
 ---
 
@@ -579,26 +568,13 @@ This will show which plugins are loaded and what clues/plans they generate.
 
 ## Landing the Plane (Session Completion)
 
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
+**When ending a work session**, you MUST complete ALL steps below.
+
 
 **MANDATORY WORKFLOW:**
 
 1. **File issues for remaining work** - Create issues for anything that needs follow-up
 2. **Run quality gates** (if code changed) - Tests, linters, builds
 3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
-   ```bash
-   git pull --rebase
-   bd sync
-   git push
-   git status  # MUST show "up to date with origin"
-   ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
+6. **Verify** - All changes committed
 7. **Hand off** - Provide context for next session
-
-**CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
