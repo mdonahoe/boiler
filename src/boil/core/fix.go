@@ -21,20 +21,22 @@ func Fix(command []string, numIterations int, allowLegacy bool) (bool, error) {
 		return false, fmt.Errorf("no command provided")
 	}
 
-	// Check for uncommitted changes (modifications, new files, staged changes)
+	// Check for uncommitted additions (new files, added lines)
 	// These would be lost during boiling since we restore from git history
+	// Note: Deletions are allowed since deleted content exists in git history
 	uncommitted, err := GetUncommittedChanges()
 	if err != nil {
-		return false, fmt.Errorf("failed to check for uncommitted changes: %v", err)
+		return false, fmt.Errorf("failed to check for uncommitted additions: %v", err)
 	}
 	if len(uncommitted) > 0 {
-		fmt.Fprintln(os.Stderr, "Error: Repository has uncommitted changes that would be lost by boiling:")
+		fmt.Fprintln(os.Stderr, "Error: Repository has uncommitted additions that would be lost by boiling:")
 		for _, f := range uncommitted {
 			fmt.Fprintf(os.Stderr, "  - %s\n", f)
 		}
-		fmt.Fprintln(os.Stderr, "\nThese changes don't exist in git history and cannot be restored.")
-		fmt.Fprintln(os.Stderr, "Please commit, stash, or discard these changes before running boil.")
-		return false, fmt.Errorf("uncommitted changes detected")
+		fmt.Fprintln(os.Stderr, "\nNew code (added files or added lines) cannot be restored from git history.")
+		fmt.Fprintln(os.Stderr, "Deletions are allowed since deleted content exists in git history.")
+		fmt.Fprintln(os.Stderr, "\nPlease commit or stash these additions before running boil.")
+		return false, fmt.Errorf("uncommitted additions detected")
 	}
 
 	ref := Ctx().GitRef
