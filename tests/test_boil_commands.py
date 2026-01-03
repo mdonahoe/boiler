@@ -306,10 +306,10 @@ class TestBoilUncommittedChanges(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0,
                               "boil should fail when there are untracked files")
 
-            # Should mention uncommitted changes in the error message
+            # Should mention uncommitted additions in the error message
             combined_output = result.stdout + result.stderr
-            self.assertIn("uncommitted", combined_output.lower(),
-                         f"Error should mention uncommitted changes. Output: {combined_output}")
+            self.assertIn("uncommitted additions", combined_output.lower(),
+                         f"Error should mention uncommitted additions. Output: {combined_output}")
 
     def test_boil_refuses_with_modified_files(self):
         """boil should refuse to run when there are modified but uncommitted files"""
@@ -344,10 +344,10 @@ class TestBoilUncommittedChanges(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0,
                               "boil should fail when there are modified files")
 
-            # Should mention uncommitted changes and the file
+            # Should mention uncommitted additions and the file
             combined_output = result.stdout + result.stderr
-            self.assertIn("uncommitted", combined_output.lower(),
-                         f"Error should mention uncommitted changes. Output: {combined_output}")
+            self.assertIn("uncommitted additions", combined_output.lower(),
+                         f"Error should mention uncommitted additions. Output: {combined_output}")
             self.assertIn("myfile.txt", combined_output,
                          f"Error should mention the modified file. Output: {combined_output}")
 
@@ -385,10 +385,10 @@ class TestBoilUncommittedChanges(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0,
                               "boil should fail when there are staged new files")
 
-            # Should mention uncommitted changes in the error message
+            # Should mention uncommitted additions in the error message
             combined_output = result.stdout + result.stderr
-            self.assertIn("uncommitted", combined_output.lower(),
-                         f"Error should mention uncommitted changes. Output: {combined_output}")
+            self.assertIn("uncommitted additions", combined_output.lower(),
+                         f"Error should mention uncommitted additions. Output: {combined_output}")
 
     def test_boil_allows_file_deletions(self):
         """boil should allow running when entire files are deleted (tracked in git)"""
@@ -434,10 +434,10 @@ class TestBoilUncommittedChanges(unittest.TestCase):
                 timeout=60
             )
 
-            # Should not fail due to uncommitted changes
+            # Should not fail due to uncommitted additions
             combined_output = result.stdout + result.stderr
-            self.assertNotIn("uncommitted changes", combined_output.lower(),
-                           f"Should not fail due to uncommitted changes. Output: {combined_output}")
+            self.assertNotIn("uncommitted additions", combined_output.lower(),
+                           f"Should not fail due to uncommitted additions. Output: {combined_output}")
 
     def test_boil_allows_line_deletions(self):
         """boil should allow running when only lines are removed from a file"""
@@ -469,10 +469,10 @@ class TestBoilUncommittedChanges(unittest.TestCase):
                 text=True
             )
 
-            # Should not fail due to uncommitted changes
+            # Should not fail due to uncommitted additions
             combined_output = result.stdout + result.stderr
-            self.assertNotIn("uncommitted changes", combined_output.lower(),
-                           f"Should not fail due to uncommitted changes when only removing lines. Output: {combined_output}")
+            self.assertNotIn("uncommitted additions", combined_output.lower(),
+                           f"Should not fail due to uncommitted additions when only removing lines. Output: {combined_output}")
 
 
 if __name__ == "__main__":
