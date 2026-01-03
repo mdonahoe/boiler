@@ -390,8 +390,8 @@ class TestBoilUncommittedChanges(unittest.TestCase):
             self.assertIn("uncommitted", combined_output.lower(),
                          f"Error should mention uncommitted changes. Output: {combined_output}")
 
-    def test_boil_allows_deletions(self):
-        """boil should allow running when there are only deletions (tracked in git)"""
+    def test_boil_allows_file_deletions(self):
+        """boil should allow running when entire files are deleted (tracked in git)"""
         boiler_dir = os.path.dirname(os.path.dirname(__file__))
         example_dir = os.path.join(boiler_dir, "example_repos", "simple", "before")
 
@@ -438,6 +438,41 @@ class TestBoilUncommittedChanges(unittest.TestCase):
             combined_output = result.stdout + result.stderr
             self.assertNotIn("uncommitted changes", combined_output.lower(),
                            f"Should not fail due to uncommitted changes. Output: {combined_output}")
+
+    def test_boil_allows_line_deletions(self):
+        """boil should allow running when only lines are removed from a file"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Initialize a git repo
+            subprocess.run(["git", "init"], cwd=tmpdir, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@example.com"],
+                         cwd=tmpdir, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.name", "Test User"],
+                         cwd=tmpdir, check=True, capture_output=True)
+
+            # Create a file with multiple lines
+            with open(os.path.join(tmpdir, "myfile.txt"), "w") as f:
+                f.write("line1\nline2\nline3\nline4\n")
+            subprocess.run(["git", "add", "myfile.txt"], cwd=tmpdir, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "Initial commit"],
+                         cwd=tmpdir, check=True, capture_output=True)
+
+            # Remove some lines (deletion only, no additions)
+            with open(os.path.join(tmpdir, "myfile.txt"), "w") as f:
+                f.write("line1\nline4\n")
+
+            # Try to run boil - it should NOT fail due to uncommitted changes
+            # (removing lines is OK because the content is tracked in git)
+            result = subprocess.run(
+                ["boil", "echo", "test"],
+                cwd=tmpdir,
+                capture_output=True,
+                text=True
+            )
+
+            # Should not fail due to uncommitted changes
+            combined_output = result.stdout + result.stderr
+            self.assertNotIn("uncommitted changes", combined_output.lower(),
+                           f"Should not fail due to uncommitted changes when only removing lines. Output: {combined_output}")
 
 
 if __name__ == "__main__":
