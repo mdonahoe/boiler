@@ -270,5 +270,135 @@ class TestBoilFinish(unittest.TestCase):
             )
 
 
+class TestBoilUnmergedAdditions(unittest.TestCase):
+    """Test that boil refuses to run when there are unmerged additions"""
+
+    def test_boil_refuses_with_untracked_files(self):
+        """boil should refuse to run when there are untracked files"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Initialize a git repo
+            subprocess.run(["git", "init"], cwd=tmpdir, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@example.com"],
+                         cwd=tmpdir, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.name", "Test User"],
+                         cwd=tmpdir, check=True, capture_output=True)
+
+            # Create and commit a file
+            with open(os.path.join(tmpdir, "committed.txt"), "w") as f:
+                f.write("committed content")
+            subprocess.run(["git", "add", "committed.txt"], cwd=tmpdir, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "Initial commit"],
+                         cwd=tmpdir, check=True, capture_output=True)
+
+            # Create an untracked file (not in git)
+            with open(os.path.join(tmpdir, "new_file.txt"), "w") as f:
+                f.write("new content that would be lost")
+
+            # Try to run boil - it should fail
+            result = subprocess.run(
+                ["boil", "echo", "test"],
+                cwd=tmpdir,
+                capture_output=True,
+                text=True
+            )
+
+            # Should fail
+            self.assertNotEqual(result.returncode, 0,
+                              "boil should fail when there are untracked files")
+
+            # Should mention unmerged additions in the error message
+            combined_output = result.stdout + result.stderr
+            self.assertIn("unmerged", combined_output.lower(),
+                         f"Error should mention unmerged additions. Output: {combined_output}")
+
+    def test_boil_refuses_with_staged_new_file(self):
+        """boil should refuse to run when there are staged but uncommitted new files"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Initialize a git repo
+            subprocess.run(["git", "init"], cwd=tmpdir, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@example.com"],
+                         cwd=tmpdir, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.name", "Test User"],
+                         cwd=tmpdir, check=True, capture_output=True)
+
+            # Create and commit a file
+            with open(os.path.join(tmpdir, "committed.txt"), "w") as f:
+                f.write("committed content")
+            subprocess.run(["git", "add", "committed.txt"], cwd=tmpdir, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "Initial commit"],
+                         cwd=tmpdir, check=True, capture_output=True)
+
+            # Create a new file and stage it (but don't commit)
+            with open(os.path.join(tmpdir, "staged_new.txt"), "w") as f:
+                f.write("new staged content that would be lost")
+            subprocess.run(["git", "add", "staged_new.txt"], cwd=tmpdir, check=True, capture_output=True)
+
+            # Try to run boil - it should fail
+            result = subprocess.run(
+                ["boil", "echo", "test"],
+                cwd=tmpdir,
+                capture_output=True,
+                text=True
+            )
+
+            # Should fail
+            self.assertNotEqual(result.returncode, 0,
+                              "boil should fail when there are staged new files")
+
+            # Should mention unmerged additions in the error message
+            combined_output = result.stdout + result.stderr
+            self.assertIn("unmerged", combined_output.lower(),
+                         f"Error should mention unmerged additions. Output: {combined_output}")
+
+    def test_boil_allows_modified_files(self):
+        """boil should allow running when there are only modified files (not new additions)"""
+        boiler_dir = os.path.dirname(os.path.dirname(__file__))
+        example_dir = os.path.join(boiler_dir, "example_repos", "simple", "before")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Initialize a git repo
+            subprocess.run(["git", "init"], cwd=tmpdir, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@example.com"],
+                         cwd=tmpdir, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.name", "Test User"],
+                         cwd=tmpdir, check=True, capture_output=True)
+
+            # Copy files from example
+            for item in os.listdir(example_dir):
+                if item.startswith('.'):
+                    continue
+                src = os.path.join(example_dir, item)
+                dst = os.path.join(tmpdir, item)
+                if os.path.isfile(src):
+                    shutil.copy2(src, dst)
+                elif os.path.isdir(src):
+                    shutil.copytree(src, dst)
+
+            # Commit
+            subprocess.run(["git", "add", "."], cwd=tmpdir, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "Initial commit"],
+                         cwd=tmpdir, check=True, capture_output=True)
+
+            # Delete a file (this is a deletion, not an addition - should be allowed)
+            makefile_path = os.path.join(tmpdir, "Makefile")
+            if os.path.exists(makefile_path):
+                os.remove(makefile_path)
+
+            # Try to run boil - it should NOT fail due to unmerged additions
+            # (it may fail for other reasons like missing Makefile, but not due to unmerged additions)
+            result = subprocess.run(
+                ["boil", "make", "test"],
+                cwd=tmpdir,
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+
+            # Should not fail due to unmerged additions
+            combined_output = result.stdout + result.stderr
+            self.assertNotIn("unmerged additions", combined_output.lower(),
+                           f"Should not fail due to unmerged additions. Output: {combined_output}")
+
+
 if __name__ == "__main__":
     unittest.main()
