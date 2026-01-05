@@ -1082,6 +1082,7 @@ xcase$(EXEEXT):	$(SUPPORT_SRC)xcase.c
 
 test: $(Program) testty.py
 	python3 testty.py --run "./bash --norc --noprofile" --input "echo 'hello world'[enter][sleep:100][ctrl-D]" | grep -q "hello world"
+	make clean
 
 tests check:	force $(Program) $(TESTS_SUPPORT)
 	@-test -d tests || mkdir tests
