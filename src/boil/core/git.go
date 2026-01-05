@@ -447,6 +447,7 @@ func isBuildArtifact(path string) bool {
 	// Known build tool binaries (generators that compile from source in different dirs)
 	buildTools := []string{
 		"mksignames", "mksyntax", "mkbuiltins", "psize.aux",
+		"bashversion", "bash", "bash.exe",
 	}
 	for _, tool := range buildTools {
 		if base == tool {
