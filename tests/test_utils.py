@@ -86,8 +86,8 @@ def copy_and_boil(
 
         # Copy files from source directory
         for item in os.listdir(src_dir):
-            # Skip hidden files/directories
-            if item.startswith('.'):
+            # Skip .git but allow .boil (needed for plugins)
+            if item == '.git':
                 continue
             src = os.path.join(src_dir, item)
             dst = os.path.join(tmpdir, item)
