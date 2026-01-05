@@ -421,17 +421,44 @@ func isBuildArtifact(path string) bool {
 		return true
 	}
 
-	// Object files
-	if strings.HasSuffix(path, ".o") || strings.HasSuffix(path, ".obj") {
+	// Object files and libraries
+	if strings.HasSuffix(path, ".o") || strings.HasSuffix(path, ".obj") || strings.HasSuffix(path, ".a") {
 		return true
+	}
+
+	// Common build marker files
+	base := filepath.Base(path)
+	if base == ".build" || base == ".made" || strings.HasSuffix(path, ".aux") {
+		return true
+	}
+
+	// Generated files from autotools/make (common patterns)
+	// These are typically generated during build and can be regenerated
+	generatedPatterns := []string{
+		"signames.h", "lsignames.h", "syntax.c", "version.h",
+		"pipesize.h", "builtext.h", "builtins.c",
+	}
+	for _, pattern := range generatedPatterns {
+		if base == pattern {
+			return true
+		}
+	}
+
+	// Known build tool binaries (generators that compile from source in different dirs)
+	buildTools := []string{
+		"mksignames", "mksyntax", "mkbuiltins", "psize.aux",
+	}
+	for _, tool := range buildTools {
+		if base == tool {
+			return true
+		}
 	}
 
 	// Common compiled/build outputs (no extension in root directory)
 	// Check if corresponding source file exists in git history
-	base := filepath.Base(path)
 	dir := filepath.Dir(path)
-	if !strings.Contains(base, ".") && (dir == "." || dir == "") {
-		// File has no extension and is in root - check for source file in git
+	if !strings.Contains(base, ".") && (dir == "." || dir == "" || strings.HasPrefix(dir, "builtins")) {
+		// File has no extension - check for source file in git
 		sourceExts := []string{".c", ".go", ".rs", ".cpp", ".cc"}
 		for _, ext := range sourceExts {
 			// Check if source exists in working dir
