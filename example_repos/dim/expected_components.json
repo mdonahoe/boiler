@@ -1,5 +1,6 @@
 {
   "detectors": [
+    "CSyntaxErrorDetector",
     "FopenNoSuchFileDetector",
     "MakeEnteringDirectoryDetector",
     "MakeMissingTargetDetector",
@@ -7,6 +8,7 @@
     "TestFailureDetector"
   ],
   "planners": [
+    "CSyntaxErrorPlanner",
     "MakeMissingTargetPlanner",
     "MakeNoRulePlanner",
     "MissingFilePlanner",
