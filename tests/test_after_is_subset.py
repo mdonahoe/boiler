@@ -56,18 +56,17 @@ class AfterIsSubsetTest(unittest.TestCase):
         for after_file in after_files:
             relative_path = os.path.relpath(after_file, after_dir)
             if relative_path not in before_files_set:
+                # Collect all extra files first
+                after_files_rel = set(os.path.relpath(f, after_dir) for f in after_files)
+                extra_files = sorted(after_files_rel - before_files_set)
+
                 msg = f"\n{'='*70}\n"
-                msg += f"[{subrepo_name}] EXTRA FILE IN after/ THAT DOESN'T EXIST IN before/\n"
+                msg += f"[{subrepo_name}] EXTRA FILES IN after/ THAT DON'T EXIST IN before/\n"
                 msg += f"{'='*70}\n"
-                msg += f"File: {relative_path}\n\n"
-                msg += f"Files in before/:\n"
-                for f in sorted(before_files_set):
+                msg += f"Found {len(extra_files)} extra file(s):\n"
+                for f in extra_files:
                     msg += f"  - {f}\n"
-                msg += f"\nFiles in after/:\n"
-                after_files_rel = sorted(os.path.relpath(f, after_dir) for f in after_files)
-                for f in after_files_rel:
-                    mark = " <-- EXTRA" if f == relative_path else ""
-                    msg += f"  - {f}{mark}\n"
+                msg += f"\nSummary: before/ has {len(before_files_set)} files, after/ has {len(after_files_rel)} files\n"
                 msg += f"{'='*70}\n"
                 self.fail(msg)
 
