@@ -547,6 +547,60 @@ func BoilCheck() int {
 	}
 	fmt.Println()
 
+	// If the latest iteration failed, show the error output
+	if pipelineFailures > 0 && len(jsonFiles) > 0 {
+		// Sort JSON files to find the latest one
+		for i := 0; i < len(jsonFiles); i++ {
+			for j := i + 1; j < len(jsonFiles); j++ {
+				var iNum, jNum int
+				fmt.Sscanf(jsonFiles[i], "iter%d", &iNum)
+				fmt.Sscanf(jsonFiles[j], "iter%d", &jNum)
+				if jNum > iNum {
+					jsonFiles[i], jsonFiles[j] = jsonFiles[j], jsonFiles[i]
+				}
+			}
+		}
+
+		latestJSON := filepath.Join(boilDir, jsonFiles[0])
+		latestData, err := os.ReadFile(latestJSON)
+		if err == nil {
+			var latest map[string]interface{}
+			if json.Unmarshal(latestData, &latest) == nil {
+				if success, ok := latest["success"].(bool); ok && !success {
+					// Extract iteration number from filename
+					var iterNum int
+					fmt.Sscanf(jsonFiles[0], "iter%d", &iterNum)
+
+					// Find the corresponding error output file
+					var errorFile string
+					for _, entry := range entries {
+						name := entry.Name()
+						if strings.HasPrefix(name, fmt.Sprintf("iter%d.exit", iterNum)) && strings.HasSuffix(name, ".txt") {
+							errorFile = filepath.Join(boilDir, name)
+							break
+						}
+					}
+
+					if errorFile != "" {
+						errOutput, err := os.ReadFile(errorFile)
+						if err == nil && len(errOutput) > 0 {
+							fmt.Println(strings.Repeat("=", 80))
+							fmt.Println("LATEST ITERATION ERROR OUTPUT")
+							fmt.Println(strings.Repeat("=", 80))
+							output := string(errOutput)
+							// Truncate if too long
+							if len(output) > 3000 {
+								output = output[:3000] + "\n... (truncated, see " + errorFile + " for full output)"
+							}
+							fmt.Println(output)
+							fmt.Println()
+						}
+					}
+				}
+			}
+		}
+	}
+
 	return 0
 }
 
@@ -793,9 +847,26 @@ func ClearRandomFileSoft() {
 		return
 	}
 
+	// Filter out files with 'test' in the name (case-insensitive)
+	// Test files are important for boiler to function and should not be cleared
+	var eligibleFiles []string
+	for _, f := range trackedFiles {
+		lowerPath := strings.ToLower(f)
+		if !strings.Contains(lowerPath, "test") {
+			eligibleFiles = append(eligibleFiles, f)
+		}
+	}
+
+	if len(eligibleFiles) == 0 {
+		fmt.Println("No eligible files found to clear (all files contain 'test' in name)!")
+		return
+	}
+
+	fmt.Printf("Found %d eligible files (excluded %d test files)\n", len(eligibleFiles), len(trackedFiles)-len(eligibleFiles))
+
 	// Pick a random file
 	rand.Seed(time.Now().UnixNano())
-	randomFile := trackedFiles[rand.Intn(len(trackedFiles))]
+	randomFile := eligibleFiles[rand.Intn(len(eligibleFiles))]
 	fmt.Printf("Selected file: %s\n", randomFile)
 
 	// Clear its content
