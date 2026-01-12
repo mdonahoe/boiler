@@ -778,32 +778,50 @@ func getErrorSummary(repoPath string) string {
 
 // createClaudePrompt creates the prompt to send to Claude
 func createClaudePrompt(repoPath string, errorSummary string) string {
-	return fmt.Sprintf(`I need your help fixing boiler to handle errors in this repository.
+	return fmt.Sprintf(`I need your help creating boiler plugins to handle errors in this repository.
 
-IMPORTANT SETUP:
-- You are working in TWO directories:
-  1. ~/boiler - The boiler codebase (where you'll make changes)
-  2. %s - The target repo with the .boil folder (where errors happened)
-- Start by reading ~/boiler/AGENTS.md for detailed instructions
-- Then analyze %s/.boil/ for error details
+WORKING DIRECTORY:
+%s
 
 CURRENT SITUATION:
-Boiler has failed to fix errors in %s
+Boiler has failed to fix errors in this repository.
 
 Status from 'boil --check':
 %s
 
 YOUR TASK:
-Follow the instructions in ~/boiler/AGENTS.md and:
-1. Analyze the debugging information in %s/.boil/
-2. Understand what error pattern boiler couldn't handle
-3. Create new detectors/planners in ~/boiler/src/boil/ to handle this error
-4. Test your changes with 'make check' in ~/boiler
-5. Validate the fix works by running 'boil make test' in %s
-6. Commit your changes.
+Create plugins in %s/.boil/plugins/ to handle this error pattern.
 
-Make boiler handle this error pattern generically for ANY repository, not just this specific case.
-`, repoPath, repoPath, repoPath, errorSummary, repoPath, repoPath)
+1. Analyze the debugging information in %s/.boil/iterations/
+   - Read the iter*.pipeline.json files to see what clues were detected
+   - Read the iter*.exit*.txt files to see the actual error output
+   - Identify what error pattern boiler couldn't handle
+
+2. Create a detector plugin (if the error isn't being detected):
+   - Create %s/.boil/plugins/detectors/<name>.json
+   - Use regex patterns with named groups to extract context
+   - Example format:
+     {
+       "name": "MyDetector",
+       "patterns": {
+         "my_error_type": "error: (?P<message>.+) in (?P<file>.+)"
+       },
+       "examples": [
+         {"input": "error: failed in foo.txt", "clue_type": "my_error_type", "context": {"message": "failed", "file": "foo.txt"}}
+       ]
+     }
+
+3. Create a planner plugin (if the error is detected but not fixed):
+   - Create %s/.boil/plugins/planners/<name>.star
+   - Starlark planners can use: git_show(), git_grep(), file_exists(), read_file(), regex_match()
+   - Must define: name(), can_handle(clue_type), plan(clues, git_state)
+   - Return plans with: plan_type, action, target_file, params, reason
+
+4. Test by running: boil --abort && boil make test
+   - Use BOIL_VERBOSE=1 to see plugin loading and plan generation
+
+See ~/boiler/AGENTS.md "Plugin System" section for detailed documentation.
+`, repoPath, errorSummary, repoPath, repoPath, repoPath, repoPath)
 }
 
 // DeleteAllFilesHard deletes all files in the repo before starting the boiling session
