@@ -15,26 +15,19 @@ import (
 	"github.com/mdonahoe/boiler/src/boil/pipeline"
 )
 
+// BoilDir is the main boil directory
+const BoilDir = ".boil"
+
+// IterationsDir is the subdirectory for iteration files (easy to delete)
+const IterationsDir = ".boil/iterations"
+
 // CleanBoilSession removes session files from .boil/ but preserves plugins/
 func CleanBoilSession() {
-	entries, err := os.ReadDir(".boil")
-	if err != nil {
-		return
-	}
+	// Remove the iterations subdirectory
+	os.RemoveAll(IterationsDir)
 
-	for _, entry := range entries {
-		name := entry.Name()
-		// Remove iteration files and boil.index, but preserve plugins/
-		if strings.HasPrefix(name, "iter") || name == "boil.index" {
-			os.RemoveAll(filepath.Join(".boil", name))
-		}
-	}
-
-	// Remove .boil directory only if empty (no plugins remaining)
-	remaining, _ := os.ReadDir(".boil")
-	if len(remaining) == 0 {
-		os.Remove(".boil")
-	}
+	// Remove boil.index if it exists
+	os.Remove(filepath.Join(BoilDir, "boil.index"))
 }
 
 // Fix repeatedly runs a command, repairing files until it is fixed
@@ -105,14 +98,14 @@ func Fix(command []string, numIterations int, allowLegacy bool) (bool, error) {
 		return false, err
 	}
 
-	// Create .boil directory
-	os.MkdirAll(".boil", 0755)
+	// Create .boil and iterations directories
+	os.MkdirAll(IterationsDir, 0755)
 
 	// Count existing iterations
-	entries, _ := os.ReadDir(".boil")
+	entries, _ := os.ReadDir(IterationsDir)
 	n := 0
 	for _, entry := range entries {
-		if strings.HasPrefix(entry.Name(), "iter") {
+		if strings.HasPrefix(entry.Name(), "iter") && strings.HasSuffix(entry.Name(), ".pipeline.json") {
 			n++
 		}
 	}
@@ -135,7 +128,7 @@ func Fix(command []string, numIterations int, allowLegacy bool) (bool, error) {
 		fmt.Println(stderr)
 
 		errOutput := stdout + stderr
-		errorFile := fmt.Sprintf(".boil/iter%d.exit%d.txt", n, code)
+		errorFile := filepath.Join(IterationsDir, fmt.Sprintf("iter%d.exit%d.txt", n, code))
 		if writeErr := os.WriteFile(errorFile, []byte(errOutput), 0644); writeErr != nil {
 			return false, writeErr
 		}
@@ -176,7 +169,7 @@ func Fix(command []string, numIterations int, allowLegacy bool) (bool, error) {
 		}
 
 		// Always save debug JSON (even if pipeline didn't run or failed)
-		debugJSONPath := fmt.Sprintf(".boil/iter%d.pipeline.json", n)
+		debugJSONPath := filepath.Join(IterationsDir, fmt.Sprintf("iter%d.pipeline.json", n))
 		var debugData map[string]interface{}
 		if pipelineResult != nil {
 			debugData = pipelineResult.ToDict()
@@ -321,16 +314,15 @@ func FinishBoiling() int {
 
 // BoilCheck analyzes the current boil session and shows status/statistics
 func BoilCheck() int {
-	boilDir := ".boil"
-	if _, err := os.Stat(boilDir); os.IsNotExist(err) {
-		fmt.Printf("No %s directory found. Run boil first.\n", boilDir)
+	if _, err := os.Stat(IterationsDir); os.IsNotExist(err) {
+		fmt.Printf("No %s directory found. Run boil first.\n", IterationsDir)
 		return 1
 	}
 
 	// Find all pipeline JSON files
-	entries, err := os.ReadDir(boilDir)
+	entries, err := os.ReadDir(IterationsDir)
 	if err != nil {
-		fmt.Printf("Error reading %s directory: %v\n", boilDir, err)
+		fmt.Printf("Error reading %s directory: %v\n", IterationsDir, err)
 		return 1
 	}
 
@@ -342,7 +334,7 @@ func BoilCheck() int {
 	}
 
 	if len(jsonFiles) == 0 {
-		fmt.Printf("No pipeline JSON files found in %s\n", boilDir)
+		fmt.Printf("No pipeline JSON files found in %s\n", IterationsDir)
 		return 1
 	}
 
@@ -360,7 +352,7 @@ func BoilCheck() int {
 
 	// Analyze each file
 	for _, jsonFile := range jsonFiles {
-		path := filepath.Join(boilDir, jsonFile)
+		path := filepath.Join(IterationsDir, jsonFile)
 
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -561,7 +553,7 @@ func BoilCheck() int {
 			}
 		}
 
-		latestJSON := filepath.Join(boilDir, jsonFiles[0])
+		latestJSON := filepath.Join(IterationsDir, jsonFiles[0])
 		latestData, err := os.ReadFile(latestJSON)
 		if err == nil {
 			var latest map[string]interface{}
@@ -576,7 +568,7 @@ func BoilCheck() int {
 					for _, entry := range entries {
 						name := entry.Name()
 						if strings.HasPrefix(name, fmt.Sprintf("iter%d.exit", iterNum)) && strings.HasSuffix(name, ".txt") {
-							errorFile = filepath.Join(boilDir, name)
+							errorFile = filepath.Join(IterationsDir, name)
 							break
 						}
 					}
@@ -700,18 +692,18 @@ func AutoFixBoiler(args []string) int {
 
 	fmt.Fprintf(os.Stderr, "Checking boiler status in: %s\n\n", repoPath)
 
-	// Check if .boil directory exists
-	boilDir := filepath.Join(repoPath, ".boil")
-	if _, err := os.Stat(boilDir); os.IsNotExist(err) {
-		fmt.Fprintf(os.Stderr, "Status: No .boil directory found - boiler hasn't been run yet\n")
+	// Check if iterations directory exists
+	iterDir := filepath.Join(repoPath, IterationsDir)
+	if _, err := os.Stat(iterDir); os.IsNotExist(err) {
+		fmt.Fprintf(os.Stderr, "Status: No %s directory found - boiler hasn't been run yet\n", IterationsDir)
 		fmt.Fprintf(os.Stderr, "\nNothing to fix!\n")
 		return 0
 	}
 
 	// Find pipeline JSON files
-	entries, err := os.ReadDir(boilDir)
+	entries, err := os.ReadDir(iterDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading .boil directory: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error reading %s directory: %v\n", IterationsDir, err)
 		return 1
 	}
 
@@ -741,7 +733,7 @@ func AutoFixBoiler(args []string) int {
 		}
 	}
 
-	latestFile := filepath.Join(boilDir, pipelineFiles[len(pipelineFiles)-1])
+	latestFile := filepath.Join(iterDir, pipelineFiles[len(pipelineFiles)-1])
 	data, err := os.ReadFile(latestFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error reading pipeline file: %v\n", err)

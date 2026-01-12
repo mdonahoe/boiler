@@ -201,15 +201,15 @@ func writeFailureReport(t *testing.T, tmpDir, stage string, output []byte, err e
 	})
 	report.WriteString("\n")
 
-	// Check for .boil directory and include debug info
-	boilDir := filepath.Join(tmpDir, ".boil")
-	if info, err := os.Stat(boilDir); err == nil && info.IsDir() {
+	// Check for .boil/iterations directory and include debug info
+	iterDir := filepath.Join(tmpDir, IterationsDir)
+	if info, err := os.Stat(iterDir); err == nil && info.IsDir() {
 		report.WriteString("-" + strings.Repeat("-", 79) + "\n")
-		report.WriteString(".boil directory contents:\n")
+		report.WriteString(".boil/iterations directory contents:\n")
 		report.WriteString("-" + strings.Repeat("-", 79) + "\n")
 
 		// List pipeline JSON files
-		files, _ := filepath.Glob(filepath.Join(boilDir, "iter*.pipeline.json"))
+		files, _ := filepath.Glob(filepath.Join(iterDir, "iter*.pipeline.json"))
 		for _, f := range files {
 			report.WriteString(fmt.Sprintf("\n--- %s ---\n", filepath.Base(f)))
 			content, err := os.ReadFile(f)
@@ -225,7 +225,7 @@ func writeFailureReport(t *testing.T, tmpDir, stage string, output []byte, err e
 		}
 
 		// Include last exit output
-		exitFiles, _ := filepath.Glob(filepath.Join(boilDir, "iter*.exit*.txt"))
+		exitFiles, _ := filepath.Glob(filepath.Join(iterDir, "iter*.exit*.txt"))
 		if len(exitFiles) > 0 {
 			lastExit := exitFiles[len(exitFiles)-1]
 			report.WriteString(fmt.Sprintf("\n--- %s ---\n", filepath.Base(lastExit)))

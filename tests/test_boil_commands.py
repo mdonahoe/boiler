@@ -89,7 +89,7 @@ class TestBoilAbort(unittest.TestCase):
 
     def test_abort_restores_working_directory(self):
         """boil --abort should restore working directory to pre-boil state"""
-                example_dir = os.path.join(BOILER_DIR, "example_repos", "simple", "before")
+        example_dir = os.path.join(BOILER_DIR, "example_repos", "simple", "before")
 
         # Create a temp directory and set up a test scenario
         tmpdir = tempfile.mkdtemp(prefix="boil_abort_test_")
@@ -202,7 +202,7 @@ class TestBoilFinish(unittest.TestCase):
 
     def test_finish_removes_boil_directory(self):
         """boil --finish should remove .boil directory but keep working directory state"""
-                example_dir = os.path.join(BOILER_DIR, "example_repos", "simple", "before")
+        example_dir = os.path.join(BOILER_DIR, "example_repos", "simple", "before")
 
         # Run boil to create a session
         with copy_and_boil(
@@ -393,7 +393,7 @@ class TestBoilUncommittedChanges(unittest.TestCase):
 
     def test_boil_allows_file_deletions(self):
         """boil should allow running when entire files are deleted (tracked in git)"""
-                example_dir = os.path.join(BOILER_DIR, "example_repos", "simple", "before")
+        example_dir = os.path.join(BOILER_DIR, "example_repos", "simple", "before")
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # Initialize a git repo
