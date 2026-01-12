@@ -18,14 +18,17 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 # Import test utilities
 from tests.test_utils import copy_and_boil
 
+# Use local boil binary, not system-installed one
+BOILER_DIR = os.path.dirname(os.path.dirname(__file__))
+BOIL_SCRIPT = os.path.join(BOILER_DIR, "boil")
+
 
 class TestBoilCheck(unittest.TestCase):
     """Test boil --check command"""
 
     def test_check_shows_stats_after_boiling(self):
         """boil --check should show statistics after a boiling session"""
-        boiler_dir = os.path.dirname(os.path.dirname(__file__))
-        example_dir = os.path.join(boiler_dir, "example_repos", "simple", "before")
+        example_dir = os.path.join(BOILER_DIR, "example_repos", "simple", "before")
 
         # Run boil to create a session
         with copy_and_boil(
@@ -35,9 +38,9 @@ class TestBoilCheck(unittest.TestCase):
         ) as result:
             tmpdir = result['tmpdir']
 
-            # Now run boil --check in the same directory
+            # Now run boil --check in the same directory (use local binary)
             check_result = subprocess.run(
-                ["boil", "--check"],
+                [BOIL_SCRIPT, "--check"],
                 cwd=tmpdir,
                 capture_output=True,
                 text=True
@@ -67,7 +70,7 @@ class TestBoilCheck(unittest.TestCase):
 
             # Try to run boil --check
             check_result = subprocess.run(
-                ["boil", "--check"],
+                [BOIL_SCRIPT, "--check"],
                 cwd=tmpdir,
                 capture_output=True,
                 text=True
@@ -86,8 +89,7 @@ class TestBoilAbort(unittest.TestCase):
 
     def test_abort_restores_working_directory(self):
         """boil --abort should restore working directory to pre-boil state"""
-        boiler_dir = os.path.dirname(os.path.dirname(__file__))
-        example_dir = os.path.join(boiler_dir, "example_repos", "simple", "before")
+                example_dir = os.path.join(BOILER_DIR, "example_repos", "simple", "before")
 
         # Create a temp directory and set up a test scenario
         tmpdir = tempfile.mkdtemp(prefix="boil_abort_test_")
@@ -127,7 +129,7 @@ class TestBoilAbort(unittest.TestCase):
 
             # Run boil (it should create a session)
             boil_result = subprocess.run(
-                ["boil", "make", "test"],
+                [BOIL_SCRIPT, "make", "test"],
                 cwd=tmpdir,
                 capture_output=True,
                 text=True,
@@ -145,7 +147,7 @@ class TestBoilAbort(unittest.TestCase):
 
             # Now run boil --abort
             abort_result = subprocess.run(
-                ["boil", "--abort"],
+                [BOIL_SCRIPT, "--abort"],
                 cwd=tmpdir,
                 capture_output=True,
                 text=True
@@ -180,7 +182,7 @@ class TestBoilAbort(unittest.TestCase):
 
             # Try to run boil --abort
             abort_result = subprocess.run(
-                ["boil", "--abort"],
+                [BOIL_SCRIPT, "--abort"],
                 cwd=tmpdir,
                 capture_output=True,
                 text=True
@@ -200,8 +202,7 @@ class TestBoilFinish(unittest.TestCase):
 
     def test_finish_removes_boil_directory(self):
         """boil --finish should remove .boil directory but keep working directory state"""
-        boiler_dir = os.path.dirname(os.path.dirname(__file__))
-        example_dir = os.path.join(boiler_dir, "example_repos", "simple", "before")
+                example_dir = os.path.join(BOILER_DIR, "example_repos", "simple", "before")
 
         # Run boil to create a session
         with copy_and_boil(
@@ -222,7 +223,7 @@ class TestBoilFinish(unittest.TestCase):
 
             # Run boil --finish
             finish_result = subprocess.run(
-                ["boil", "--finish"],
+                [BOIL_SCRIPT, "--finish"],
                 cwd=tmpdir,
                 capture_output=True,
                 text=True
@@ -256,7 +257,7 @@ class TestBoilFinish(unittest.TestCase):
 
             # Try to run boil --finish
             finish_result = subprocess.run(
-                ["boil", "--finish"],
+                [BOIL_SCRIPT, "--finish"],
                 cwd=tmpdir,
                 capture_output=True,
                 text=True
@@ -296,7 +297,7 @@ class TestBoilUncommittedChanges(unittest.TestCase):
 
             # Try to run boil - it should fail
             result = subprocess.run(
-                ["boil", "echo", "test"],
+                [BOIL_SCRIPT, "echo", "test"],
                 cwd=tmpdir,
                 capture_output=True,
                 text=True
@@ -334,7 +335,7 @@ class TestBoilUncommittedChanges(unittest.TestCase):
 
             # Try to run boil - it should fail
             result = subprocess.run(
-                ["boil", "echo", "test"],
+                [BOIL_SCRIPT, "echo", "test"],
                 cwd=tmpdir,
                 capture_output=True,
                 text=True
@@ -375,7 +376,7 @@ class TestBoilUncommittedChanges(unittest.TestCase):
 
             # Try to run boil - it should fail
             result = subprocess.run(
-                ["boil", "echo", "test"],
+                [BOIL_SCRIPT, "echo", "test"],
                 cwd=tmpdir,
                 capture_output=True,
                 text=True
@@ -392,8 +393,7 @@ class TestBoilUncommittedChanges(unittest.TestCase):
 
     def test_boil_allows_file_deletions(self):
         """boil should allow running when entire files are deleted (tracked in git)"""
-        boiler_dir = os.path.dirname(os.path.dirname(__file__))
-        example_dir = os.path.join(boiler_dir, "example_repos", "simple", "before")
+                example_dir = os.path.join(BOILER_DIR, "example_repos", "simple", "before")
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # Initialize a git repo
@@ -427,7 +427,7 @@ class TestBoilUncommittedChanges(unittest.TestCase):
             # Try to run boil - it should NOT fail due to uncommitted changes
             # (deletions are OK because they're tracked in git)
             result = subprocess.run(
-                ["boil", "make", "test"],
+                [BOIL_SCRIPT, "make", "test"],
                 cwd=tmpdir,
                 capture_output=True,
                 text=True,
@@ -463,7 +463,7 @@ class TestBoilUncommittedChanges(unittest.TestCase):
             # Try to run boil - it should NOT fail due to uncommitted changes
             # (removing lines is OK because the content is tracked in git)
             result = subprocess.run(
-                ["boil", "echo", "test"],
+                [BOIL_SCRIPT, "echo", "test"],
                 cwd=tmpdir,
                 capture_output=True,
                 text=True
