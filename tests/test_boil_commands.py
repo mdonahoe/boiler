@@ -157,9 +157,10 @@ class TestBoilAbort(unittest.TestCase):
             self.assertEqual(abort_result.returncode, 0,
                            f"boil --abort should succeed. stderr: {abort_result.stderr}")
 
-            # .boil directory should be removed
-            self.assertFalse(os.path.exists(boil_dir),
-                           ".boil directory should be removed after abort")
+            # .boil/iterations directory should be removed (but .boil may remain for plugins)
+            iterations_dir = os.path.join(tmpdir, ".boil", "iterations")
+            self.assertFalse(os.path.exists(iterations_dir),
+                           ".boil/iterations should be removed after abort")
 
             # Makefile should still be deleted (restored to pre-boil state)
             self.assertFalse(os.path.exists(makefile_path),
@@ -233,9 +234,10 @@ class TestBoilFinish(unittest.TestCase):
             self.assertEqual(finish_result.returncode, 0,
                            f"boil --finish should succeed. stderr: {finish_result.stderr}")
 
-            # .boil directory should be removed
-            self.assertFalse(os.path.exists(boil_dir),
-                           ".boil directory should be removed after finish")
+            # .boil/iterations directory should be removed (but .boil may remain for plugins)
+            iterations_dir = os.path.join(tmpdir, ".boil", "iterations")
+            self.assertFalse(os.path.exists(iterations_dir),
+                           ".boil/iterations should be removed after finish")
 
             # Working directory state should be preserved
             # (Makefile should still exist if it was there before)
