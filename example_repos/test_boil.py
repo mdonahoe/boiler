@@ -33,8 +33,12 @@ sys.path.insert(0, boiler_root)
 from tests.test_utils import run_boil_with_profiling, analyze_boil_debug, copy_and_boil
 
 
-def get_available_repos():
-    """Get list of available example repos"""
+def get_available_repos(include_slow=False):
+    """Get list of available example repos
+
+    Args:
+        include_slow: If False, exclude repos with skip_slow.txt marker
+    """
     example_repos_dir = os.path.dirname(os.path.abspath(__file__))
 
     if not os.path.exists(example_repos_dir):
@@ -44,13 +48,23 @@ def get_available_repos():
     for item in os.listdir(example_repos_dir):
         repo_path = os.path.join(example_repos_dir, item)
         before_dir = os.path.join(repo_path, "before")
+        skip_marker = os.path.join(repo_path, "skip_slow.txt")
+
         if os.path.isdir(repo_path) and os.path.exists(before_dir):
-            repos.append(item)
+            if include_slow or not os.path.exists(skip_marker):
+                repos.append(item)
 
     return sorted(repos)
 
 
-def profile_repo(repo_name, max_iterations=1000, timeout=120, verbose=True):
+def is_slow_repo(repo_name):
+    """Check if a repo has the skip_slow.txt marker"""
+    example_repos_dir = os.path.dirname(os.path.abspath(__file__))
+    skip_marker = os.path.join(example_repos_dir, repo_name, "skip_slow.txt")
+    return os.path.exists(skip_marker)
+
+
+def profile_repo(repo_name, max_iterations=1000, timeout=120, verbose=True, force_slow=False):
     """Profile a specific example repo
 
     Args:
@@ -58,6 +72,7 @@ def profile_repo(repo_name, max_iterations=1000, timeout=120, verbose=True):
         max_iterations: Maximum iterations for boil
         timeout: Timeout in seconds
         verbose: Whether to enable verbose output
+        force_slow: If True, run even if repo has skip_slow.txt marker
 
     Returns:
         tuple: (tmpdir, success) - Path to temp directory and whether boiling succeeded
@@ -68,9 +83,18 @@ def profile_repo(repo_name, max_iterations=1000, timeout=120, verbose=True):
     example_before_dir = os.path.join(example_repos_dir, repo_name, "before")
 
     if not os.path.exists(example_before_dir):
-        available = get_available_repos()
+        available = get_available_repos(include_slow=True)
         print(f"Error: Example repo '{repo_name}' not found.")
         print(f"Available repos: {', '.join(available)}")
+        sys.exit(1)
+
+    # Check for slow repo marker
+    if is_slow_repo(repo_name) and not force_slow:
+        skip_file = os.path.join(example_repos_dir, repo_name, "skip_slow.txt")
+        print(f"Warning: '{repo_name}' is marked as slow (see {skip_file})")
+        print(f"The default timeout ({timeout}s) may not be sufficient.")
+        print(f"Use --include-slow to run anyway, or -t to set a longer timeout.")
+        print(f"Example: python3 test_boil.py {repo_name} -t 3600 --include-slow")
         sys.exit(1)
 
     print(f"Profiling example repo: {repo_name}")
@@ -278,7 +302,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Profile example repo tests to find bottlenecks",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=f"Available repos: {', '.join(get_available_repos())}"
+        epilog=f"Available repos: {', '.join(get_available_repos())}\nSlow repos (require --include-slow): {', '.join(r for r in get_available_repos(include_slow=True) if is_slow_repo(r)) or 'none'}"
     )
 
     parser.add_argument(
@@ -306,6 +330,12 @@ def main():
         '--no-verbose',
         action='store_true',
         help="Don't set BOIL_VERBOSE=1"
+    )
+
+    parser.add_argument(
+        '--include-slow',
+        action='store_true',
+        help='Include repos marked as slow (have skip_slow.txt)'
     )
 
     parser.add_argument(
@@ -344,7 +374,8 @@ def main():
             repo_name=args.repo_name,
             max_iterations=args.max_iterations,
             timeout=args.timeout,
-            verbose=not args.no_verbose
+            verbose=not args.no_verbose,
+            force_slow=args.include_slow
         )
 
         status = "SUCCESS" if success else "FAILED"

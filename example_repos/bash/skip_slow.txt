@@ -1,0 +1,9 @@
+This example is too slow for automated testing.
+
+The bash build takes several minutes per iteration, and restoring 1600+
+files from scratch requires many iterations.
+
+To run manually with a longer timeout:
+    python3 test_boil.py bash -t 3600
+
+Or test incrementally by deleting specific files instead of all files.
