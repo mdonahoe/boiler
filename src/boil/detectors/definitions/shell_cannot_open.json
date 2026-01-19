@@ -2,7 +2,7 @@
   "name": "ShellCannotOpenDetector",
   "priority": 100,
   "patterns": {
-    "missing_file": "sh:\\s*\\d+:\\s*cannot open\\s+(?P<file_path>[^\\s:]+):\\s*No such file"
+    "missing_file": "(?:/bin/)?sh:\\s*\\d+:\\s*cannot open\\s+(?P<file_path>[^\\s:]+):\\s*No such file"
   },
   "examples": [
     {
@@ -11,6 +11,14 @@
       "clue_type": "missing_file",
       "context": {
         "file_path": "config.sh"
+      }
+    },
+    {
+      "name": "missing_file_bin_sh",
+      "input": "/bin/sh: 0: cannot open ./psize.sh: No such file",
+      "clue_type": "missing_file",
+      "context": {
+        "file_path": "./psize.sh"
       }
     }
   ]
