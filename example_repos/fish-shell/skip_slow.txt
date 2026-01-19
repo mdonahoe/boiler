@@ -1,0 +1,12 @@
+This example requires significant memory and is too slow for automated testing.
+
+Fish-shell is a Rust project that requires cargo to build. The Rust compiler
+and linker need substantial memory (4GB+ recommended), causing OOM kills on
+instances with 2GB RAM or less.
+
+To run manually on a machine with sufficient memory:
+    cd before/
+    boil --hard make test
+
+Note: This example does not yet have an after/ directory since boiling
+has not been successfully completed.
