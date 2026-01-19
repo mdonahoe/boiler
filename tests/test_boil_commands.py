@@ -548,6 +548,80 @@ class TestBoilSearch(unittest.TestCase):
             self.assertIn("Phase 2", combined_output,
                          "Output should mention Phase 2")
 
+    def test_search_on_dim_repo(self):
+        """boil --search should work on dim repo and restore dim.c"""
+        example_dir = os.path.join(BOILER_DIR, "example_repos", "dim", "before")
+
+        if not os.path.exists(example_dir):
+            self.skipTest(f"Dim example repo not found at {example_dir}")
+
+        # Get original dim.c size for comparison
+        original_dim_c = os.path.join(example_dir, "dim.c")
+        if not os.path.exists(original_dim_c):
+            self.skipTest("dim.c not found in dim example repo")
+
+        original_size = os.path.getsize(original_dim_c)
+
+        # Run boil --search
+        with copy_and_boil(
+            src_dir=example_dir,
+            test_command=["make", "test"],
+            boil_args=["--search"],
+            preserve_tmpdir=True,  # Keep tmpdir to check file sizes
+            verify_before=True,
+            delete_files=True,
+            timeout=300  # Search on dim repo may take longer
+        ) as result:
+            tmpdir = result['tmpdir']
+
+            try:
+                # Should succeed
+                self.assertTrue(
+                    result['success'],
+                    f"boil --search should succeed on dim repo.\n"
+                    f"stdout: {result['boil_result'].stdout[-2000:]}\n"
+                    f"stderr: {result['boil_result'].stderr[-2000:]}"
+                )
+
+                # Check dim.c was restored
+                restored_dim_c = os.path.join(tmpdir, "dim.c")
+                self.assertTrue(
+                    os.path.exists(restored_dim_c),
+                    "dim.c should be restored after boil --search"
+                )
+
+                restored_size = os.path.getsize(restored_dim_c)
+
+                # Verify test still passes with the restored file
+                test_result = subprocess.run(
+                    ["make", "test"],
+                    cwd=tmpdir,
+                    capture_output=True,
+                    text=True
+                )
+                self.assertEqual(
+                    test_result.returncode, 0,
+                    f"Tests should pass with restored dim.c.\n"
+                    f"stdout: {test_result.stdout}\n"
+                    f"stderr: {test_result.stderr}"
+                )
+
+                # Log size comparison for analysis
+                # Note: Current search mode may not reduce dim.c because:
+                # 1. dim tests are runtime assertions, not compile-time errors
+                # 2. Element-level restoration works best for missing symbols
+                # Future improvement: smarter runtime test analysis
+                if restored_size < original_size:
+                    print(f"SUCCESS: dim.c reduced from {original_size} to {restored_size} bytes "
+                          f"({original_size - restored_size} bytes smaller)")
+                else:
+                    print(f"NOTE: dim.c not reduced ({restored_size} bytes). "
+                          f"Search mode element-level restoration not applicable for runtime tests.")
+            finally:
+                # Clean up tmpdir
+                import shutil
+                shutil.rmtree(tmpdir, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()
