@@ -983,16 +983,23 @@ func DeleteAllFilesHard() {
 	}
 
 	fmt.Printf("Found %d tracked files\n", len(trackedFiles))
+	deleted := 0
 	for _, filePath := range trackedFiles {
+		// Skip .boil/ directory - it contains plugins and session data
+		if strings.HasPrefix(filePath, ".boil/") || strings.HasPrefix(filePath, ".boil\\") {
+			fmt.Printf("Preserving .boil file: %s\n", filePath)
+			continue
+		}
 		if info, err := os.Stat(filePath); err == nil && !info.IsDir() {
 			fmt.Printf("Deleting tracked file: %s\n", filePath)
 			os.Remove(filePath)
+			deleted++
 		} else {
 			fmt.Printf("Skipping non-existent file: %s\n", filePath)
 		}
 	}
 
-	fmt.Println("=== All tracked files deleted ===")
+	fmt.Printf("=== Deleted %d tracked files (.boil/ preserved) ===\n", deleted)
 }
 
 // ClearRandomFileSoft picks a random file and clears its content before starting the boiling session
