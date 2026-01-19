@@ -42,6 +42,12 @@ func (p *MissingFilePlanner) planForClue(clue *pipeline.ErrorClue, gitState *pip
 		return nil
 	}
 
+	// In search mode (Phase 2), skip files that were discovered in Phase 1
+	// Let element-level planners handle these files instead of restore_full
+	if gitState.SearchMode && gitState.IsDiscoveredFile(filePath) {
+		return nil
+	}
+
 	// Make path relative if absolute
 	originalFilePath := filePath
 	if filepath.IsAbs(filePath) {
@@ -92,6 +98,11 @@ func (p *MissingFilePlanner) planForClue(clue *pipeline.ErrorClue, gitState *pip
 	targetFile := actualPath
 	if targetFile == "" {
 		targetFile = filePath
+	}
+
+	// Check again after path normalization for search mode
+	if gitState.SearchMode && gitState.IsDiscoveredFile(targetFile) {
+		return nil
 	}
 
 	return []*pipeline.RepairPlan{{

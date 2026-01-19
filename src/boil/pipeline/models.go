@@ -152,8 +152,18 @@ type PartialFileInfo struct {
 
 // GitState encapsulates git repository state
 type GitState struct {
-	Ref          string             // git ref to restore from (e.g., "HEAD")
-	DeletedFiles []string           // files deleted in working directory (sorted for determinism)
-	GitToplevel  string             // git repository root directory
-	PartialFiles []*PartialFileInfo // files with missing lines
+	Ref             string             // git ref to restore from (e.g., "HEAD")
+	DeletedFiles    []string           // files deleted in working directory (sorted for determinism)
+	GitToplevel     string             // git repository root directory
+	PartialFiles    []*PartialFileInfo // files with missing lines
+	SearchMode      bool               // True during Phase 2 of --search (element-level restoration)
+	DiscoveredFiles map[string]bool    // Files discovered during Phase 1 of --search
+}
+
+// IsDiscoveredFile checks if a file was discovered during Phase 1 of --search
+func (g *GitState) IsDiscoveredFile(filePath string) bool {
+	if g.DiscoveredFiles == nil {
+		return false
+	}
+	return g.DiscoveredFiles[filePath]
 }

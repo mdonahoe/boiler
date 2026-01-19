@@ -59,6 +59,10 @@ func (p *MissingDirectoryPlanner) Plan(clues []*pipeline.ErrorClue, gitState *pi
 		if strings.Contains(filePath, "*") || strings.Contains(filePath, "?") {
 			matchingFiles := matchGlob(filePath, gitState.DeletedFiles)
 			for _, deleted := range matchingFiles {
+				// In search mode, skip discovered files
+				if gitState.SearchMode && gitState.IsDiscoveredFile(deleted) {
+					continue
+				}
 				plans = append(plans, &pipeline.RepairPlan{
 					PlanType:   "restore_file",
 					Priority:   0,
@@ -81,6 +85,10 @@ func (p *MissingDirectoryPlanner) Plan(clues []*pipeline.ErrorClue, gitState *pi
 		}
 		if len(directoryFiles) > 0 {
 			for _, deleted := range directoryFiles {
+				// In search mode, skip discovered files
+				if gitState.SearchMode && gitState.IsDiscoveredFile(deleted) {
+					continue
+				}
 				plans = append(plans, &pipeline.RepairPlan{
 					PlanType:   "restore_file",
 					Priority:   0,

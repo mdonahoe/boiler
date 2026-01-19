@@ -139,10 +139,12 @@ func Fix(command []string, numIterations int, allowLegacy bool) (bool, error) {
 		// Build git state for pipeline (always needed for debug JSON)
 		gitInfo, _ := GetGitFileInfo(ref)
 		gitState := &pipeline.GitState{
-			Ref:          ref,
-			DeletedFiles: gitInfo.DeletedFiles,
-			GitToplevel:  gitInfo.GitToplevel,
-			PartialFiles: gitInfo.PartialFiles,
+			Ref:             ref,
+			DeletedFiles:    gitInfo.DeletedFiles,
+			GitToplevel:     gitInfo.GitToplevel,
+			PartialFiles:    gitInfo.PartialFiles,
+			SearchMode:      Ctx().SearchMode,
+			DiscoveredFiles: Ctx().DiscoveredFiles,
 		}
 
 		// Try pipeline system
@@ -231,6 +233,152 @@ func Fix(command []string, numIterations int, allowLegacy bool) (bool, error) {
 	}
 
 	return false, nil
+}
+
+// SearchFix runs a two-phase search to find minimal set of lines that satisfies tests
+// Phase 1: Normal fix with restore_full to discover which files are needed
+// Phase 2: Reset and re-run with element-level restoration for discovered files only
+func SearchFix(command []string, numIterations int, allowLegacy bool) (bool, error) {
+	fmt.Println("=== SEARCH MODE: Finding minimal set of lines ===")
+	fmt.Println()
+
+	// Phase 1: Discovery pass with normal restoration
+	fmt.Println("=== Phase 1: Discovery (full file restoration) ===")
+	success, err := Fix(command, numIterations, allowLegacy)
+	if err != nil {
+		return false, fmt.Errorf("phase 1 failed: %v", err)
+	}
+	if !success {
+		return false, fmt.Errorf("phase 1 did not succeed - cannot proceed to minimization")
+	}
+
+	// Collect files that were restored during Phase 1
+	discoveredFiles, err := collectRestoredFiles()
+	if err != nil {
+		return false, fmt.Errorf("failed to collect restored files: %v", err)
+	}
+
+	if len(discoveredFiles) == 0 {
+		fmt.Println("No files were restored during Phase 1 - nothing to minimize")
+		return true, nil
+	}
+
+	fmt.Printf("\nDiscovered %d file(s) during Phase 1:\n", len(discoveredFiles))
+	for f := range discoveredFiles {
+		fmt.Printf("  - %s\n", f)
+		AddDiscoveredFile(f)
+	}
+	fmt.Println()
+
+	// Reset to pre-boil broken state for Phase 2
+	fmt.Println("=== Resetting to broken state for Phase 2 ===")
+	if err := resetToBoilStart(); err != nil {
+		return false, fmt.Errorf("failed to reset for phase 2: %v", err)
+	}
+
+	// Clean up iterations from Phase 1 (keep plugins)
+	CleanBoilSession()
+
+	// Phase 2: Minimization pass with element-level restoration
+	fmt.Println()
+	fmt.Println("=== Phase 2: Minimization (element-level restoration) ===")
+	SetSearchMode(true)
+
+	success, err = Fix(command, numIterations, allowLegacy)
+	if err != nil {
+		return false, fmt.Errorf("phase 2 failed: %v", err)
+	}
+
+	SetSearchMode(false)
+
+	if success {
+		fmt.Println()
+		fmt.Println("=== Search complete: Found minimal set of lines ===")
+	}
+
+	return success, nil
+}
+
+// collectRestoredFiles reads pipeline JSON files to find all files that were restored
+func collectRestoredFiles() (map[string]bool, error) {
+	files := make(map[string]bool)
+
+	entries, err := os.ReadDir(IterationsDir)
+	if err != nil {
+		return files, err
+	}
+
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".pipeline.json") {
+			continue
+		}
+
+		path := filepath.Join(IterationsDir, entry.Name())
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+
+		var pipelineData map[string]interface{}
+		if err := json.Unmarshal(data, &pipelineData); err != nil {
+			continue
+		}
+
+		// Get files_modified from the pipeline result
+		if filesModified, ok := pipelineData["files_modified"].([]interface{}); ok {
+			for _, f := range filesModified {
+				if s, ok := f.(string); ok {
+					files[s] = true
+				}
+			}
+		}
+	}
+
+	return files, nil
+}
+
+// resetToBoilStart resets the working directory to the state right after boil_start
+// This is the "broken" state before any repairs were made
+func resetToBoilStart() error {
+	// Find the boil_start commit on the boiling branch
+	output, err := exec.Command("git", "log", "--format=%H", "--grep", "boil_start", fmt.Sprintf("HEAD..%s", BoilingBranch)).Output()
+	if err != nil {
+		return fmt.Errorf("could not find boil_start commit: %v", err)
+	}
+
+	commits := strings.Split(strings.TrimSpace(string(output)), "\n")
+	if len(commits) == 0 || commits[0] == "" {
+		return fmt.Errorf("no boil_start commit found on boiling branch")
+	}
+
+	boilStartCommit := commits[0]
+	fmt.Printf("Found boil_start commit: %s\n", boilStartCommit)
+
+	// Get the parent of boil_start (the original state)
+	parentCommit, err := exec.Command("git", "rev-parse", fmt.Sprintf("%s^", boilStartCommit)).Output()
+	if err != nil {
+		return fmt.Errorf("could not get parent of boil_start: %v", err)
+	}
+	parentCommitStr := strings.TrimSpace(string(parentCommit))
+
+	// Reset to parent (clean state)
+	if err := GitResetHard(parentCommitStr); err != nil {
+		return fmt.Errorf("reset to parent failed: %v", err)
+	}
+
+	// Apply the changes from boil_start (recreate the broken state)
+	cmd := exec.Command("sh", "-c", fmt.Sprintf("git show %s | git apply --allow-empty", boilStartCommit))
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to apply boil_start changes: %v", err)
+	}
+
+	// Reset the boiling branch to point to boil_start (discard Phase 1 commits)
+	if err := exec.Command("git", "branch", "-f", BoilingBranch, boilStartCommit).Run(); err != nil {
+		return fmt.Errorf("failed to reset boiling branch: %v", err)
+	}
+
+	fmt.Println("Successfully reset to broken state")
+	return nil
 }
 
 // AbortBoiling aborts current boiling session and restores working directory

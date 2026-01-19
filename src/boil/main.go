@@ -31,6 +31,7 @@ func main() {
 	fix := flag.String("fix", "", "invoke an AI assistant to fix boiler for unfixable errors (choices: claude)")
 	hard := flag.Bool("hard", false, "delete all files in the repo before starting the boiling session")
 	soft := flag.Bool("soft", false, "pick a random file and clear its content before starting the boiling session")
+	search := flag.Bool("search", false, "find minimal set of lines (not files) that satisfies tests")
 
 	// Parse flags
 	flag.Parse()
@@ -89,8 +90,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	if (*hard || *soft) && len(command) == 0 {
-		fmt.Fprintln(os.Stderr, "Error: --hard and --soft require a test command (e.g., 'boil --soft make test')")
+	if (*hard || *soft || *search) && len(command) == 0 {
+		fmt.Fprintln(os.Stderr, "Error: --hard, --soft, and --search require a test command (e.g., 'boil --search make test')")
 		os.Exit(1)
 	}
 
@@ -111,7 +112,15 @@ func main() {
 	}
 
 	// Main fix loop
-	success, err := core.Fix(command, *maxIterations, *legacy)
+	var success bool
+	var err error
+
+	if *search {
+		success, err = core.SearchFix(command, *maxIterations, *legacy)
+	} else {
+		success, err = core.Fix(command, *maxIterations, *legacy)
+	}
+
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)

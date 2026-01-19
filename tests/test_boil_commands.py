@@ -477,5 +477,77 @@ class TestBoilUncommittedChanges(unittest.TestCase):
                            f"Should not fail due to uncommitted additions when only removing lines. Output: {combined_output}")
 
 
+class TestBoilSearch(unittest.TestCase):
+    """Test boil --search command"""
+
+    def test_search_requires_command(self):
+        """boil --search should require a test command"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Initialize a git repo
+            subprocess.run(["git", "init"], cwd=tmpdir, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@example.com"],
+                         cwd=tmpdir, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.name", "Test User"],
+                         cwd=tmpdir, check=True, capture_output=True)
+
+            # Create and commit a file
+            with open(os.path.join(tmpdir, "test.txt"), "w") as f:
+                f.write("test content")
+            subprocess.run(["git", "add", "."], cwd=tmpdir, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "Initial"],
+                         cwd=tmpdir, check=True, capture_output=True)
+
+            # Try to run boil --search without a command
+            result = subprocess.run(
+                [BOIL_SCRIPT, "--search"],
+                cwd=tmpdir,
+                capture_output=True,
+                text=True
+            )
+
+            # Should fail
+            self.assertNotEqual(result.returncode, 0,
+                              "boil --search should fail without a command")
+
+            # Should mention that a command is required
+            combined_output = result.stdout + result.stderr
+            self.assertTrue(
+                "require" in combined_output.lower() or "command" in combined_output.lower(),
+                f"Should indicate a command is required. Output: {combined_output}"
+            )
+
+    def test_search_works_on_simple_repo(self):
+        """boil --search should work on a simple example repo"""
+        example_dir = os.path.join(BOILER_DIR, "example_repos", "simple", "before")
+
+        if not os.path.exists(example_dir):
+            self.skipTest(f"Simple example repo not found at {example_dir}")
+
+        # Run boil --search
+        with copy_and_boil(
+            src_dir=example_dir,
+            test_command=["make", "test"],
+            boil_args=["--search"],
+            preserve_tmpdir=False,
+            verify_before=True,
+            delete_files=True,
+            timeout=180  # Search takes longer (two phases)
+        ) as result:
+            # Should succeed
+            self.assertTrue(
+                result['success'],
+                f"boil --search should succeed on simple repo.\n"
+                f"stdout: {result['boil_result'].stdout[-2000:]}\n"
+                f"stderr: {result['boil_result'].stderr[-2000:]}"
+            )
+
+            # Output should mention search phases
+            combined_output = result['boil_result'].stdout + result['boil_result'].stderr
+            self.assertIn("Phase 1", combined_output,
+                         "Output should mention Phase 1")
+            self.assertIn("Phase 2", combined_output,
+                         "Output should mention Phase 2")
+
+
 if __name__ == "__main__":
     unittest.main()
