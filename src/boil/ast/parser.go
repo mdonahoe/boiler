@@ -5,6 +5,7 @@ package ast
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -491,4 +492,40 @@ func GetLabels(source []byte, lang Language) (map[string]bool, error) {
 		}
 	}
 	return labels, nil
+}
+
+// GetFunctionNames returns a list of function names defined in the source code
+func GetFunctionNames(source []byte, lang Language) ([]string, error) {
+	labels, err := GetLabels(source, lang)
+	if err != nil {
+		return nil, err
+	}
+
+	var functions []string
+	seen := make(map[string]bool)
+	for label := range labels {
+		if strings.HasPrefix(label, "function:") {
+			name := strings.TrimPrefix(label, "function:")
+			if !seen[name] {
+				functions = append(functions, name)
+				seen[name] = true
+			}
+		}
+	}
+	return functions, nil
+}
+
+// GetFunctionNamesFromFile reads a file and returns function names
+func GetFunctionNamesFromFile(filename string) ([]string, error) {
+	lang, err := InferLanguage(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	source, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	return GetFunctionNames(source, lang)
 }

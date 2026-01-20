@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mdonahoe/boiler/src/boil/ast"
 	"github.com/mdonahoe/boiler/src/boil/pipeline"
 )
 
@@ -235,9 +236,9 @@ func Fix(command []string, numIterations int, allowLegacy bool) (bool, error) {
 	return false, nil
 }
 
-// SearchFix runs a two-phase search to find minimal set of lines that satisfies tests
+// SearchFix runs a multi-phase search to find minimal set of lines that satisfies tests
 // Phase 1: Normal fix with restore_full to discover which files are needed
-// Phase 2: Reset and re-run with element-level restoration for discovered files only
+// Phase 2: Trial-and-error minimization - try removing functions and keep removals that don't break tests
 func SearchFix(command []string, numIterations int, allowLegacy bool) (bool, error) {
 	fmt.Println("=== SEARCH MODE: Finding minimal set of lines ===")
 	fmt.Println()
@@ -270,33 +271,98 @@ func SearchFix(command []string, numIterations int, allowLegacy bool) (bool, err
 	}
 	fmt.Println()
 
-	// Reset to pre-boil broken state for Phase 2
-	fmt.Println("=== Resetting to broken state for Phase 2 ===")
-	if err := resetToBoilStart(); err != nil {
-		return false, fmt.Errorf("failed to reset for phase 2: %v", err)
-	}
-
-	// Clean up iterations from Phase 1 (keep plugins)
-	CleanBoilSession()
-
-	// Phase 2: Minimization pass with element-level restoration
-	fmt.Println()
-	fmt.Println("=== Phase 2: Minimization (element-level restoration) ===")
-	SetSearchMode(true)
-
-	success, err = Fix(command, numIterations, allowLegacy)
+	// Phase 2: Trial-and-error minimization
+	fmt.Println("=== Phase 2: Minimization (trial-and-error function removal) ===")
+	removed, err := minimizeFiles(discoveredFiles, command)
 	if err != nil {
-		return false, fmt.Errorf("phase 2 failed: %v", err)
+		fmt.Printf("Warning: minimization encountered error: %v\n", err)
 	}
 
-	SetSearchMode(false)
-
-	if success {
-		fmt.Println()
-		fmt.Println("=== Search complete: Found minimal set of lines ===")
+	if removed > 0 {
+		fmt.Printf("\n=== Search complete: Removed %d function(s) ===\n", removed)
+	} else {
+		fmt.Println("\n=== Search complete: No functions could be removed ===")
 	}
 
-	return success, nil
+	return true, nil
+}
+
+// minimizeFiles tries to remove functions from discovered files one by one
+// Returns the number of functions successfully removed
+func minimizeFiles(files map[string]bool, command []string) (int, error) {
+	totalRemoved := 0
+
+	for file := range files {
+		// Only process C files for now (ast.RemoveFunctionFromFile supports C)
+		if !strings.HasSuffix(file, ".c") {
+			continue
+		}
+
+		removed, err := minimizeFile(file, command)
+		if err != nil {
+			fmt.Printf("  Warning: error minimizing %s: %v\n", file, err)
+			continue
+		}
+		totalRemoved += removed
+	}
+
+	return totalRemoved, nil
+}
+
+// minimizeFile tries to remove functions from a single file
+// Returns the number of functions successfully removed
+func minimizeFile(filename string, command []string) (int, error) {
+	// Get list of functions in the file
+	functions, err := ast.GetFunctionNamesFromFile(filename)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get functions: %v", err)
+	}
+
+	if len(functions) == 0 {
+		return 0, nil
+	}
+
+	fmt.Printf("\nMinimizing %s (%d functions):\n", filename, len(functions))
+
+	removed := 0
+	for _, funcName := range functions {
+		// Skip main function - always needed
+		if funcName == "main" {
+			fmt.Printf("  - %s: skipped (main)\n", funcName)
+			continue
+		}
+
+		// Save original content
+		original, err := os.ReadFile(filename)
+		if err != nil {
+			continue
+		}
+
+		// Try removing the function
+		_, err = ast.RemoveFunctionFromFile(filename, funcName, true)
+		if err != nil {
+			fmt.Printf("  - %s: skipped (removal failed: %v)\n", funcName, err)
+			continue
+		}
+
+		// Run tests
+		cmd := exec.Command(command[0], command[1:]...)
+		cmd.Stdout = nil
+		cmd.Stderr = nil
+		testErr := cmd.Run()
+
+		if testErr == nil {
+			// Tests still pass - keep the removal
+			fmt.Printf("  - %s: REMOVED (tests pass without it)\n", funcName)
+			removed++
+		} else {
+			// Tests fail - restore the function
+			os.WriteFile(filename, original, 0644)
+			fmt.Printf("  - %s: kept (tests need it)\n", funcName)
+		}
+	}
+
+	return removed, nil
 }
 
 // collectRestoredFiles reads pipeline JSON files to find all files that were restored
