@@ -311,6 +311,9 @@ func minimizeFiles(files map[string]bool, command []string) (int, error) {
 
 // minimizeFile tries to remove functions from a single file
 // Returns the number of functions successfully removed
+// NOTE: There is a known issue (boiler-1s1) where RemoveFunctionFromFile corrupts
+// files with preprocessor macros containing line continuations (\). This may cause
+// false negatives where functions appear to be needed but actually aren't.
 func minimizeFile(filename string, command []string) (int, error) {
 	// Get list of functions in the file
 	functions, err := ast.GetFunctionNamesFromFile(filename)
@@ -345,20 +348,42 @@ func minimizeFile(filename string, command []string) (int, error) {
 			continue
 		}
 
+		// Verify the file was actually modified
+		modified, _ := os.ReadFile(filename)
+		if len(modified) >= len(original) {
+			fmt.Printf("  - %s: skipped (file not reduced: %d -> %d bytes)\n", funcName, len(original), len(modified))
+			os.WriteFile(filename, original, 0644)
+			continue
+		}
+
 		// Run tests
 		cmd := exec.Command(command[0], command[1:]...)
-		cmd.Stdout = nil
-		cmd.Stderr = nil
+		var stdout, stderr strings.Builder
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
 		testErr := cmd.Run()
 
 		if testErr == nil {
 			// Tests still pass - keep the removal
-			fmt.Printf("  - %s: REMOVED (tests pass without it)\n", funcName)
+			fmt.Printf("  - %s: REMOVED (tests pass without it, saved %d bytes)\n", funcName, len(original)-len(modified))
 			removed++
+			// Update original for next iteration since we're keeping this removal
+			original = modified
 		} else {
 			// Tests fail - restore the function
 			os.WriteFile(filename, original, 0644)
-			fmt.Printf("  - %s: kept (tests need it)\n", funcName)
+			// Show brief error info for debugging
+			errStr := stderr.String()
+			if len(errStr) > 200 {
+				errStr = errStr[:200] + "..."
+			}
+			if errStr == "" {
+				errStr = stdout.String()
+				if len(errStr) > 200 {
+					errStr = errStr[:200] + "..."
+				}
+			}
+			fmt.Printf("  - %s: kept (tests need it: %v)\n", funcName, testErr)
 		}
 	}
 
