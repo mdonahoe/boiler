@@ -606,17 +606,14 @@ class TestBoilSearch(unittest.TestCase):
                     f"stderr: {test_result.stderr}"
                 )
 
-                # Log size comparison for analysis
-                # Note: Current search mode may not reduce dim.c because:
-                # 1. dim tests are runtime assertions, not compile-time errors
-                # 2. Element-level restoration works best for missing symbols
-                # Future improvement: smarter runtime test analysis
-                if restored_size < original_size:
-                    print(f"SUCCESS: dim.c reduced from {original_size} to {restored_size} bytes "
-                          f"({original_size - restored_size} bytes smaller)")
-                else:
-                    print(f"NOTE: dim.c not reduced ({restored_size} bytes). "
-                          f"Search mode element-level restoration not applicable for runtime tests.")
+                # Search mode Phase 2 should minimize dim.c by removing unused functions
+                self.assertLess(
+                    restored_size, original_size,
+                    f"dim.c should be smaller after search mode minimization. "
+                    f"Original: {original_size} bytes, Restored: {restored_size} bytes"
+                )
+                print(f"SUCCESS: dim.c reduced from {original_size} to {restored_size} bytes "
+                      f"({original_size - restored_size} bytes smaller)")
             finally:
                 # Clean up tmpdir
                 import shutil

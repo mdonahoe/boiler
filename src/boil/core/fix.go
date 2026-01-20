@@ -311,9 +311,6 @@ func minimizeFiles(files map[string]bool, command []string) (int, error) {
 
 // minimizeFile tries to remove functions from a single file
 // Returns the number of functions successfully removed
-// NOTE: There is a known issue (boiler-1s1) where RemoveFunctionFromFile corrupts
-// files with preprocessor macros containing line continuations (\). This may cause
-// false negatives where functions appear to be needed but actually aren't.
 func minimizeFile(filename string, command []string) (int, error) {
 	// Get list of functions in the file
 	functions, err := ast.GetFunctionNamesFromFile(filename)
