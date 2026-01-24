@@ -10,8 +10,11 @@ import os
 import sys
 import unittest
 
+BOILER_DIR = os.path.dirname(os.path.dirname(__file__))
+BOIL_SCRIPT = os.path.join(BOILER_DIR, "boil")
+
 # Add parent directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+sys.path.insert(0, BOILER_DIR)
 
 from tests.test_utils import copy_and_boil
 

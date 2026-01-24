@@ -13,7 +13,6 @@ import subprocess
 import shutil
 import tempfile
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 # Import test utilities
 from tests.test_utils import copy_and_boil
@@ -21,6 +20,7 @@ from tests.test_utils import copy_and_boil
 # Use local boil binary, not system-installed one
 BOILER_DIR = os.path.dirname(os.path.dirname(__file__))
 BOIL_SCRIPT = os.path.join(BOILER_DIR, "boil")
+sys.path.insert(0, BOILER_DIR)
 
 
 class TestBoilCheck(unittest.TestCase):
