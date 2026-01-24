@@ -74,9 +74,9 @@ func makeGitGrepBuiltin(defaultRef string) func(*starlark.Thread, *starlark.Buil
 			if len(parts) >= 4 {
 				lineNum, _ := strconv.Atoi(parts[2])
 				results = append(results, starlark.Tuple{
-					starlark.String(parts[1]),     // file
-					starlark.MakeInt(lineNum),     // line_num
-					starlark.String(parts[3]),     // content
+					starlark.String(parts[1]), // file
+					starlark.MakeInt(lineNum), // line_num
+					starlark.String(parts[3]), // content
 				})
 			}
 		}

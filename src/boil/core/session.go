@@ -7,8 +7,8 @@ type Session struct {
 	GitRef          string
 	Iteration       int
 	Command         []string
-	SearchMode      bool              // True during Phase 2 of --search (element-level restoration)
-	DiscoveredFiles map[string]bool   // Files discovered during Phase 1 of --search
+	SearchMode      bool            // True during Phase 2 of --search (element-level restoration)
+	DiscoveredFiles map[string]bool // Files discovered during Phase 1 of --search
 }
 
 // currentSession is the global session instance

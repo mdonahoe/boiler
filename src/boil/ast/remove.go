@@ -88,7 +88,7 @@ func collectRemovals(node *sitter.Node, source []byte, name string, removeRanges
 					// Keep: body of else
 					// Remove: }
 					*removeRanges = append(*removeRanges, byteRange{node.StartByte(), child.StartByte() + 1}) // +1 to include opening brace
-					*removeRanges = append(*removeRanges, byteRange{child.EndByte() - 1, node.EndByte()})    // closing brace
+					*removeRanges = append(*removeRanges, byteRange{child.EndByte() - 1, node.EndByte()})     // closing brace
 					return
 				}
 			}
@@ -228,4 +228,3 @@ func extractIf(node *sitter.Node) (expression, thenBlock, elseBlock *sitter.Node
 	}
 	return
 }
-

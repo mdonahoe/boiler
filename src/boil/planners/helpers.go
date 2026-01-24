@@ -73,8 +73,8 @@ func getGitFileContent(file, ref string) (string, error) {
 
 // containsSymbolDefinition checks if a C file contains a definition (not just
 // a usage) for the given symbol. This handles both:
-//   1. Function definitions: ReturnType symbol(params) {
-//   2. Global variable definitions: Type symbol = value; or Type (*symbol)(...) = value;
+//  1. Function definitions: ReturnType symbol(params) {
+//  2. Global variable definitions: Type symbol = value; or Type (*symbol)(...) = value;
 func containsSymbolDefinition(content, symbol string) bool {
 	lines := strings.Split(content, "\n")
 	for i, line := range lines {

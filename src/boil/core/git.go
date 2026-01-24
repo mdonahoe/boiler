@@ -164,9 +164,9 @@ func GetGitFileInfo(ref string) (*GitFileInfo, error) {
 	if err != nil {
 		// If git diff fails, return empty lists
 		return &GitFileInfo{
-			PartialFiles:  partialFiles,
-			DeletedFiles:  deletedFiles,
-			GitToplevel:   "",
+			PartialFiles: partialFiles,
+			DeletedFiles: deletedFiles,
+			GitToplevel:  "",
 		}, nil
 	}
 
@@ -218,17 +218,17 @@ func GetGitFileInfo(ref string) (*GitFileInfo, error) {
 	}
 
 	return &GitFileInfo{
-		PartialFiles:  partialFiles,
-		DeletedFiles:  deletedFiles,
-		GitToplevel:   gitToplevel,
+		PartialFiles: partialFiles,
+		DeletedFiles: deletedFiles,
+		GitToplevel:  gitToplevel,
 	}, nil
 }
 
 // GitFileInfo holds git file information
 type GitFileInfo struct {
-	PartialFiles  []*pipeline.PartialFileInfo
-	DeletedFiles  []string
-	GitToplevel   string
+	PartialFiles []*pipeline.PartialFileInfo
+	DeletedFiles []string
+	GitToplevel  string
 }
 
 // SaveChanges commits the current working directory relative to a parent

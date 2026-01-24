@@ -6,8 +6,8 @@ import (
 
 	"github.com/mdonahoe/boiler/src/boil/detectors"
 	"github.com/mdonahoe/boiler/src/boil/executors"
-	"github.com/mdonahoe/boiler/src/boil/planners"
 	"github.com/mdonahoe/boiler/src/boil/pipeline"
+	"github.com/mdonahoe/boiler/src/boil/planners"
 )
 
 // RegisterAllHandlers registers all detectors, planners, and executors

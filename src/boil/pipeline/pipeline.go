@@ -11,8 +11,8 @@ import (
 
 // Timer tracks execution time for different pipeline stages
 type Timer struct {
-	prev     time.Time
-	timings  map[string]time.Duration
+	prev    time.Time
+	timings map[string]time.Duration
 }
 
 // NewTimer creates a new timer

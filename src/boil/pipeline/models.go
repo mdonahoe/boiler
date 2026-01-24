@@ -43,7 +43,7 @@ func (p *RepairPlan) String() string {
 // RepairResult represents the outcome of attempting repairs.
 // Produced by Stage 3 (Execution).
 type RepairResult struct {
-	Success      bool
+	Success        bool
 	PlansAttempted []*RepairPlan
 	FilesModified  []string
 	ErrorMessage   string
@@ -133,13 +133,13 @@ func (r *RepairResult) ToDict() map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"success":        r.Success,
-		"files_modified": r.FilesModified,
-		"error_message":  r.ErrorMessage,
-		"clues_detected": cluesDetected,
+		"success":         r.Success,
+		"files_modified":  r.FilesModified,
+		"error_message":   r.ErrorMessage,
+		"clues_detected":  cluesDetected,
 		"plans_generated": plansGenerated,
 		"plans_attempted": plansAttempted,
-		"timings":        timingsDict,
+		"timings":         timingsDict,
 	}
 }
 
