@@ -11,6 +11,7 @@ For each subrepo in example_repos/:
 import os
 import unittest
 
+
 def is_subsequence(before, after):
     i = 0
     for ch in after:

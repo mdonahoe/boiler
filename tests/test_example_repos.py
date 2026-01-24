@@ -7,7 +7,9 @@ They are slow tests and can be skipped with SKIP_SLOW_TESTS=1.
 """
 
 import os
+import subprocess
 import sys
+import tempfile
 import unittest
 
 BOILER_DIR = os.path.dirname(os.path.dirname(__file__))
