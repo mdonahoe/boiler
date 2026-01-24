@@ -32,7 +32,7 @@ func CleanBoilSession() {
 }
 
 // Fix repeatedly runs a command, repairing files until it is fixed
-func Fix(command []string, numIterations int, allowLegacy bool) (bool, error) {
+func Fix(command []string, numIterations int, allowLegacy bool, ignoreDirty bool) (bool, error) {
 	if len(command) == 0 {
 		return false, fmt.Errorf("no command provided")
 	}
@@ -45,14 +45,16 @@ func Fix(command []string, numIterations int, allowLegacy bool) (bool, error) {
 		return false, fmt.Errorf("failed to check for uncommitted additions: %v", err)
 	}
 	if len(uncommitted) > 0 {
-		fmt.Fprintln(os.Stderr, "Error: Repository has uncommitted additions that would be lost by boiling:")
+		fmt.Fprintln(os.Stderr, "Error: Repository has uncommitted additions that will be lost by boiling:")
 		for _, f := range uncommitted {
 			fmt.Fprintf(os.Stderr, "  - %s\n", f)
 		}
-		fmt.Fprintln(os.Stderr, "\nWhile deletions are allowed since deleted content exists in git history,")
-		fmt.Fprintln(os.Stderr, "new code (added files or added lines) may be deleted during boiling, losing your changes.")
-		fmt.Fprintln(os.Stderr, "\nPlease commit or stash these additions before running boil.")
-		return false, fmt.Errorf("uncommitted additions detected")
+		if !ignoreDirty {
+			fmt.Fprintln(os.Stderr, "\nWhile deletions are allowed since deleted content exists in git history,")
+			fmt.Fprintln(os.Stderr, "new code (added files or added lines) may be deleted during boiling, losing your changes.")
+			fmt.Fprintln(os.Stderr, "\nPlease commit or stash these additions before running boil.")
+			return false, fmt.Errorf("uncommitted additions detected")
+		}
 	}
 
 	ref := Ctx().GitRef
@@ -239,13 +241,13 @@ func Fix(command []string, numIterations int, allowLegacy bool) (bool, error) {
 // SearchFix runs a multi-phase search to find minimal set of lines that satisfies tests
 // Phase 1: Normal fix with restore_full to discover which files are needed
 // Phase 2: Trial-and-error minimization - try removing functions and keep removals that don't break tests
-func SearchFix(command []string, numIterations int, allowLegacy bool) (bool, error) {
+func SearchFix(command []string, numIterations int, allowLegacy bool, ignoreDirty bool) (bool, error) {
 	fmt.Println("=== SEARCH MODE: Finding minimal set of lines ===")
 	fmt.Println()
 
 	// Phase 1: Discovery pass with normal restoration
 	fmt.Println("=== Phase 1: Discovery (full file restoration) ===")
-	success, err := Fix(command, numIterations, allowLegacy)
+	success, err := Fix(command, numIterations, allowLegacy, ignoreDirty)
 	if err != nil {
 		return false, fmt.Errorf("phase 1 failed: %v", err)
 	}

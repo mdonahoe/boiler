@@ -32,6 +32,7 @@ func main() {
 	hard := flag.Bool("hard", false, "delete all files in the repo before starting the boiling session")
 	soft := flag.Bool("soft", false, "pick a random file and clear its content before starting the boiling session")
 	search := flag.Bool("search", false, "find minimal set of lines (not files) that satisfies tests")
+	ignoreDirty := flag.Bool("ignore-dirty", false, "Allow boiling of git additions, even though they might get lost")
 
 	// Parse flags
 	flag.Parse()
@@ -116,9 +117,9 @@ func main() {
 	var err error
 
 	if *search {
-		success, err = core.SearchFix(command, *maxIterations, *legacy)
+		success, err = core.SearchFix(command, *maxIterations, *legacy, *ignoreDirty)
 	} else {
-		success, err = core.Fix(command, *maxIterations, *legacy)
+		success, err = core.Fix(command, *maxIterations, *legacy, *ignoreDirty)
 	}
 
 	if err != nil {
