@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache: true
+
+      - name: Build binaries
+        run: |
+          VERSION=${GITHUB_REF_NAME}
+          LDFLAGS="-X main.Version=${VERSION}"
+          mkdir -p dist
+          cd src/boil
+          GOOS=linux  GOARCH=amd64  go build -ldflags "$LDFLAGS" -o ../../dist/boil-linux-amd64   .
+          GOOS=linux  GOARCH=arm64  go build -ldflags "$LDFLAGS" -o ../../dist/boil-linux-arm64   .
+          GOOS=darwin GOARCH=amd64  go build -ldflags "$LDFLAGS" -o ../../dist/boil-darwin-amd64  .
+          GOOS=darwin GOARCH=arm64  go build -ldflags "$LDFLAGS" -o ../../dist/boil-darwin-arm64  .
+
+      - name: Create checksums
+        run: |
+          cd dist
+          sha256sum boil-* > checksums.txt
+          cat checksums.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/boil-*
+            dist/checksums.txt
+          generate_release_notes: true

@@ -14,6 +14,22 @@ import json
 import time
 
 
+def git_init(tmpdir):
+    """Initialize a git repo in tmpdir with test user config.
+
+    Disables commit signing because the global signing config requires a
+    signing server that is only available for the main boiler repo, not
+    ephemeral test repos.
+    """
+    for cmd in [
+        ["git", "init"],
+        ["git", "config", "user.email", "test@example.com"],
+        ["git", "config", "user.name", "Test User"],
+        ["git", "config", "commit.gpgsign", "false"],
+    ]:
+        subprocess.run(cmd, cwd=tmpdir, check=True, capture_output=True)
+
+
 class BoilTestContext:
     """Context manager for running boil tests with automatic cleanup"""
 
@@ -82,6 +98,10 @@ def copy_and_boil(
         subprocess.run(["git", "config", "user.email", "test@example.com"],
                       cwd=tmpdir, check=True, capture_output=True)
         subprocess.run(["git", "config", "user.name", "Test User"],
+                      cwd=tmpdir, check=True, capture_output=True)
+        # Disable commit signing for this temp test repo (global signing config
+        # requires a signing server that is only available for the main repo)
+        subprocess.run(["git", "config", "commit.gpgsign", "false"],
                       cwd=tmpdir, check=True, capture_output=True)
 
         # Copy files from source directory

@@ -16,8 +16,8 @@
 print-tree/tree_print
 print-tree/libtree-sitter.a
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
+# Dependency directories
+# vendor/ is intentionally not committed; run `go mod vendor` before building offline
 
 # Go boil binary
 /boil
