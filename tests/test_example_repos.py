@@ -7,9 +7,11 @@ They are slow tests and can be skipped with SKIP_SLOW_TESTS=1.
 """
 
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
+import textwrap
 import unittest
 
 BOILER_DIR = os.path.dirname(os.path.dirname(__file__))
@@ -18,7 +20,7 @@ BOIL_SCRIPT = os.path.join(BOILER_DIR, "boil")
 # Add parent directory to path for imports
 sys.path.insert(0, BOILER_DIR)
 
-from tests.test_utils import copy_and_boil
+from tests.test_utils import copy_and_boil, git_init
 
 
 def is_slow_test_skipped():
@@ -224,9 +226,132 @@ class TestBoilSearch(unittest.TestCase):
                       f"({original_size - restored_size} bytes smaller)")
             finally:
                 # Clean up tmpdir
-                import shutil
                 shutil.rmtree(tmpdir, ignore_errors=True)
 
+
+class TestSearchMinimization(unittest.TestCase):
+    """Tests for boil --search minimization quality.
+
+    These tests verify that search mode doesn't just restore files to their
+    original state — it should remove functions that aren't exercised by tests.
+    They act as a specification for the minimization strategy and will fail
+    until Python file minimization is implemented in minimizeFiles().
+    """
+
+    def test_search_removes_unused_python_functions(self):
+        """boil --search should remove Python functions not exercised by tests.
+
+        Setup: a module with 7 functions, tests only call 2 of them.
+        After --search the file should contain only those 2 functions.
+
+        This currently FAILS because minimizeFiles() in fix.go skips non-.c files:
+            if !strings.HasSuffix(file, ".c") { continue }
+        Implementing Python minimization there should make this test pass.
+        """
+        tmpdir = tempfile.mkdtemp(prefix="boil_search_minimize_test_")
+
+        try:
+            git_init(tmpdir)
+
+            # A module with 7 functions — tests only need add() and subtract()
+            with open(os.path.join(tmpdir, "math_helpers.py"), "w") as f:
+                f.write(textwrap.dedent("""\
+                    def add(a, b):
+                        return a + b
+
+                    def subtract(a, b):
+                        return a - b
+
+                    def multiply(a, b):
+                        return a * b
+
+                    def divide(a, b):
+                        return a / b
+
+                    def power(a, b):
+                        return a ** b
+
+                    def factorial(n):
+                        if n <= 1:
+                            return 1
+                        return n * factorial(n - 1)
+
+                    def fibonacci(n):
+                        if n <= 1:
+                            return n
+                        return fibonacci(n - 1) + fibonacci(n - 2)
+                """))
+
+            # Tests exercise only add() and subtract()
+            with open(os.path.join(tmpdir, "test_math.py"), "w") as f:
+                f.write(textwrap.dedent("""\
+                    import math_helpers
+                    assert math_helpers.add(2, 3) == 5, "add failed"
+                    assert math_helpers.subtract(10, 4) == 6, "subtract failed"
+                    print("ok")
+                """))
+
+            subprocess.run(["git", "add", "."], cwd=tmpdir, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "Initial commit"],
+                           cwd=tmpdir, check=True, capture_output=True)
+
+            helpers_path = os.path.join(tmpdir, "math_helpers.py")
+            original_content = open(helpers_path).read()
+
+            # Delete math_helpers.py to trigger Phase 1 restoration
+            os.remove(helpers_path)
+
+            # Run boil --search
+            boil_result = subprocess.run(
+                [BOIL_SCRIPT, "--search", "-n", "30", "python3", "test_math.py"],
+                cwd=tmpdir,
+                capture_output=True,
+                text=True,
+                timeout=180,
+            )
+
+            # The file must be restored and tests must pass
+            self.assertTrue(
+                os.path.exists(helpers_path),
+                "math_helpers.py should be restored after --search",
+            )
+            test_result = subprocess.run(
+                ["python3", "test_math.py"],
+                cwd=tmpdir, capture_output=True, text=True,
+            )
+            self.assertEqual(
+                test_result.returncode, 0,
+                f"Tests must pass after --search.\nstderr: {test_result.stderr}",
+            )
+
+            restored_content = open(helpers_path).read()
+
+            # Functions required by tests must be present
+            self.assertIn("def add", restored_content,
+                          "add() is called by tests — must be present")
+            self.assertIn("def subtract", restored_content,
+                          "subtract() is called by tests — must be present")
+
+            # Functions NOT called by tests should have been pruned.
+            # This is the key assertion that will fail until Python minimization
+            # is implemented in minimizeFiles() in src/boil/core/fix.go.
+            unused = ["multiply", "divide", "power", "factorial", "fibonacci"]
+            for fn in unused:
+                self.assertNotIn(
+                    f"def {fn}", restored_content,
+                    f"{fn}() is never called by tests — search should have removed it.\n"
+                    f"Restored file:\n{restored_content}",
+                )
+
+            restored_lines = restored_content.count("\n")
+            original_lines = original_content.count("\n")
+            print(
+                f"Minimization: {original_lines} → {restored_lines} lines "
+                f"({original_lines - restored_lines} removed)"
+            )
+
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 if __name__ == "__main__":

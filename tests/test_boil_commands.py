@@ -15,28 +15,12 @@ import tempfile
 
 
 # Import test utilities
-from tests.test_utils import copy_and_boil
+from tests.test_utils import copy_and_boil, git_init as _git_init
 
 # Use local boil binary, not system-installed one
 BOILER_DIR = os.path.dirname(os.path.dirname(__file__))
 BOIL_SCRIPT = os.path.join(BOILER_DIR, "boil")
 sys.path.insert(0, BOILER_DIR)
-
-
-def _git_init(tmpdir):
-    """Initialize a git repo in tmpdir with test user config.
-
-    Disables commit signing because the global signing config requires a
-    signing server that is only available for the main boiler repo, not
-    ephemeral test repos.
-    """
-    for cmd in [
-        ["git", "init"],
-        ["git", "config", "user.email", "test@example.com"],
-        ["git", "config", "user.name", "Test User"],
-        ["git", "config", "commit.gpgsign", "false"],
-    ]:
-        subprocess.run(cmd, cwd=tmpdir, check=True, capture_output=True)
 
 
 class TestBoilCheck(unittest.TestCase):
