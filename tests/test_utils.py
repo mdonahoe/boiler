@@ -83,6 +83,10 @@ def copy_and_boil(
                       cwd=tmpdir, check=True, capture_output=True)
         subprocess.run(["git", "config", "user.name", "Test User"],
                       cwd=tmpdir, check=True, capture_output=True)
+        # Disable commit signing for this temp test repo (global signing config
+        # requires a signing server that is only available for the main repo)
+        subprocess.run(["git", "config", "commit.gpgsign", "false"],
+                      cwd=tmpdir, check=True, capture_output=True)
 
         # Copy files from source directory
         for item in os.listdir(src_dir):

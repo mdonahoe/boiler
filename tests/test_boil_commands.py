@@ -23,6 +23,22 @@ BOIL_SCRIPT = os.path.join(BOILER_DIR, "boil")
 sys.path.insert(0, BOILER_DIR)
 
 
+def _git_init(tmpdir):
+    """Initialize a git repo in tmpdir with test user config.
+
+    Disables commit signing because the global signing config requires a
+    signing server that is only available for the main boiler repo, not
+    ephemeral test repos.
+    """
+    for cmd in [
+        ["git", "init"],
+        ["git", "config", "user.email", "test@example.com"],
+        ["git", "config", "user.name", "Test User"],
+        ["git", "config", "commit.gpgsign", "false"],
+    ]:
+        subprocess.run(cmd, cwd=tmpdir, check=True, capture_output=True)
+
+
 class TestBoilCheck(unittest.TestCase):
     """Test boil --check command"""
 
@@ -62,11 +78,7 @@ class TestBoilCheck(unittest.TestCase):
         """boil --check should fail if no .boil directory exists"""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Initialize a git repo but don't run boil
-            subprocess.run(["git", "init"], cwd=tmpdir, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.email", "test@example.com"],
-                         cwd=tmpdir, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.name", "Test User"],
-                         cwd=tmpdir, check=True, capture_output=True)
+            _git_init(tmpdir)
 
             # Try to run boil --check
             check_result = subprocess.run(
@@ -96,11 +108,7 @@ class TestBoilAbort(unittest.TestCase):
 
         try:
             # Initialize git repo
-            subprocess.run(["git", "init"], cwd=tmpdir, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.email", "test@example.com"],
-                         cwd=tmpdir, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.name", "Test User"],
-                         cwd=tmpdir, check=True, capture_output=True)
+            _git_init(tmpdir)
 
             # Copy files from example
             for item in os.listdir(example_dir):
@@ -171,15 +179,120 @@ class TestBoilAbort(unittest.TestCase):
             if os.path.exists(tmpdir):
                 shutil.rmtree(tmpdir)
 
+    def test_abort_restores_working_directory_after_boil_repairs(self):
+        """boil --abort should restore the pre-boil working directory state,
+        even when boil has already repaired files during its run.
+
+        Scenario: user deletes a file before boiling (pre-boil state = file absent).
+        Boil runs, detects the missing file, and restores it. Then the user aborts.
+        --abort should bring the working directory back to the pre-boil state
+        where the file is absent -- NOT the HEAD state where the file exists.
+
+        This tests the bug where --abort only resets to HEAD without re-applying
+        the boil_start commit that captured the pre-boil working directory.
+        """
+        tmpdir = tempfile.mkdtemp(prefix="boil_abort_wd_test_")
+
+        try:
+            # Set up a minimal git repo
+            _git_init(tmpdir)
+
+            # Create a module and a test that depends on it
+            with open(os.path.join(tmpdir, "utils.py"), "w") as f:
+                f.write("def greet(name):\n    return f'Hello, {name}!'\n")
+
+            with open(os.path.join(tmpdir, "test_hello.py"), "w") as f:
+                f.write(
+                    "import utils\n"
+                    "result = utils.greet('world')\n"
+                    "assert result == 'Hello, world!', f'got: {result}'\n"
+                    "print('ok')\n"
+                )
+
+            # Commit both files
+            subprocess.run(["git", "add", "."], cwd=tmpdir, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "Initial commit"],
+                           cwd=tmpdir, check=True, capture_output=True)
+
+            original_head = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=tmpdir, check=True, capture_output=True, text=True
+            ).stdout.strip()
+
+            # --- Pre-boil working directory state ---
+            # Delete utils.py WITHOUT committing. This is a tracked-file deletion,
+            # which boil allows. boil_start will capture this deletion.
+            utils_path = os.path.join(tmpdir, "utils.py")
+            os.remove(utils_path)
+            self.assertFalse(os.path.exists(utils_path), "utils.py should be absent before boiling")
+
+            # Run boil. It will detect the missing module, restore utils.py, and pass.
+            # Use -n 5 to limit iterations; boil should succeed within 1-2 iterations.
+            boil_result = subprocess.run(
+                [BOIL_SCRIPT, "-n", "5", "python3", "test_hello.py"],
+                cwd=tmpdir,
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+
+            # Boil must have created a session for this test to be meaningful
+            boil_dir = os.path.join(tmpdir, ".boil")
+            if not os.path.exists(boil_dir):
+                self.skipTest(".boil directory not created - cannot test abort")
+
+            # If boil succeeded, utils.py should now be present in the working directory.
+            # (If boil failed and never restored it, the abort test is less interesting,
+            # but abort must still leave us in the pre-boil state.)
+            boil_restored_utils = os.path.exists(utils_path)
+
+            # --- Now abort ---
+            abort_result = subprocess.run(
+                [BOIL_SCRIPT, "--abort"],
+                cwd=tmpdir,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(
+                abort_result.returncode, 0,
+                f"boil --abort should succeed.\nstdout: {abort_result.stdout}\nstderr: {abort_result.stderr}",
+            )
+
+            # --- Key assertion ---
+            # utils.py was ABSENT before boiling. --abort must restore that state.
+            # If abort only did `git reset --hard HEAD` without re-applying boil_start,
+            # utils.py would be present (HEAD state), which is wrong.
+            self.assertFalse(
+                os.path.exists(utils_path),
+                f"After --abort, utils.py should be absent (pre-boil state).\n"
+                f"boil had {'restored' if boil_restored_utils else 'NOT restored'} utils.py during its run.\n"
+                f"abort stdout: {abort_result.stdout}",
+            )
+
+            # HEAD should be unchanged
+            current_head = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=tmpdir, check=True, capture_output=True, text=True
+            ).stdout.strip()
+            self.assertEqual(current_head, original_head, "HEAD should not change after --abort")
+
+            # Boiling branch should be gone
+            branch_check = subprocess.run(
+                ["git", "rev-parse", "--verify", "boiling"],
+                cwd=tmpdir, capture_output=True, text=True,
+            )
+            self.assertNotEqual(branch_check.returncode, 0,
+                                "boiling branch should be deleted after --abort")
+
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
     def test_abort_fails_without_boil_session(self):
         """boil --abort should fail gracefully if no session exists"""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Initialize a git repo but don't run boil
-            subprocess.run(["git", "init"], cwd=tmpdir, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.email", "test@example.com"],
-                         cwd=tmpdir, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.name", "Test User"],
-                         cwd=tmpdir, check=True, capture_output=True)
+            _git_init(tmpdir)
 
             # Try to run boil --abort
             abort_result = subprocess.run(
@@ -251,11 +364,7 @@ class TestBoilFinish(unittest.TestCase):
         """boil --finish should fail gracefully if no session exists"""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Initialize a git repo but don't run boil
-            subprocess.run(["git", "init"], cwd=tmpdir, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.email", "test@example.com"],
-                         cwd=tmpdir, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.name", "Test User"],
-                         cwd=tmpdir, check=True, capture_output=True)
+            _git_init(tmpdir)
 
             # Try to run boil --finish
             finish_result = subprocess.run(
@@ -280,11 +389,7 @@ class TestBoilUncommittedChanges(unittest.TestCase):
         """boil should refuse to run when there are untracked files"""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Initialize a git repo
-            subprocess.run(["git", "init"], cwd=tmpdir, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.email", "test@example.com"],
-                         cwd=tmpdir, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.name", "Test User"],
-                         cwd=tmpdir, check=True, capture_output=True)
+            _git_init(tmpdir)
 
             # Create and commit a file
             with open(os.path.join(tmpdir, "committed.txt"), "w") as f:
@@ -318,11 +423,7 @@ class TestBoilUncommittedChanges(unittest.TestCase):
         """boil should refuse to run when there are modified but uncommitted files"""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Initialize a git repo
-            subprocess.run(["git", "init"], cwd=tmpdir, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.email", "test@example.com"],
-                         cwd=tmpdir, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.name", "Test User"],
-                         cwd=tmpdir, check=True, capture_output=True)
+            _git_init(tmpdir)
 
             # Create and commit a file
             with open(os.path.join(tmpdir, "myfile.txt"), "w") as f:
@@ -358,11 +459,7 @@ class TestBoilUncommittedChanges(unittest.TestCase):
         """boil should refuse to run when there are staged but uncommitted changes"""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Initialize a git repo
-            subprocess.run(["git", "init"], cwd=tmpdir, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.email", "test@example.com"],
-                         cwd=tmpdir, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.name", "Test User"],
-                         cwd=tmpdir, check=True, capture_output=True)
+            _git_init(tmpdir)
 
             # Create and commit a file
             with open(os.path.join(tmpdir, "committed.txt"), "w") as f:
@@ -399,11 +496,7 @@ class TestBoilUncommittedChanges(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # Initialize a git repo
-            subprocess.run(["git", "init"], cwd=tmpdir, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.email", "test@example.com"],
-                         cwd=tmpdir, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.name", "Test User"],
-                         cwd=tmpdir, check=True, capture_output=True)
+            _git_init(tmpdir)
 
             # Copy files from example
             for item in os.listdir(example_dir):
@@ -445,11 +538,7 @@ class TestBoilUncommittedChanges(unittest.TestCase):
         """boil should allow running when only lines are removed from a file"""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Initialize a git repo
-            subprocess.run(["git", "init"], cwd=tmpdir, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.email", "test@example.com"],
-                         cwd=tmpdir, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.name", "Test User"],
-                         cwd=tmpdir, check=True, capture_output=True)
+            _git_init(tmpdir)
 
             # Create a file with multiple lines
             with open(os.path.join(tmpdir, "myfile.txt"), "w") as f:
